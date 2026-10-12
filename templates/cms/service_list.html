@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+{% translate "Services coming soon" as t_empty_title %}
+{% translate "Our service pages are being prepared. Please check back shortly." as t_empty_message %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{% translate "Our services" %}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{% translate "From consultancy to export, AA Shinaka supports every stage of the agricultural value chain." %}</p>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-14 sm:py-16">
+  <div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {% for service in services %}
+      {% include "components/service_card.html" with service=service %}
+    {% empty %}
+      {% include "components/empty_state.html" with title=t_empty_title message=t_empty_message %}
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,24 @@
+{% load i18n catalog_tags %}
+<fieldset id="shipping-options" class="space-y-2">
+  <legend class="text-sm font-medium text-stone-700">{% trans "Delivery method" %}</legend>
+  {% if shipping_options %}
+    {% for option in shipping_options %}
+      <label class="flex items-start gap-3 rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm hover:border-forest/40">
+        <input type="radio" name="shipping_method" value="{{ option.method.pk }}" required
+               class="mt-0.5 h-4 w-4 border-stone-300 text-brand-600 focus:ring-brand-500">
+        <span class="flex-1">
+          <span class="block font-medium text-stone-900">{{ option.method.name }}</span>
+          {% if option.zone %}<span class="block text-xs text-stone-500">{{ option.zone.name }}</span>{% endif %}
+          {% if option.method.description %}<span class="block text-xs text-stone-500">{{ option.method.description }}</span>{% endif %}
+        </span>
+        <span class="font-semibold text-stone-900">
+          {% if option.fee_for_order %}{{ option.fee_for_order|money:"NGN" }}{% else %}{% trans "Free" %}{% endif %}
+        </span>
+      </label>
+    {% endfor %}
+  {% else %}
+    <p class="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+      {% trans "No delivery method is configured for this destination yet. Please select another address or contact us." %}
+    </p>
+  {% endif %}
+</fieldset>

@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+{% translate "Contact us" as t_contact %}
+{% translate "An agricultural business platform serving the whole value chain." as t_about_tagline %}
+{% translate "AA Shinaka is an agricultural business platform supporting consultancy, farming services, marketing, storage, export, product sales and training." as t_about_description %}
+{% url 'cms:contact' as contact_url %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{% translate "About AA Shinaka" %}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{{ site.tagline|default:t_about_tagline }}</p>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-14 sm:py-16">
+  <div class="grid gap-12 lg:grid-cols-[1fr_360px]">
+    <div class="space-y-12">
+      {% if page %}
+        <div class="rich-text">{{ page.body|safe }}</div>
+      {% else %}
+        <div class="space-y-6 text-stone-700">
+          <div>
+            <h2 class="text-2xl font-bold text-stone-900">{% translate "Who we are" %}</h2>
+            <p class="mt-3">{{ site.description|default:t_about_description }}</p>
+          </div>
+          <div class="grid gap-6 sm:grid-cols-2">
+            <div class="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+              <h3 class="text-lg font-semibold text-stone-900">{% translate "Mission" %}</h3>
+              <p class="mt-2 text-sm text-stone-600">{% translate "To connect Nigerian farmers and buyers to reliable markets, services and knowledge." %}</p>
+            </div>
+            <div class="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+              <h3 class="text-lg font-semibold text-stone-900">{% translate "Vision" %}</h3>
+              <p class="mt-2 text-sm text-stone-600">{% translate "A trusted, transparent agricultural platform serving the whole value chain." %}</p>
+            </div>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if divisions %}
+        <section aria-labelledby="about-divisions">
+          <h2 id="about-divisions" class="text-2xl font-bold text-stone-900">{% translate "Our divisions" %}</h2>
+          <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {% for division in divisions %}
+              {% include "components/service_card.html" with service=division %}
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if team %}
+        <section aria-labelledby="about-team">
+          <h2 id="about-team" class="text-2xl font-bold text-stone-900">{% translate "Our team" %}</h2>
+          <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+            {% for member in team %}
+              <div class="rounded-xl border border-stone-200 bg-white p-5 text-center shadow-sm">
+                {% if member.photo %}
+                  {% include "components/lazy_image.html" with image=member.photo alt=member.name ratio="mx-auto h-24 w-24 rounded-full object-cover" %}
+                {% else %}
+                  <span class="mx-auto grid h-24 w-24 place-items-center rounded-full bg-cream-dark text-2xl font-semibold text-forest" aria-hidden="true">{{ member.name|slice:":1" }}</span>
+                {% endif %}
+                <h3 class="mt-4 font-semibold text-stone-900">{{ member.name }}</h3>
+                {% if member.role_title %}<p class="text-sm text-harvest-dark">{{ member.role_title }}</p>{% endif %}
+                {% if member.bio %}<p class="mt-2 text-sm text-stone-600">{{ member.bio }}</p>{% endif %}
+              </div>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+
+      {% if testimonials %}
+        <section aria-labelledby="about-testimonials">
+          <h2 id="about-testimonials" class="text-2xl font-bold text-stone-900">{% translate "What our customers say" %}</h2>
+          <div class="mt-6 grid gap-5 sm:grid-cols-2">
+            {% for testimonial in testimonials %}
+              <figure class="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+                <blockquote class="text-stone-700">“{{ testimonial.quote }}”</blockquote>
+                <figcaption class="mt-3 text-sm font-semibold text-stone-900">{{ testimonial.author_name }}{% if testimonial.company %}, {{ testimonial.company }}{% endif %}</figcaption>
+              </figure>
+            {% endfor %}
+          </div>
+        </section>
+      {% endif %}
+    </div>
+
+    <aside class="h-max rounded-xl border border-stone-200 bg-cream-dark p-6 lg:sticky lg:top-24">
+      <h2 class="text-lg font-semibold text-stone-900">{% translate "Talk to us" %}</h2>
+      <div class="mt-4">{% include "components/button.html" with label=t_contact href=contact_url variant="primary" extra_class="w-full" %}</div>
+    </aside>
+  </div>
+</section>
+{% endblock %}

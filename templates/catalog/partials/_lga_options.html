@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+Dependent LGA options for a state. Requested by HTMX with ``?state=<id|slug>``;
+``?value=slug`` makes the option values slugs (public filters) instead of PKs
+(staff forms). The containing ``<select>`` keeps its previous value if any.
+{% endcomment %}
+{% if use_slug %}
+  <option value="">{% translate "All LGAs" %}</option>
+{% else %}
+  <option value="">{% translate "— Select LGA —" %}</option>
+{% endif %}
+{% for lga in lgas %}
+  <option value="{% if use_slug %}{{ lga.slug }}{% else %}{{ lga.pk }}{% endif %}">{{ lga.name }}</option>
+{% endfor %}

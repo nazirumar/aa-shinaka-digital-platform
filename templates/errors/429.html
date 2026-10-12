@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+
+{% block title %}Too many requests{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-md px-4 py-20 text-center">
+  <p class="text-5xl font-semibold text-brand-700">429</p>
+  <h1 class="mt-4 text-xl font-semibold text-stone-900">Too many requests</h1>
+  <p class="mt-2 text-sm text-stone-600">{{ message|default:"Please wait a moment and try again." }}</p>
+  <a href="{% url 'core:home' %}" class="mt-6 inline-block rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Back home</a>
+</div>
+{% endblock %}

@@ -1,0 +1,40 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+<div class="flex items-center justify-between">
+  <div class="flex gap-2 text-sm">
+    <a href="{% url 'orders_dashboard:shipping_zone_list' %}" class="rounded-md bg-white px-3 py-1.5 font-medium text-forest shadow-sm">{% trans "Zones" %}</a>
+    <a href="{% url 'orders_dashboard:shipping_method_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-white">{% trans "Methods" %}</a>
+    <a href="{% url 'orders_dashboard:shipping_rate_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-white">{% trans "Rates" %}</a>
+  </div>
+  <a href="{% url 'orders_dashboard:shipping_zone_create' %}" class="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800">{% trans "New zone" %}</a>
+</div>
+
+<div class="mt-6 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">{% trans "Zone" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Code" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "States" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Active" %}</th>
+        <th scope="col" class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for zone in zones %}
+        <tr>
+          <td class="px-4 py-3 font-medium text-stone-900">{{ zone.name }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ zone.code }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ zone.states.count }}</td>
+          <td class="px-4 py-3">{% if zone.is_active %}<span class="rounded-full bg-leaf/10 px-2 py-0.5 text-xs text-leaf">{% trans "Active" %}</span>{% else %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{% trans "Inactive" %}</span>{% endif %}</td>
+          <td class="px-4 py-3 text-right"><a href="{% url 'orders_dashboard:shipping_zone_edit' zone.pk %}" class="text-sm font-medium text-forest hover:underline">{% trans "Edit" %}</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-4 py-8 text-center text-stone-500">{% trans "No shipping zones configured yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "components/pagination.html" %}
+</div>
+{% endblock %}

@@ -1,0 +1,9 @@
+Hello {{ user.first_name|default:"there" }},
+
+Thanks for creating an AA Shinaka account. Please confirm your email address by opening the link below:
+
+{{ verify_url }}
+
+This link expires in {{ expires_hours }} hours. If you did not create an account, you can ignore this email.
+
+— AA Shinaka Digital Business Platform

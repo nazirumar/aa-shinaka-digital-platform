@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{% translate "Shop by state" %}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{% translate "Browse agricultural products and inputs by their Nigerian state of origin." %}</p>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-14 sm:py-16">
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {% for state in states %}
+      {% include "components/state_card.html" with name=state.name url=state.get_absolute_url count=state.listing_count %}
+    {% empty %}
+      <p class="col-span-full text-sm text-stone-600">{% translate "No states are available yet." %}</p>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,54 @@
+{% extends "dashboard/base.html" %}
+{% block dashboard_content %}
+<div class="max-w-4xl">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-lg font-semibold text-stone-900">Images — {{ product.name }}</h2>
+    <a href="{% url 'catalog_dashboard:product_edit' product.pk %}" class="rounded-md border border-stone-300 px-3 py-2 text-sm hover:bg-cream">Back to product</a>
+  </div>
+  <p class="mt-2 text-sm text-stone-600">A published product needs at least one image. The primary image is used on cards and search results.</p>
+
+  <div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {% for image in images %}
+      <div class="overflow-hidden rounded-xl border border-stone-200 bg-white">
+        <img src="{{ image.image.url }}" alt="{{ image.alt_text|default:product.name }}" class="aspect-[4/3] w-full object-cover">
+        <div class="p-4">
+          <p class="text-sm text-stone-700">{{ image.alt_text|default:"No alt text" }}</p>
+          <p class="mt-0.5 text-xs text-stone-500">Sort {{ image.sort_order }}{% if image.listing %} · {{ image.listing.state.name }}{% endif %}</p>
+          <div class="mt-3 flex flex-wrap items-center gap-2">
+            {% if product.primary_image_id == image.pk %}
+              <span class="rounded-full bg-leaf/10 px-2 py-0.5 text-xs text-leaf">Primary</span>
+            {% else %}
+              <form method="post" action="{% url 'catalog_dashboard:product_image_primary' product.pk image.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Set primary</button>
+              </form>
+            {% endif %}
+            <form method="post" action="{% url 'catalog_dashboard:product_image_delete' product.pk image.pk %}" onsubmit="return confirm('Remove this image?');">
+              {% csrf_token %}
+              <button type="submit" class="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Remove</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% empty %}
+      <div class="sm:col-span-2 lg:col-span-3">
+        {% include "components/empty_state.html" with title="No images yet" message="Upload the first image so this product can be published." %}
+      </div>
+    {% endfor %}
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="mt-8 space-y-5 rounded-xl border border-stone-200 bg-white p-6">
+    {% csrf_token %}
+    <h3 class="font-semibold text-stone-900">Upload an image</h3>
+    {% if form.non_field_errors %}
+      <div class="space-y-2">{% for error in form.non_field_errors %}{% include "components/alert.html" with type="error" message=error %}{% endfor %}</div>
+    {% endif %}
+    <div class="grid gap-5 sm:grid-cols-2">
+      {% for field in form %}{% include "components/form_field.html" with field=field %}{% endfor %}
+    </div>
+    <div class="border-t border-stone-100 pt-4">
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">Upload</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

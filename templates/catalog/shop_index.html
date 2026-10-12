@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% load i18n catalog_tags %}
+{% comment %}
+Public shop landing page. Categories, states and featured listings all come from
+the database; when the catalogue is empty, clearly-labelled empty states are
+shown instead of invented products or prices.
+{% endcomment %}
+{% block content %}
+{% translate "Shop" as t_shop %}
+{% translate "Browse by category" as t_categories %}
+{% translate "Discover produce and inputs, organised from general to specific." as t_categories_sub %}
+{% translate "All categories" as t_all_categories %}
+{% translate "Shop by state" as t_states %}
+{% translate "Produce and inputs grouped by their Nigerian state of origin." as t_states_sub %}
+{% translate "Featured listings" as t_featured %}
+{% translate "A selection of current, verified listings from across Nigeria." as t_featured_sub %}
+{% translate "Search the catalogue" as t_search %}
+{% translate "Filter by price" as t_price %}
+{% translate "No categories yet" as t_no_categories %}
+{% translate "Categories appear here as soon as staff publish them." as t_no_categories_msg %}
+{% translate "No listings yet" as t_no_listings %}
+{% translate "Listings appear here once products are published with an active offer." as t_no_listings_msg %}
+
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{% translate "Shop agricultural products" %}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{% translate "Browse by category or Nigerian state of origin. Every listing shows its origin, package and current price." %}</p>
+    <form action="{% url 'catalog:search' %}" method="get" class="mt-6 flex max-w-xl gap-2">
+      <label for="shop-search" class="sr-only">{% translate "Search products" %}</label>
+      <input id="shop-search" type="search" name="q" placeholder="{% translate 'Search products, states or tags…' %}" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">{{ t_search }}</button>
+    </form>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-14 sm:py-16" aria-labelledby="shop-categories">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    {% include "components/section_heading.html" with eyebrow=t_search title=t_categories subtitle=t_categories_sub heading_id="shop-categories" %}
+    <a href="{% url 'catalog:category_list' %}" class="text-sm font-medium text-forest hover:text-leaf">{{ t_all_categories }} →</a>
+  </div>
+  <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+    {% for category in categories %}
+      {% include "components/category_card.html" with category=category %}
+    {% empty %}
+      {% include "components/empty_state.html" with title=t_no_categories message=t_no_categories_msg %}
+    {% endfor %}
+  </div>
+</section>
+
+{% if price_bands %}
+<section class="bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-10">
+    <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t_price }}</h2>
+    <div class="mt-3 flex flex-wrap gap-2">
+      {% for band in price_bands %}
+        <a href="{% url 'catalog:search' %}?min_price={{ band.min|floatformat:0 }}{% if band.max %}&amp;max_price={{ band.max|floatformat:0 }}{% endif %}" class="rounded-full border border-stone-300 bg-white px-3 py-1 text-sm text-stone-700 hover:border-forest hover:text-forest">₦{{ band.label }}</a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<section class="mx-auto max-w-7xl px-4 py-14 sm:py-16" aria-labelledby="shop-states">
+  {% include "components/section_heading.html" with eyebrow=t_states title=t_states subtitle=t_states_sub heading_id="shop-states" %}
+  <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {% for state in states %}
+      {% include "components/state_card.html" with name=state.name url=state.get_absolute_url count=state.listing_count %}
+    {% empty %}
+      {% include "components/empty_state.html" with title=t_no_listings message=t_no_listings_msg %}
+    {% endfor %}
+  </div>
+</section>
+
+<section class="bg-cream-dark" aria-labelledby="shop-featured">
+  <div class="mx-auto max-w-7xl px-4 py-14 sm:py-16">
+    {% include "components/section_heading.html" with eyebrow=t_featured title=t_featured subtitle=t_featured_sub heading_id="shop-featured" %}
+    <div class="mt-8 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {% for listing in featured_listings %}
+        {% include "components/product_card.html" with listing=listing %}
+      {% empty %}
+        <p class="col-span-full text-sm text-stone-600">{{ t_no_listings_msg }}</p>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

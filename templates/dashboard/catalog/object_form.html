@@ -1,0 +1,36 @@
+{% extends "dashboard/base.html" %}
+{% block dashboard_content %}
+<div class="max-w-3xl">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-lg font-semibold text-stone-900">{{ title }}</h2>
+    {% if product %}
+      <a href="{% url 'catalog_dashboard:product_images' product.pk %}" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-cream">Manage images</a>
+    {% endif %}
+    {% block form_header_extra %}{% endblock %}
+  </div>
+
+  <form method="post" enctype="multipart/form-data" class="mt-4 space-y-5 rounded-xl border border-stone-200 bg-white p-6">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      <div class="space-y-2">
+        {% for error in form.non_field_errors %}{% include "components/alert.html" with type="error" message=error %}{% endfor %}
+      </div>
+    {% endif %}
+
+    <div class="grid gap-5 sm:grid-cols-2">
+      {% for field in form %}
+        <div class="{% if field.name == 'description' or field.name == 'seo_description' or field.name == 'short_description' or field.name == 'origin_note' or field.name == 'notes' or field.name == 'note' %}sm:col-span-2{% endif %}">
+          {% include "components/form_field.html" with field=field %}
+        </div>
+      {% endfor %}
+    </div>
+
+    {% block inline_formset %}{% endblock %}
+
+    <div class="flex items-center gap-3 border-t border-stone-100 pt-4">
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">Save</button>
+      <a href="{{ cancel_url }}" class="text-sm text-stone-600 hover:text-forest">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

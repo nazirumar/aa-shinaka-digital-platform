@@ -1,0 +1,9 @@
+{% load i18n %}{% comment %}CMS-controlled announcement bar. Props: text, url (via ``site``).{% endcomment %}
+<div class="bg-forest text-cream">
+  <div class="mx-auto flex max-w-7xl items-center justify-center gap-2 px-4 py-2 text-center text-sm">
+    <span>{{ site.announcement_text }}</span>
+    {% if site.announcement_url %}
+      <a href="{{ site.announcement_url }}" class="font-medium text-harvest underline hover:text-harvest-light">{% trans "Learn more" %}</a>
+    {% endif %}
+  </div>
+</div>

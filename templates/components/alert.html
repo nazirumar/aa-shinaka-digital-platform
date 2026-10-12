@@ -1,0 +1,11 @@
+{% comment %}Inline alert. Props: type (info|success|warning|error), message, title.{% endcomment %}
+<div role="alert" class="flex gap-3 rounded-lg border px-4 py-3 text-sm
+  {% if type == 'success' %}border-brand-300 bg-brand-50 text-brand-800
+  {% elif type == 'warning' %}border-amber-300 bg-amber-50 text-amber-800
+  {% elif type == 'error' %}border-red-300 bg-red-50 text-red-800
+  {% else %}border-stone-300 bg-stone-50 text-stone-700{% endif %}">
+  <div>
+    {% if title %}<p class="font-medium">{{ title }}</p>{% endif %}
+    <p>{{ message }}</p>
+  </div>
+</div>

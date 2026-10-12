@@ -1,0 +1,187 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h2 class="text-lg font-semibold text-stone-900">{{ listing.product.name }}</h2>
+    <p class="mt-1 text-sm text-stone-600">{{ listing.state.name }}{% if listing.lga %} · {{ listing.lga.name }}{% endif %} · {{ listing.packaging }}</p>
+  </div>
+  <div class="flex flex-wrap items-center gap-2">
+    <a href="{% url 'catalog_dashboard:listing_edit' listing.pk %}" class="rounded-md border border-stone-300 px-3 py-2 text-sm hover:bg-cream">Edit listing</a>
+    <form method="post" action="{% url 'catalog_dashboard:listing_archive' listing.pk %}" onsubmit="return confirm('Archive this listing?');">
+      {% csrf_token %}
+      <button type="submit" class="rounded-md border border-red-200 px-3 py-2 text-sm text-red-700 hover:bg-red-50">Archive</button>
+    </form>
+  </div>
+</div>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-3">
+  <div class="rounded-xl border border-stone-200 bg-white p-4">
+    <dt class="text-xs uppercase tracking-wide text-stone-500">Current price</dt>
+    <dd class="mt-1 text-2xl font-semibold text-forest">{{ listing.price|money:listing.currency }}</dd>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-4">
+    <dt class="text-xs uppercase tracking-wide text-stone-500">Available stock</dt>
+    <dd class="mt-1 text-2xl font-semibold text-stone-900">{{ listing.available_stock|decimal_str }}</dd>
+    {% if listing.low_stock_threshold %}<p class="mt-1 text-xs text-stone-500">Threshold {{ listing.low_stock_threshold|decimal_str }}</p>{% endif %}
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-4">
+    <dt class="text-xs uppercase tracking-wide text-stone-500">Status</dt>
+    <dd class="mt-1"><span class="rounded-full px-2 py-0.5 text-xs {{ listing.status|status_class }}">{{ listing.get_status_display }}</span></dd>
+    <form method="post" action="{% url 'catalog_dashboard:listing_status' listing.pk %}" class="mt-2 flex items-center gap-2">
+      {% csrf_token %}
+      <label for="listing-status" class="sr-only">Status</label>
+      <select id="listing-status" name="status" class="rounded-md border border-stone-300 bg-white px-2 py-1 text-sm">
+        {% for value, label in statuses %}<option value="{{ value }}" {% if listing.status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+      <button type="submit" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Apply</button>
+    </form>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-4 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h3 class="font-semibold text-stone-900">Set a price</h3>
+    <p class="mt-1 text-xs text-stone-500">Scheduled and variant prices may coexist; the current price updates when a new price is effective now.</p>
+    <form method="post" action="{% url 'catalog_dashboard:listing_price' listing.pk %}" class="mt-4 space-y-3">
+      {% csrf_token %}
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for field in price_form %}{% include "components/form_field.html" with field=field %}{% endfor %}
+      </div>
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">Save price</button>
+    </form>
+
+    <h4 class="mt-6 text-sm font-semibold text-stone-900">Price records</h4>
+    <div class="mt-2 overflow-x-auto">
+      <table class="min-w-full divide-y divide-stone-200 text-xs">
+        <thead class="text-left uppercase tracking-wide text-stone-500">
+          <tr><th class="py-2">Type</th><th class="py-2">Variant</th><th class="py-2 text-right">Amount</th><th class="py-2">Window</th></tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for price in prices %}
+            <tr>
+              <td class="py-2 text-stone-600">{{ price.get_price_type_display }}</td>
+              <td class="py-2 text-stone-600">{{ price.variant.name|default:"—" }}</td>
+              <td class="py-2 text-right font-medium text-stone-800">{{ price.amount|money:price.currency }}</td>
+              <td class="py-2 text-stone-500">
+                {% if price.valid_from or price.valid_to %}
+                  {{ price.valid_from|date:"j M Y"|default:"…" }} – {{ price.valid_to|date:"j M Y"|default:"open" }}
+                {% else %}always{% endif %}
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="py-3 text-stone-500">No price records yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h3 class="font-semibold text-stone-900">Adjust stock</h3>
+    <p class="mt-1 text-xs text-stone-500">Every change is recorded as an append-only movement and audited.</p>
+    <form method="post" action="{% url 'catalog_dashboard:listing_stock' listing.pk %}" class="mt-4 space-y-3">
+      {% csrf_token %}
+      {% for field in stock_form %}{% include "components/form_field.html" with field=field %}{% endfor %}
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">Apply adjustment</button>
+    </form>
+
+    <h4 class="mt-6 text-sm font-semibold text-stone-900">Stock movements</h4>
+    <div class="mt-2 overflow-x-auto">
+      <table class="min-w-full divide-y divide-stone-200 text-xs">
+        <thead class="text-left uppercase tracking-wide text-stone-500">
+          <tr><th class="py-2">When</th><th class="py-2">Kind</th><th class="py-2 text-right">Change</th><th class="py-2 text-right">Balance</th></tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for movement in movements %}
+            <tr>
+              <td class="py-2 text-stone-500">{{ movement.created_at|date:"j M Y H:i" }}</td>
+              <td class="py-2 text-stone-600">{{ movement.get_kind_display }}{% if movement.reference %} <span class="text-stone-400">· {{ movement.reference }}</span>{% endif %}</td>
+              <td class="py-2 text-right font-medium {% if movement.quantity_delta < 0 %}text-red-700{% else %}text-leaf{% endif %}">{{ movement.quantity_delta|decimal_str }}</td>
+              <td class="py-2 text-right text-stone-700">{{ movement.balance_after|decimal_str }}</td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="4" class="py-3 text-stone-500">No stock movements yet.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-4 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h3 class="font-semibold text-stone-900">Variants</h3>
+    <p class="mt-1 text-xs text-stone-500">Optional grade or size variants that can carry their own price. Stock stays at listing level.</p>
+    <div class="mt-3 divide-y divide-stone-100">
+      {% for variant in variants %}
+        <div class="flex items-center justify-between py-2 text-sm">
+          <span class="font-medium text-stone-800">{{ variant.name }}</span>
+          <span class="text-xs text-stone-500">{{ variant.notes|default:"—" }}</span>
+        </div>
+      {% empty %}
+        <p class="py-2 text-sm text-stone-500">No variants.</p>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'catalog_dashboard:variant_create' listing.pk %}" class="mt-4 space-y-3 border-t border-stone-100 pt-4">
+      {% csrf_token %}
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for field in variant_form %}{% include "components/form_field.html" with field=field %}{% endfor %}
+      </div>
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">Add variant</button>
+    </form>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h3 class="font-semibold text-stone-900">Wholesale tiers</h3>
+    <p class="mt-1 text-xs text-stone-500">Bulk prices by minimum quantity (per unit).</p>
+    <div class="mt-3 divide-y divide-stone-100">
+      {% for tier in tiers %}
+        <div class="flex items-center justify-between py-2 text-sm">
+          <span class="text-stone-700">≥ {{ tier.min_quantity|decimal_str }}{% if tier.variant %} · {{ tier.variant.name }}{% endif %}</span>
+          <span class="flex items-center gap-3">
+            <span class="font-semibold text-forest">{{ tier.price|money:tier.currency }}</span>
+            <form method="post" action="{% url 'catalog_dashboard:tier_delete' tier.pk %}" onsubmit="return confirm('Remove this tier?');">
+              {% csrf_token %}
+              <button type="submit" class="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Remove</button>
+            </form>
+          </span>
+        </div>
+      {% empty %}
+        <p class="py-2 text-sm text-stone-500">No wholesale tiers.</p>
+      {% endfor %}
+    </div>
+    <form method="post" action="{% url 'catalog_dashboard:tier_create' listing.pk %}" class="mt-4 space-y-3 border-t border-stone-100 pt-4">
+      {% csrf_token %}
+      <div class="grid gap-3 sm:grid-cols-2">
+        {% for field in tier_form %}{% include "components/form_field.html" with field=field %}{% endfor %}
+      </div>
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">Save tier</button>
+    </form>
+  </div>
+</div>
+
+<div class="mt-6 rounded-xl border border-stone-200 bg-white p-5">
+  <h3 class="font-semibold text-stone-900">Price history</h3>
+  <div class="mt-3 overflow-x-auto">
+    <table class="min-w-full divide-y divide-stone-200 text-xs">
+      <thead class="text-left uppercase tracking-wide text-stone-500">
+        <tr><th class="py-2">When</th><th class="py-2">Type</th><th class="py-2 text-right">From</th><th class="py-2 text-right">To</th><th class="py-2">By</th></tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for entry in history %}
+          <tr>
+            <td class="py-2 text-stone-500">{{ entry.created_at|date:"j M Y H:i" }}</td>
+            <td class="py-2 text-stone-600">{{ entry.get_price_type_display }}{% if entry.variant %} · {{ entry.variant.name }}{% endif %}</td>
+            <td class="py-2 text-right text-stone-600">{{ entry.old_price|money:entry.currency }}</td>
+            <td class="py-2 text-right font-medium text-stone-800">{{ entry.new_price|money:entry.currency }}</td>
+            <td class="py-2 text-stone-500">{{ entry.changed_by.email|default:"system" }}</td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="5" class="py-3 text-stone-500">No price changes recorded yet.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

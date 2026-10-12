@@ -1,0 +1,40 @@
+{% extends "dashboard/base.html" %}
+{% load i18n catalog_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h2 class="text-lg font-semibold text-stone-900">{% trans "Active reservations" %}</h2>
+    <p class="text-sm text-stone-600">{% trans "Stock held for pending orders. Reservations release automatically when they expire or the order is cancelled." %}</p>
+  </div>
+</div>
+
+<div class="mt-6 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">{% trans "Order" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Listing" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Warehouse" %}</th>
+        <th scope="col" class="px-4 py-3 text-right">{% trans "Quantity" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Expires" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for reservation in reservations %}
+        <tr class="hover:bg-cream-50">
+          <td class="px-4 py-3"><a href="{% url 'orders_dashboard:order_detail' reservation.order.number %}" class="font-medium text-forest hover:underline">{{ reservation.order.number }}</a></td>
+          <td class="px-4 py-3 text-stone-800">{{ reservation.listing.product.name }}{% if reservation.variant %} · {{ reservation.variant.name }}{% endif %}</td>
+          <td class="px-4 py-3 text-stone-600">{{ reservation.warehouse.name }}</td>
+          <td class="px-4 py-3 text-right font-medium text-stone-900">{{ reservation.quantity|decimal_str }}</td>
+          <td class="px-4 py-3"><span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">{{ reservation.get_status_display }}</span></td>
+          <td class="px-4 py-3 text-stone-600">{{ reservation.expires_at|date:"j M Y, H:i"|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-4 py-10 text-center text-stone-500">{% trans "No active reservations." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "components/pagination.html" %}
+</div>
+{% endblock %}

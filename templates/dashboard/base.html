@@ -1,0 +1,166 @@
+{% load static perm_tags %}{% has_capability user 'staff.view' as can_view_staff %}{% has_capability user 'audit.view' as can_view_audit %}{% has_capability user 'content.manage' as can_manage_content %}{% has_capability user 'contact.manage' as can_manage_contact %}{% has_capability user 'site.config' as can_config_site %}{% has_capability user 'catalog.manage' as can_manage_catalog %}{% has_capability user 'inventory.manage' as can_manage_inventory %}{% has_capability user 'orders.manage' as can_manage_orders %}{% has_capability user 'finance.manage' as can_confirm_payments %}<!doctype html>
+<html lang="en" class="h-full">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ page_title|default:"Dashboard" }}{% endblock %} · AA Shinaka Admin</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+  <style>[x-cloak] { display: none !important; }</style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="min-h-full bg-cream-100 text-stone-800 antialiased" x-data="{ sidebar: false }">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-brand-700 focus:px-4 focus:py-2 focus:text-white">Skip to content</a>
+
+  <div class="flex min-h-screen">
+    {# ---------------- Sidebar ---------------- #}
+    <aside id="sidebar"
+           class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-brand-900/20 bg-brand-900 text-brand-50 transition-transform lg:static lg:translate-x-0"
+           :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+           aria-label="Admin navigation">
+      <div class="flex h-16 items-center gap-2 border-b border-white/10 px-5">
+        <span class="grid h-9 w-9 place-items-center rounded-lg bg-gold-400 font-semibold text-brand-950">AS</span>
+        <span class="leading-tight">
+          <span class="block font-semibold">AA Shinaka</span>
+          <span class="block text-xs text-brand-200">Admin console</span>
+        </span>
+      </div>
+      <nav class="space-y-1 px-3 py-4 text-sm">
+        <a href="{% url 'dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'home' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Dashboard</a>
+        {% if can_view_staff %}
+          <a href="{% url 'dashboard:staff_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'staff' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Staff</a>
+        {% endif %}
+        {% if can_view_audit %}
+          <a href="{% url 'dashboard:audit_log' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'audit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Audit log</a>
+        {% endif %}
+        {% if can_manage_content %}
+          <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Website</p>
+          <a href="{% url 'cms_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Content</a>
+          <a href="{% url 'cms_dashboard:service_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_services' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Service pages</a>
+          <a href="{% url 'cms_dashboard:post_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_blog' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Blog</a>
+          <a href="{% url 'cms_dashboard:testimonial_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_testimonials' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Testimonials</a>
+          <a href="{% url 'cms_dashboard:media_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_media' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Media</a>
+        {% endif %}
+        {% if can_manage_contact %}
+          <a href="{% url 'cms_dashboard:enquiry_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_enquiries' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Enquiries</a>
+        {% endif %}
+        {% if can_config_site %}
+          <a href="{% url 'cms_dashboard:settings' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_settings' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Site settings</a>
+        {% endif %}
+        {% if can_manage_catalog or can_manage_inventory %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Catalogue</p>
+          {% if can_manage_catalog %}
+            <a href="{% url 'catalog_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'catalog_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Overview</a>
+            <a href="{% url 'catalog_dashboard:category_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'category_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Categories</a>
+            <a href="{% url 'catalog_dashboard:product_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'product_list' or url_name == 'product_images' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Products</a>
+            <a href="{% url 'catalog_dashboard:listing_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'listing_list' or url_name == 'listing_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Listings</a>
+            <a href="{% url 'catalog_dashboard:reference_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reference_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Market references</a>
+          {% endif %}
+          {% if can_manage_inventory %}
+            <a href="{% url 'catalog_dashboard:low_stock' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'low_stock' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Inventory · low stock</a>
+            <a href="{% url 'inventory_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'inventory_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Inventory overview</a>
+            <a href="{% url 'inventory_dashboard:stock_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'stock_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Stock levels</a>
+            <a href="{% url 'inventory_dashboard:warehouse_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'warehouse_list' or url_name == 'warehouse_create' or url_name == 'warehouse_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Warehouses</a>
+            <a href="{% url 'inventory_dashboard:movement_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'movement_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Movements</a>
+            <a href="{% url 'inventory_dashboard:reservation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reservation_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Reservations</a>
+          {% endif %}
+          {% endwith %}
+        {% endif %}
+        <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Modules</p>
+        {% if can_manage_orders %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'orders_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'orders_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Orders</a>
+          <a href="{% url 'orders_dashboard:order_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'order_list' or url_name == 'order_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">All orders</a>
+          <a href="{% url 'orders_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Quotations</a>
+          <a href="{% url 'orders_dashboard:shipping_zone_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'shipping_zone_list' or url_name == 'shipping_zone_create' or url_name == 'shipping_zone_edit' or url_name == 'shipping_method_list' or url_name == 'shipping_method_create' or url_name == 'shipping_method_edit' or url_name == 'shipping_rate_list' or url_name == 'shipping_rate_create' or url_name == 'shipping_rate_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Shipping</a>
+          {% endwith %}
+        {% endif %}
+      </nav>
+    </aside>
+
+    <div x-show="sidebar" x-cloak @click="sidebar = false" class="fixed inset-0 z-30 bg-stone-900/40 lg:hidden"></div>
+
+    {# ---------------- Main column ---------------- #}
+    <div class="flex min-w-0 flex-1 flex-col">
+      <header class="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-stone-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+        <div class="flex items-center gap-3">
+          <button type="button" class="rounded-md p-2 hover:bg-stone-100 lg:hidden" @click="sidebar = true" aria-label="Open navigation">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
+          </button>
+          <span class="font-semibold text-brand-900">{% block header_title %}{{ page_title|default:"Dashboard" }}{% endblock %}</span>
+        </div>
+
+        <div class="flex items-center gap-2">
+          {# Notification area (real recent activity) #}
+          <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
+            <button type="button" class="relative rounded-md p-2 hover:bg-stone-100" @click="open = !open" :aria-expanded="open" aria-label="Notifications">
+              <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0"/></svg>
+              {% if notifications %}<span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-gold-400" aria-hidden="true"></span>{% endif %}
+            </button>
+            <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 mt-2 w-80 rounded-lg border border-stone-200 bg-white p-2 shadow-lg" role="menu">
+              <p class="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">Recent activity</p>
+              {% if notifications %}
+                <ul class="divide-y divide-stone-100">
+                  {% for entry in notifications %}
+                    <li class="px-2 py-2 text-sm">
+                      <p class="font-medium text-stone-800">{{ entry.action }}</p>
+                      <p class="text-xs text-stone-500">{{ entry.actor.email|default:"system" }} · {{ entry.created_at|timesince }} ago</p>
+                    </li>
+                  {% endfor %}
+                </ul>
+              {% else %}
+                <p class="px-2 py-3 text-sm text-stone-500">No notifications.</p>
+              {% endif %}
+            </div>
+          </div>
+
+          {# Account dropdown #}
+          <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
+            <button type="button" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-100" @click="open = !open" :aria-expanded="open">
+              <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-600 text-sm font-semibold text-white">{{ user.first_name|default:user.email|slice:":1"|upper }}</span>
+              <span class="hidden text-left text-sm sm:block">
+                <span class="block font-medium leading-tight text-stone-800">{{ user.full_name }}</span>
+                <span class="block text-xs text-stone-500">{{ user.display_role }}</span>
+              </span>
+            </button>
+            <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 mt-2 w-56 rounded-lg border border-stone-200 bg-white p-1 text-sm shadow-lg" role="menu">
+              <a href="{% url 'account:dashboard' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100" role="menuitem">My account</a>
+              <a href="{% url 'core:home' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100" role="menuitem">View public site</a>
+              <form method="post" action="{% url 'accounts:logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="block w-full rounded-md px-3 py-2 text-left hover:bg-stone-100" role="menuitem">Sign out</button>
+              </form>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <main id="main" class="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+        {% if breadcrumbs %}{% include "components/breadcrumbs.html" with items=breadcrumbs %}{% endif %}
+
+        {% if messages %}
+          <div class="mt-4 space-y-2" aria-live="polite">
+            {% for message in messages %}
+              {% if message.tags == 'error' %}{% include "components/alert.html" with type="error" message=message %}
+              {% elif message.tags == 'warning' %}{% include "components/alert.html" with type="warning" message=message %}
+              {% elif message.tags == 'success' %}{% include "components/alert.html" with type="success" message=message %}
+              {% else %}{% include "components/alert.html" with type="info" message=message %}{% endif %}
+            {% endfor %}
+          </div>
+        {% endif %}
+
+        <div class="mt-6">
+          {% block dashboard_content %}{% endblock %}
+        </div>
+      </main>
+
+      <footer class="border-t border-stone-200 px-4 py-4 text-xs text-stone-500 sm:px-6 lg:px-8">
+        AA Shinaka Digital Business Platform · Admin console
+      </footer>
+    </div>
+  </div>
+  {% block body_extra %}{% endblock %}
+</body>
+</html>

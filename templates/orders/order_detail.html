@@ -1,0 +1,114 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+<div class="grid gap-6 lg:grid-cols-[1fr_320px]">
+  <div class="space-y-6">
+    <div class="rounded-xl border border-stone-200 bg-white p-6">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Order" %}</p>
+          <p class="text-lg font-semibold text-stone-900">{{ order.number }}</p>
+        </div>
+        <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">{{ order.get_status_display }}</span>
+      </div>
+      <p class="mt-2 text-sm text-stone-500">{% trans "Placed" %} {{ order.created_at|date:"j M Y, H:i" }}</p>
+
+      <table class="mt-5 min-w-full divide-y divide-stone-200 text-sm">
+        <thead class="text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            <th scope="col" class="py-2">{% trans "Item" %}</th>
+            <th scope="col" class="py-2 text-right">{% trans "Qty" %}</th>
+            <th scope="col" class="py-2 text-right">{% trans "Unit" %}</th>
+            <th scope="col" class="py-2 text-right">{% trans "Total" %}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for item in items %}
+            <tr>
+              <td class="py-3">
+                <span class="font-medium text-stone-900">{{ item.product_name }}</span>
+                {% if item.variant_name %}<span class="block text-xs text-stone-500">{{ item.variant_name }}</span>{% endif %}
+                <span class="block text-xs text-stone-500">{{ item.packaging }}</span>
+              </td>
+              <td class="py-3 text-right text-stone-700">{{ item.quantity|decimal_str }}</td>
+              <td class="py-3 text-right text-stone-700">{{ item.unit_price|money:order.currency }}</td>
+              <td class="py-3 text-right font-medium text-stone-900">{{ item.line_total|money:order.currency }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <dl class="mt-5 space-y-1 border-t border-stone-100 pt-4 text-sm">
+        <div class="flex justify-between"><dt class="text-stone-600">{% trans "Subtotal" %}</dt><dd class="text-stone-900">{{ order.subtotal|money:order.currency }}</dd></div>
+        <div class="flex justify-between"><dt class="text-stone-600">{% trans "Shipping" %}</dt><dd class="text-stone-900">{{ order.shipping_amount|money:order.currency }}</dd></div>
+        {% if order.tax_amount %}<div class="flex justify-between"><dt class="text-stone-600">{% trans "Tax" %}</dt><dd class="text-stone-900">{{ order.tax_amount|money:order.currency }}</dd></div>{% endif %}
+        {% if order.discount_amount %}<div class="flex justify-between"><dt class="text-stone-600">{% trans "Discount" %}</dt><dd class="text-stone-900">−{{ order.discount_amount|money:order.currency }}</dd></div>{% endif %}
+        <div class="flex justify-between border-t border-stone-100 pt-2 text-base font-semibold"><dt>{% trans "Total" %}</dt><dd>{{ order.grand_total|money:order.currency }}</dd></div>
+      </dl>
+    </div>
+
+    {% if timeline %}
+      <div class="rounded-xl border border-stone-200 bg-white p-6">
+        <h2 class="text-lg font-semibold text-stone-900">{% trans "History" %}</h2>
+        <ol class="mt-4 space-y-3 text-sm">
+          {% for entry in timeline %}
+            <li class="flex gap-3">
+              <span class="mt-1 h-2 w-2 shrink-0 rounded-full bg-forest" aria-hidden="true"></span>
+              <div>
+                <p class="font-medium text-stone-800">{{ entry.get_to_status_display|default:entry.to_status }}</p>
+                <p class="text-xs text-stone-500">{{ entry.created_at|date:"j M Y, H:i" }}{% if entry.reason %} · {{ entry.reason }}{% endif %}</p>
+              </div>
+            </li>
+          {% endfor %}
+        </ol>
+      </div>
+    {% endif %}
+  </div>
+
+  <aside class="space-y-6">
+    <div class="rounded-xl border border-stone-200 bg-white p-6 text-sm">
+      <h2 class="font-semibold text-stone-900">{% trans "Delivery" %}</h2>
+      <address class="mt-2 not-italic text-stone-600">
+        {{ order.delivery_recipient_name }}<br>
+        {{ order.delivery_address.street_address }}<br>
+        {{ order.delivery_address.city }}{% if order.delivery_address.lga %} · {{ order.delivery_address.lga.name }}{% endif %}<br>
+        {{ order.delivery_address.state.name }}
+      </address>
+      {% if order.shipping_method %}<p class="mt-3 text-stone-600">{% trans "Method" %}: {{ order.shipping_method.name }}</p>{% endif %}
+      {% if shipments %}
+        <ul class="mt-3 space-y-2">
+          {% for shipment in shipments %}
+            <li class="rounded-md bg-cream-100 px-3 py-2">
+              <p class="font-medium text-stone-800">{{ shipment.get_status_display }}</p>
+              {% if shipment.tracking_number %}<p class="text-xs text-stone-500">{% trans "Tracking" %}: {{ shipment.tracking_number }}</p>{% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    </div>
+
+    {% if can_submit_payment %}
+      <div class="rounded-xl border border-stone-200 bg-white p-6 text-sm">
+        <h2 class="font-semibold text-stone-900">{% trans "Payment" %}</h2>
+        <p class="mt-1 text-stone-600">{% trans "Already paid? Submit your payment reference and our team will confirm your order." %}</p>
+        <form method="post" action="{% url 'orders:order_payment_review' order.number %}" class="mt-3 space-y-3">
+          {% csrf_token %}
+          <textarea name="note" rows="2" placeholder="{% trans 'Payment reference / note' %}" class="w-full rounded-md border border-stone-300 px-3 py-2"></textarea>
+          <button type="submit" class="rounded-md bg-forest px-4 py-2 font-medium text-white hover:bg-forest-light">{% trans "Submit for review" %}</button>
+        </form>
+      </div>
+    {% endif %}
+
+    {% if can_cancel %}
+      <div class="rounded-xl border border-stone-200 bg-white p-6 text-sm">
+        <h2 class="font-semibold text-stone-900">{% trans "Need to cancel?" %}</h2>
+        <form method="post" action="{% url 'orders:order_cancel' order.number %}" class="mt-3 space-y-3" onsubmit="return confirm('{% trans "Cancel this order?" %}');">
+          {% csrf_token %}
+          <input type="text" name="reason" placeholder="{% trans 'Reason (optional)' %}" class="w-full rounded-md border border-stone-300 px-3 py-2">
+          <button type="submit" class="rounded-md border border-red-300 px-4 py-2 font-medium text-red-700 hover:bg-red-50">{% trans "Cancel order" %}</button>
+        </form>
+      </div>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

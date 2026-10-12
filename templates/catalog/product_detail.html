@@ -1,0 +1,202 @@
+{% extends "base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+{% translate "Available from" as t_available %}
+{% translate "Package" as t_package %}
+{% translate "Price" as t_price %}
+{% translate "Availability" as t_availability %}
+{% translate "Origin" as t_origin %}
+{% translate "Quality notes" as t_notes %}
+{% translate "Product details" as t_details %}
+{% translate "Market reference prices" as t_market %}
+{% translate "Indicative prices recorded by our team — not an offer for sale." as t_market_note %}
+{% translate "Related products" as t_related %}
+{% translate "Compare" as t_compare %}
+{% translate "Talk to us" as t_talk %}
+{% translate "In stock" as t_in_stock %}
+{% translate "Out of stock" as t_out_of_stock %}
+{% translate "Low stock" as t_low_stock %}
+{% translate "Year" as t_year %}
+{% translate "Season" as t_season %}
+{% translate "Source" as t_source %}
+{% translate "State" as t_state %}
+{% translate "National" as t_national %}
+
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-8">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-10 sm:py-12">
+  <div class="grid gap-10 lg:grid-cols-2">
+    <div>
+      {% if images %}
+        <div class="space-y-3" x-data="{ active: '{{ images.0.image.url }}' }">
+          <div class="overflow-hidden rounded-xl border border-stone-200 bg-cream-dark">
+            <img :src="active" src="{{ images.0.image.url }}" alt="{{ images.0.alt_text|default:product.name }}" class="aspect-[4/3] h-full w-full object-cover">
+          </div>
+          <div class="grid grid-cols-5 gap-2">
+            {% for image in images %}
+              <button type="button" @click="active = '{{ image.image.url }}'" class="overflow-hidden rounded-lg border border-stone-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-forest" aria-label="{% translate 'View image' %}">
+                <img src="{{ image.image.url }}" alt="{{ image.alt_text|default:product.name }}" loading="lazy" class="aspect-square h-full w-full object-cover">
+              </button>
+            {% endfor %}
+          </div>
+        </div>
+      {% else %}
+        <div class="grid aspect-[4/3] place-items-center rounded-xl border border-dashed border-stone-300 bg-cream-dark text-stone-400">{% translate "No image" %}</div>
+      {% endif %}
+    </div>
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wide text-harvest-dark">{{ product.category.name }}</p>
+      <h1 class="mt-2 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{{ product.name }}</h1>
+      {% if product.short_description %}<p class="mt-3 text-lg text-stone-600">{{ product.short_description }}</p>{% endif %}
+
+      {% if product.is_featured %}<span class="mt-4 inline-block rounded-full bg-gold-100 px-3 py-1 text-xs font-medium text-gold-700">{% translate "Featured" %}</span>{% endif %}
+
+      <dl class="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+        {% if product.variety %}<div><dt class="text-stone-500">{% translate "Variety" %}</dt><dd class="font-medium text-stone-800">{{ product.variety }}</dd></div>{% endif %}
+        {% if product.grade %}<div><dt class="text-stone-500">{% translate "Grade" %}</dt><dd class="font-medium text-stone-800">{{ product.grade }}</dd></div>{% endif %}
+        {% if product.harvest_season %}<div><dt class="text-stone-500">{% translate "Harvest season" %}</dt><dd class="font-medium text-stone-800">{{ product.harvest_season }}</dd></div>{% endif %}
+        {% if product.unit %}<div><dt class="text-stone-500">{% translate "Sold by" %}</dt><dd class="font-medium text-stone-800">{{ product.unit.name }} ({{ product.unit.code }})</dd></div>{% endif %}
+      </dl>
+
+      {% if product.tags.all %}
+        <div class="mt-5 flex flex-wrap gap-2">
+          {% for tag in product.tags.all %}<span class="rounded-full bg-cream-100 px-2.5 py-1 text-xs text-stone-600">{{ tag.name }}</span>{% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="mt-6 flex flex-wrap gap-3">
+        {% include "components/button.html" with label=t_talk href="/contact/" variant="primary" %}
+        {% url 'catalog:compare' as compare_url %}
+        {% include "components/button.html" with label=t_compare href=compare_url|add:"?slugs="|add:product.slug variant="outline" %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="bg-cream-dark" aria-labelledby="listings-heading">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-14">
+    <h2 id="listings-heading" class="text-xl font-semibold text-stone-900">{{ t_available }}</h2>
+    <div class="mt-5 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+      <table class="min-w-full divide-y divide-stone-200 text-sm">
+        <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            <th scope="col" class="px-4 py-3">{{ t_origin }}</th>
+            <th scope="col" class="px-4 py-3">{{ t_package }}</th>
+            <th scope="col" class="px-4 py-3">{{ t_price }}</th>
+            <th scope="col" class="px-4 py-3">{% translate "Verified" %}</th>
+            <th scope="col" class="px-4 py-3 text-right">{{ t_availability }}</th>
+            <th scope="col" class="px-4 py-3 text-right">{% translate "Buy" %}</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for listing in listings %}
+            <tr>
+              <td class="px-4 py-3 text-stone-800">
+                {{ listing.state.name }}{% if listing.lga %} <span class="text-stone-500">· {{ listing.lga.name }}</span>{% endif %}
+                {% if listing.origin_note %}<p class="mt-1 text-xs text-stone-500">{{ listing.origin_note }}</p>{% endif %}
+              </td>
+              <td class="px-4 py-3 text-stone-700">{{ listing.packaging }}</td>
+              <td class="px-4 py-3 font-semibold text-forest">{{ listing.price|money:listing.currency }}</td>
+              <td class="px-4 py-3">
+                {% if listing.origin_verification == 'verified' %}
+                  <span class="rounded-full bg-leaf/10 px-2 py-0.5 text-xs text-leaf">{% translate "Verified" %}</span>
+                {% else %}
+                  <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{{ listing.get_origin_verification_display }}</span>
+                {% endif %}
+              </td>
+              <td class="px-4 py-3 text-right">
+                {% with state=listing|stock_state %}
+                  {% if state == 'in' %}<span class="rounded-full bg-leaf/10 px-2 py-0.5 text-xs text-leaf">{{ t_in_stock }}</span>
+                  {% elif state == 'low' %}<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{{ t_low_stock }}</span>
+                  {% else %}<span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{{ t_out_of_stock }}</span>{% endif %}
+                {% endwith %}
+              </td>
+              <td class="px-4 py-3">
+                <div class="flex items-center justify-end gap-2">
+                  {% if listing.in_stock %}
+                    <form method="post" action="{% url 'orders:cart_add' listing.pk %}" class="flex items-center gap-2">
+                      {% csrf_token %}
+                      <input type="hidden" name="quantity" value="1">
+                      <button type="submit" class="rounded-md bg-forest px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-light">{% translate "Add to cart" %}</button>
+                    </form>
+                  {% endif %}
+                  <a href="{% url 'orders:quotation_create' listing.pk %}" class="rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-cream-dark">{% translate "Request quote" %}</a>
+                </div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="px-4 py-8 text-center text-stone-500">{% translate "No active listings for this product yet." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% if product.description %}
+      <div class="mt-10 max-w-3xl">
+        <h2 class="text-lg font-semibold text-stone-900">{{ t_details }}</h2>
+        <div class="mt-3 space-y-3 text-stone-700">{{ product.description|linebreaks }}</div>
+      </div>
+    {% endif %}
+  </div>
+</section>
+
+{% if market_references %}
+<section class="mx-auto max-w-7xl px-4 py-12 sm:py-14">
+  <h2 class="text-lg font-semibold text-stone-900">{{ t_market }}</h2>
+  <p class="mt-1 text-sm text-stone-600">{{ t_market_note }}</p>
+  <div class="mt-4 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">{{ t_year }}</th>
+          <th scope="col" class="px-4 py-3">{{ t_state }}</th>
+          <th scope="col" class="px-4 py-3">{{ t_season }}</th>
+          <th scope="col" class="px-4 py-3 text-right">{{ t_price }}</th>
+          <th scope="col" class="px-4 py-3">{{ t_source }}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for reference in market_references %}
+          <tr>
+            <td class="px-4 py-3 text-stone-700">{{ reference.year }}</td>
+            <td class="px-4 py-3 text-stone-700">{{ reference.state.name|default:t_national }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ reference.season|default:"—" }}</td>
+            <td class="px-4 py-3 text-right text-stone-800">{{ reference.price_per_unit|money:reference.currency }} <span class="text-xs text-stone-500">/ {{ reference.unit.symbol|default:reference.unit.code }}</span></td>
+            <td class="px-4 py-3 text-stone-500">{{ reference.source|default:"—" }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+{% if related %}
+<section class="bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-14">
+    <h2 class="text-lg font-semibold text-stone-900">{{ t_related }}</h2>
+    <div class="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {% for item in related %}
+        <a href="{{ item.get_absolute_url }}" class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
+          <div class="aspect-[4/3] overflow-hidden bg-cream-dark">
+            {% if item.primary_image %}
+              <img src="{{ item.primary_image.image.url }}" alt="{{ item.primary_image.alt_text|default:item.name }}" loading="lazy" class="h-full w-full object-cover transition group-hover:scale-105">
+            {% else %}
+              <div class="grid h-full place-items-center text-2xl text-stone-300" aria-hidden="true">◆</div>
+            {% endif %}
+          </div>
+          <div class="p-4">
+            <h3 class="font-semibold text-stone-900 group-hover:text-forest">{{ item.name }}</h3>
+            <p class="mt-1 text-xs text-stone-500">{{ item.category.name }}</p>
+          </div>
+        </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

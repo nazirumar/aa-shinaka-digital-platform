@@ -1,0 +1,9 @@
+{% load i18n %}{% comment %}
+State card for "shop by state".
+Props: name, slug, count (optional). Links to ``url`` or the catalogue
+state route when it exists.
+{% endcomment %}
+<a href="{{ url|default:'#' }}" class="group flex items-center justify-between rounded-xl border border-stone-200 bg-white px-5 py-4 shadow-sm transition hover:border-forest/40 hover:shadow-md">
+  <span class="font-medium text-stone-800 group-hover:text-forest">{{ name }}</span>
+  <span class="text-xs text-stone-500">{% if count %}{{ count }} {% trans "listings" %}{% else %}{% trans "Browse" %}{% endif %}</span>
+</a>

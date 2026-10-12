@@ -1,0 +1,44 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h2 class="text-lg font-semibold text-stone-900">Market reference prices</h2>
+  <a href="{% url 'catalog_dashboard:reference_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">New reference</a>
+</div>
+<p class="mt-2 text-sm text-stone-600">Indicative market prices recorded by staff. These are shown on product pages as context and are never an offer for sale.</p>
+
+<div class="mt-4 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">Product</th>
+        <th scope="col" class="px-4 py-3">State</th>
+        <th scope="col" class="px-4 py-3">Year</th>
+        <th scope="col" class="px-4 py-3">Season</th>
+        <th scope="col" class="px-4 py-3 text-right">Price</th>
+        <th scope="col" class="px-4 py-3">Source</th>
+        <th scope="col" class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for reference in references %}
+        <tr>
+          <td class="px-4 py-3 font-medium text-stone-900">{{ reference.product.name }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ reference.state.name|default:"National" }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ reference.year }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ reference.season|default:"—" }}</td>
+          <td class="px-4 py-3 text-right text-stone-800">{{ reference.price_per_unit|money:reference.currency }} <span class="text-xs text-stone-500">/ {{ reference.unit.symbol|default:reference.unit.code }}</span></td>
+          <td class="px-4 py-3 text-stone-500">{{ reference.source|default:"—" }}</td>
+          <td class="px-4 py-3 text-right">
+            <a href="{% url 'catalog_dashboard:reference_edit' reference.pk %}" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Edit</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="7" class="px-4 py-10 text-center text-stone-500">No market references recorded.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "components/pagination.html" with page_obj=page_obj %}
+{% endblock %}

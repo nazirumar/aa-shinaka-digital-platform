@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block content %}
+<article class="mx-auto max-w-3xl px-4 py-12 sm:py-16">
+  {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+  <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{{ page.title }}</h1>
+  {% if page.summary %}<p class="mt-4 text-lg text-stone-600">{{ page.summary }}</p>{% endif %}
+
+  {% if page.hero_image %}
+    <div class="mt-8">
+      {% include "components/lazy_image.html" with image=page.hero_image alt=page.title ratio="w-full rounded-2xl object-cover" eager=True %}
+    </div>
+  {% endif %}
+
+  {# Body is authored by trusted staff via the CMS and rendered as sanitised-by-policy HTML. #}
+  <div class="rich-text mt-8">{{ page.body|safe }}</div>
+</article>
+{% endblock %}

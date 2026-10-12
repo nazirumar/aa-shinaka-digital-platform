@@ -1,0 +1,187 @@
+# Hausa translation catalogue for AA Shinaka.
+#
+# This is a *prepared* translation covering core navigation and common interface
+# labels only. It is not a complete bilingual translation: any msgid absent here
+# falls back to the English source string. Content entered through the CMS is not
+# translated automatically.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: aa-shinaka 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"Language: ha\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "Skip to content"
+msgstr "Tsallake zuwa abun ciki"
+
+msgid "Language"
+msgstr "Harshe"
+
+msgid "Primary"
+msgstr "Babba"
+
+msgid "Mobile"
+msgstr "Wayar hannu"
+
+msgid "Toggle navigation"
+msgstr "Buɗe ko rufe menu"
+
+msgid "Home"
+msgstr "Gida"
+
+msgid "Services"
+msgstr "Ayyuka"
+
+msgid "About"
+msgstr "Game da mu"
+
+msgid "About us"
+msgstr "Game da mu"
+
+msgid "News"
+msgstr "Labarai"
+
+msgid "News & insights"
+msgstr "Labarai da fahimta"
+
+msgid "FAQs"
+msgstr "Tambayoyi"
+
+msgid "Contact"
+msgstr "Tuntuɓe mu"
+
+msgid "Contact us"
+msgstr "Tuntuɓe mu"
+
+msgid "Sign in"
+msgstr "Shiga"
+
+msgid "Sign out"
+msgstr "Fita"
+
+msgid "Create account"
+msgstr "Ƙirƙiri asusu"
+
+msgid "My account"
+msgstr "Asusuna"
+
+msgid "Dashboard"
+msgstr "Dashboard"
+
+msgid "Explore"
+msgstr "Bincika"
+
+msgid "Get in touch"
+msgstr "Tuntuɓe mu"
+
+msgid "WhatsApp"
+msgstr "WhatsApp"
+
+msgid "Chat on WhatsApp"
+msgstr "Yi hira a WhatsApp"
+
+msgid "Learn more"
+msgstr "Ƙara koyo"
+
+msgid "View all news"
+msgstr "Duba duk labarai"
+
+msgid "All rights reserved."
+msgstr "An kiyaye duk haƙƙin mallaka."
+
+msgid "Contact details are being confirmed by the business owner."
+msgstr "Mai kasuwanci na tabbatar da bayanan tuntuɓa."
+
+msgid "Our services"
+msgstr "Ayyukanmu"
+
+msgid "What we do"
+msgstr "Abin da muke yi"
+
+msgid "Marketplace"
+msgstr "Kasuwa"
+
+msgid "Product categories"
+msgstr "Rukunin kayayyaki"
+
+msgid "Onion"
+msgstr "Albasa"
+
+msgid "Garlic"
+msgstr "Tafarnuwa"
+
+msgid "Seeds"
+msgstr "Iri"
+
+msgid "Other agricultural products"
+msgstr "Sauran kayayyakin noma"
+
+msgid "Produce near you"
+msgstr "Kayan amfani kusa da kai"
+
+msgid "Shop by state"
+msgstr "Saya bisa jiha"
+
+msgid "Featured"
+msgstr "Zaɓaɓɓu"
+
+msgid "Featured products"
+msgstr "Zaɓaɓɓun kayayyaki"
+
+msgid "Training academy"
+msgstr "Makarantar horo"
+
+msgid "Learn practical, modern farming."
+msgstr "Koyi noma na zamani mai amfani."
+
+msgid "See training"
+msgstr "Duba horo"
+
+msgid "Our approach"
+msgstr "Hanyarmu"
+
+msgid "Why choose us"
+msgstr "Me ya sa za ka zaɓe mu"
+
+msgid "What our customers say"
+msgstr "Abin da abokan cinikinmu ke faɗa"
+
+msgid "From the field"
+msgstr "Daga fili"
+
+msgid "Request a quote"
+msgstr "Nemi farashi"
+
+msgid "Export enquiry"
+msgstr "Tambayar fitarwa"
+
+msgid "Send an enquiry"
+msgstr "Aika tambaya"
+
+msgid "Send enquiry"
+msgstr "Aika tambaya"
+
+msgid "More about us"
+msgstr "Ƙarin bayani game da mu"
+
+msgid "Ready to work with AA Shinaka?"
+msgstr "A shirye ka yi aiki da AA Shinaka?"
+
+msgid "Mission"
+msgstr "Manufa"
+
+msgid "Vision"
+msgstr "Hangen nesa"
+
+msgid "About AA Shinaka"
+msgstr "Game da AA Shinaka"
+
+msgid "Back to home"
+msgstr "Koma gida"
+
+msgid "Send us an enquiry about consultancy, farming, marketing, storage, export or training."
+msgstr "Aiko mana da tambaya kan shawara, noma, talla, ajiya, fitarwa ko horo."

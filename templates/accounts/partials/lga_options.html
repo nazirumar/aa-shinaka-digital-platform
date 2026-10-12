@@ -1,0 +1,4 @@
+<option value="">Select an LGA</option>
+{% for lga in lgas %}
+  <option value="{{ lga.pk }}">{{ lga.name }}</option>
+{% endfor %}

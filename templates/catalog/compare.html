@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+{% translate "Compare products" as t_title %}
+{% translate "Image" as t_image %}
+{% translate "Category" as t_category %}
+{% translate "Sold by" as t_unit %}
+{% translate "Variety" as t_variety %}
+{% translate "Grade" as t_grade %}
+{% translate "Season" as t_season %}
+{% translate "Origins & prices" as t_origins %}
+{% translate "Tags" as t_tags %}
+{% translate "No products to compare" as t_empty_title %}
+{% translate "Open a product and use the compare link to add it here." as t_empty_message %}
+
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{{ t_title }}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{% translate "Side-by-side comparison of category, specification and current offers. Nothing is fabricated — only recorded listings appear." %}</p>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-14 sm:py-16">
+  {% if products %}
+    <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+      <table class="min-w-full divide-y divide-stone-200 text-sm">
+        <tbody class="divide-y divide-stone-100">
+          <tr>
+            <th scope="row" class="w-40 bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_image }}</th>
+            {% for product in products %}
+              <td class="px-4 py-3 align-top">
+                <a href="{{ product.get_absolute_url }}" class="block w-40">
+                  {% if product.primary_image %}
+                    <img src="{{ product.primary_image.image.url }}" alt="{{ product.primary_image.alt_text|default:product.name }}" class="aspect-[4/3] w-full rounded-lg object-cover">
+                  {% else %}
+                    <div class="grid aspect-[4/3] w-full place-items-center rounded-lg bg-cream-dark text-stone-300" aria-hidden="true">◆</div>
+                  {% endif %}
+                </a>
+              </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{% translate "Product" %}</th>
+            {% for product in products %}
+              <td class="px-4 py-3 font-semibold text-stone-900"><a href="{{ product.get_absolute_url }}" class="hover:text-forest">{{ product.name }}</a></td>
+            {% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_category }}</th>
+            {% for product in products %}<td class="px-4 py-3 text-stone-700">{{ product.category.name }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_unit }}</th>
+            {% for product in products %}<td class="px-4 py-3 text-stone-700">{{ product.unit.name|default:"—" }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_variety }}</th>
+            {% for product in products %}<td class="px-4 py-3 text-stone-700">{{ product.variety|default:"—" }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_grade }}</th>
+            {% for product in products %}<td class="px-4 py-3 text-stone-700">{{ product.grade|default:"—" }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_season }}</th>
+            {% for product in products %}<td class="px-4 py-3 text-stone-700">{{ product.harvest_season|default:"—" }}</td>{% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_origins }}</th>
+            {% for product in products %}
+              <td class="px-4 py-3 align-top">
+                <ul class="space-y-1">
+                  {% for listing in product.active_listings %}
+                    <li class="text-stone-700">
+                      {{ listing.state.name }}{% if listing.lga %} <span class="text-stone-500">· {{ listing.lga.name }}</span>{% endif %}
+                      <span class="block font-semibold text-forest">{{ listing.price|money:listing.currency }} <span class="text-xs font-normal text-stone-500">/ {{ listing.packaging }}</span></span>
+                    </li>
+                  {% empty %}
+                    <li class="text-stone-500">—</li>
+                  {% endfor %}
+                </ul>
+              </td>
+            {% endfor %}
+          </tr>
+          <tr>
+            <th scope="row" class="bg-cream-100 px-4 py-3 text-left text-xs font-medium uppercase tracking-wide text-stone-500">{{ t_tags }}</th>
+            {% for product in products %}
+              <td class="px-4 py-3 text-stone-600">
+                {% for tag in product.tags.all %}<span class="mr-1 inline-block rounded-full bg-cream-100 px-2 py-0.5 text-xs">{{ tag.name }}</span>{% empty %}—{% endfor %}
+              </td>
+            {% endfor %}
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {% include "components/empty_state.html" with title=t_empty_title message=t_empty_message %}
+  {% endif %}
+</section>
+{% endblock %}

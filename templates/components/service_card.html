@@ -1,0 +1,13 @@
+{% load i18n %}{% comment %}
+Service card. Props: service — a published ServicePage (or BusinessDivision).
+Shows title, short description and a link to its page.
+{% endcomment %}
+<article class="flex flex-col rounded-xl border border-stone-200 bg-white p-6 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+  <span class="grid h-11 w-11 place-items-center rounded-lg bg-forest/10 text-xl text-forest" aria-hidden="true">{{ service.icon|default:"🌱" }}</span>
+  <h3 class="mt-4 text-lg font-semibold text-stone-900">{{ service.title }}</h3>
+  {% firstof service.intro service.short_description service.description "" as service_summary %}
+  <p class="mt-2 flex-1 text-sm text-stone-600">{{ service_summary|truncatewords:22 }}</p>
+  <a href="{{ service.get_absolute_url }}" class="mt-4 inline-flex w-max items-center gap-1 text-sm font-medium text-forest hover:text-leaf">
+    {% trans "Learn more" %}<span aria-hidden="true">→</span>
+  </a>
+</article>

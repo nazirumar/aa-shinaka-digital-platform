@@ -1,0 +1,40 @@
+{% if staff %}
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <caption class="sr-only">Staff accounts</caption>
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">Name</th>
+          <th scope="col" class="px-4 py-3">Email</th>
+          <th scope="col" class="px-4 py-3">Role</th>
+          <th scope="col" class="px-4 py-3">Status</th>
+          <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for member in staff %}
+          <tr class="hover:bg-cream-50">
+            <td class="px-4 py-3 font-medium text-stone-800">{{ member.full_name }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ member.email }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ member.display_role }}</td>
+            <td class="px-4 py-3">
+              {% if member.is_active %}
+                <span class="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-medium text-brand-700">Active</span>
+              {% else %}
+                <span class="rounded-full bg-stone-200 px-2.5 py-0.5 text-xs font-medium text-stone-600">Inactive</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right">
+              <a href="{% url 'dashboard:staff_detail' member.pk %}" class="font-medium text-brand-700 hover:underline">View</a>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "components/pagination.html" with page_obj=page_obj %}
+{% else %}
+  <div class="p-6">
+    {% include "components/empty_state.html" with title="No staff found" message="Adjust your search or filters, or create a new staff account." %}
+  </div>
+{% endif %}

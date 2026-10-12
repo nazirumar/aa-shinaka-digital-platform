@@ -1,0 +1,14 @@
+{% load i18n %}{% comment %}
+Placeholder product card shown until the catalogue ships (Phase 4).
+Props: name (a product category label, never a price, origin claim or stock value).
+{% endcomment %}
+<article class="flex flex-col overflow-hidden rounded-xl border border-dashed border-stone-300 bg-white">
+  <div class="grid aspect-[4/3] place-items-center bg-cream" aria-hidden="true">
+    <span class="text-3xl text-stone-300">◆</span>
+  </div>
+  <div class="flex flex-1 flex-col p-4">
+    <h3 class="font-semibold text-stone-800">{{ name }}</h3>
+    <p class="mt-1 text-xs text-stone-500">{% trans "Product listings arrive with the catalogue." %}</p>
+    <span class="mt-4 inline-flex w-max items-center rounded-full bg-stone-100 px-2 py-0.5 text-xs font-medium text-stone-500">{% trans "Coming soon" %}</span>
+  </div>
+</article>

@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+{% translate "Search" as t_search %}
+{% translate "Search products" as t_placeholder %}
+{% translate "Category" as t_category %}
+{% translate "State" as t_state %}
+{% translate "LGA" as t_lga %}
+{% translate "Sort" as t_sort %}
+{% translate "In stock only" as t_in_stock %}
+{% translate "Price (₦)" as t_price %}
+{% translate "Newest" as t_newest %}
+{% translate "Price: low to high" as t_price_asc %}
+{% translate "Price: high to low" as t_price_desc %}
+
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">
+      {% if query %}{% blocktranslate with term=query %}Results for "{{ term }}"{% endblocktranslate %}{% else %}{% translate "Search the catalogue" %}{% endif %}
+    </h1>
+    <form action="{% url 'catalog:search' %}" method="get" class="mt-6 flex max-w-2xl gap-2" hx-get="{% url 'catalog:search' %}" hx-target="#listing-results" hx-trigger="submit, change from:select" hx-push-url="true">
+      <label for="search-q" class="sr-only">{{ t_placeholder }}</label>
+      <input id="search-q" type="search" name="q" value="{{ query }}" placeholder="{{ t_placeholder }}" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900 placeholder:text-stone-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">{{ t_search }}</button>
+    </form>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-10 sm:py-12">
+  <div class="grid gap-8 lg:grid-cols-[16rem_1fr]">
+    <aside>
+      <form method="get" action="{% url 'catalog:search' %}" class="space-y-4 rounded-xl border border-stone-200 bg-white p-5" hx-get="{% url 'catalog:search' %}" hx-target="#listing-results" hx-trigger="change" hx-push-url="true" hx-include="this">
+        <input type="hidden" name="q" value="{{ query }}">
+        <div>
+          <label for="filter-category" class="block text-sm font-medium text-stone-700">{{ t_category }}</label>
+          <select id="filter-category" name="category" class="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-sm text-stone-900">
+            <option value="">{% translate "All categories" %}</option>
+            {% for category in categories %}
+              <option value="{{ category.slug }}" {% if selected_category == category.slug %}selected{% endif %}>{{ category.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="search-state" class="block text-sm font-medium text-stone-700">{{ t_state }}</label>
+          <select id="filter-state" name="state" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900" hx-get="{% url 'catalog:lga_options' %}?value=slug" hx-target="#filter-lga" hx-trigger="change" hx-include="this">
+            <option value="">{% translate "All states" %}</option>
+            {% for state in states %}
+              <option value="{{ state.slug }}" {% if selected_state == state.slug %}selected{% endif %}>{{ state.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label for="filter-lga" class="block text-sm font-medium text-stone-700">{{ t_lga }}</label>
+          <select id="filter-lga" name="lga" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+            <option value="">{% translate "All LGAs" %}</option>
+            {% for lga in lgas %}
+              <option value="{{ lga.slug }}" {% if selected_lga == lga.slug %}selected{% endif %}>{{ lga.name }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-stone-700">{{ t_price }}</label>
+          <div class="flex items-center gap-2">
+            <input type="number" name="min_price" min="0" step="1" value="{{ selected_min_price }}" placeholder="{% translate 'Min' %}" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900">
+            <span class="text-stone-400">–</span>
+            <input type="number" name="max_price" min="0" step="1" value="{{ selected_max_price }}" placeholder="{% translate 'Max' %}" aria-label="{% translate 'Maximum price' %}" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900">
+          </div>
+        </div>
+        <div>
+          <label for="filter-sort" class="block text-sm font-medium text-stone-700">{{ t_sort }}</label>
+          <select id="filter-sort" name="sort" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+            <option value="" {% if not selected_sort %}selected{% endif %}>{{ t_newest }}</option>
+            <option value="price_asc" {% if selected_sort == 'price_asc' %}selected{% endif %}>{{ t_price_asc }}</option>
+            <option value="price_desc" {% if selected_sort == 'price_desc' %}selected{% endif %}>{{ t_price_desc }}</option>
+          </select>
+        </div>
+        <label class="inline-flex items-center gap-2 text-sm text-stone-700">
+          <input type="checkbox" name="in_stock" value="1" {% if in_stock_only %}checked{% endif %} class="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500">
+          {{ t_in_stock }}
+        </label>
+        <button type="submit" class="w-full rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">{% translate "Apply filters" %}</button>
+      </form>
+    </aside>
+
+    <div id="listing-results">
+      {% include "catalog/partials/_listing_results.html" %}
+    </div>
+  </div>
+</section>
+{% endblock %}

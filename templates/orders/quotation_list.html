@@ -1,0 +1,37 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+{% if quotations %}
+  <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">{% trans "Product" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Quantity" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Destination" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Submitted" %}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for quotation in quotations %}
+          <tr>
+            <td class="px-4 py-3 font-medium text-stone-900">{{ quotation.listing.product.name }}</td>
+            <td class="px-4 py-3 text-stone-700">{{ quotation.quantity|decimal_str }}</td>
+            <td class="px-4 py-3 text-stone-700">{{ quotation.destination_state.name|default:"—" }}{% if quotation.destination_lga %} · {{ quotation.destination_lga.name }}{% endif %}</td>
+            <td class="px-4 py-3"><span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">{{ quotation.get_status_display }}</span></td>
+            <td class="px-4 py-3 text-stone-600">{{ quotation.created_at|date:"j M Y" }}</td>
+          </tr>
+          {% if quotation.response_note %}
+            <tr><td colspan="5" class="bg-cream-100 px-4 py-2 text-xs text-stone-600">{{ quotation.response_note }}</td></tr>
+          {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  {% trans "No quotation requests yet" as empty_title %}
+  {% trans "Request a bulk quotation from any product page." as empty_message %}
+  {% include "components/empty_state.html" with title=empty_title message=empty_message %}
+{% endif %}
+{% endblock %}

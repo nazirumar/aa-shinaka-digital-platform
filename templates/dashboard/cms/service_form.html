@@ -1,0 +1,22 @@
+{% extends "dashboard/cms/object_form.html" %}
+{% block inline_formset %}
+  <fieldset class="rounded-lg border border-stone-200 p-4">
+    <legend class="px-1 text-sm font-medium text-stone-700">Service categories</legend>
+    {{ formset.management_form }}
+    {% if formset.non_form_errors %}
+      <div class="mb-3 space-y-2">
+        {% for error in formset.non_form_errors %}{% include "components/alert.html" with type="error" message=error %}{% endfor %}
+      </div>
+    {% endif %}
+    <div class="space-y-4">
+      {% for category_form in formset %}
+        <div class="grid gap-3 rounded-md border border-stone-100 p-3 sm:grid-cols-2">
+          {{ category_form.id }}
+          {% for field in category_form.visible_fields %}
+            {% include "components/form_field.html" with field=field %}
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </fieldset>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "dashboard/base.html" %}
+{% load cms_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h2 class="text-lg font-semibold text-stone-900">{{ title }}</h2>
+  {% if create_url %}
+    <a href="{{ create_url }}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">New</a>
+  {% endif %}
+</div>
+
+<div class="mt-4 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        {% for label, field in columns %}<th scope="col" class="px-4 py-3">{{ label }}</th>{% endfor %}
+        <th scope="col" class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for obj in objects %}
+        <tr>
+          {% for label, field in columns %}<td class="px-4 py-3 text-stone-700">{{ obj|attr:field }}</td>{% endfor %}
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              {% if publish_url_name %}
+                <form method="post" action="{% url publish_url_name obj.pk %}">
+                  {% csrf_token %}
+                  {% if obj.status == 'published' %}
+                    <input type="hidden" name="status" value="draft">
+                    <button type="submit" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Unpublish</button>
+                  {% else %}
+                    <input type="hidden" name="status" value="published">
+                    <button type="submit" class="rounded border border-leaf/40 bg-leaf/10 px-2 py-1 text-xs text-leaf hover:bg-leaf/20">Publish</button>
+                  {% endif %}
+                </form>
+              {% endif %}
+              {% if detail_url_name %}<a href="{% url detail_url_name obj.pk %}" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">View</a>{% endif %}
+              <a href="{% url edit_url_name obj.pk %}" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Edit</a>
+              <a href="{% url delete_url_name obj.pk %}" class="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Delete</a>
+            </div>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="{{ columns|length|add:1 }}" class="px-4 py-10 text-center text-stone-500">{{ empty_message }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "components/pagination.html" with page_obj=page_obj %}
+{% endblock %}

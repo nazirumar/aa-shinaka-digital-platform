@@ -1,0 +1,72 @@
+{% load i18n catalog_tags %}
+<div id="cart-body">
+  {% if summary.lines %}
+    <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+      <table class="min-w-full divide-y divide-stone-200 text-sm">
+        <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            <th scope="col" class="px-4 py-3">{% trans "Item" %}</th>
+            <th scope="col" class="px-4 py-3">{% trans "Price" %}</th>
+            <th scope="col" class="px-4 py-3">{% trans "Quantity" %}</th>
+            <th scope="col" class="px-4 py-3 text-right">{% trans "Line total" %}</th>
+            <th scope="col" class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for line in summary.lines %}
+            <tr>
+              <td class="px-4 py-3">
+                <a href="{{ line.listing.get_absolute_url }}" class="font-medium text-stone-900 hover:text-forest">{{ line.listing.product.name }}</a>
+                <p class="text-xs text-stone-500">{{ line.listing.state.name }}{% if line.listing.lga %} · {{ line.listing.lga.name }}{% endif %}{% if line.listing.packaging %} · {{ line.listing.packaging }}{% endif %}</p>
+                {% if line.variant %}<p class="text-xs text-stone-500">{{ line.variant.name }}</p>{% endif %}
+                {% if line.issue %}<p class="mt-1 text-xs font-medium text-red-700" role="alert">{{ line.issue }}</p>{% endif %}
+              </td>
+              <td class="px-4 py-3 text-stone-700">{{ line.unit_price|money:"NGN" }}</td>
+              <td class="px-4 py-3">
+                <form method="post" action="{% url 'orders:cart_item_update' line.item.pk %}"
+                      hx-post="{% url 'orders:cart_item_update' line.item.pk %}"
+                      hx-target="#cart-body" hx-swap="outerHTML">
+                  {% csrf_token %}
+                  <input type="number" name="quantity" value="{{ line.quantity|decimal_str }}" min="1" step="1"
+                         class="w-20 rounded-md border border-stone-300 px-2 py-1 text-stone-900"
+                         hx-post="{% url 'orders:cart_item_update' line.item.pk %}"
+                         hx-trigger="change" hx-target="#cart-body" hx-swap="outerHTML"
+                         aria-label="{% trans 'Quantity' %}">
+                  <noscript><button type="submit" class="ml-1 text-xs text-forest underline">{% trans "Update" %}</button></noscript>
+                </form>
+              </td>
+              <td class="px-4 py-3 text-right font-semibold text-forest">{{ line.line_total|money:"NGN" }}</td>
+              <td class="px-4 py-3 text-right">
+                <form method="post" action="{% url 'orders:cart_item_remove' line.item.pk %}"
+                      hx-post="{% url 'orders:cart_item_remove' line.item.pk %}"
+                      hx-target="#cart-body" hx-swap="outerHTML">
+                  {% csrf_token %}
+                  <button type="submit" class="text-xs font-medium text-red-700 hover:underline">{% trans "Remove" %}</button>
+                </form>
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="mt-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+      <form method="post" action="{% url 'orders:cart_clear' %}">
+        {% csrf_token %}
+        <button type="submit" class="text-sm text-stone-600 hover:text-red-700">{% trans "Clear cart" %}</button>
+      </form>
+      <div class="text-right">
+        <p class="text-sm text-stone-600">{% trans "Subtotal" %}: <span class="text-lg font-semibold text-stone-900">{{ summary.subtotal|money:"NGN" }}</span></p>
+        <p class="mt-0.5 text-xs text-stone-500">{% trans "Shipping and taxes are calculated at checkout." %}</p>
+        {% if summary.is_checkoutable %}
+          <a href="{% url 'orders:checkout' %}" class="mt-3 inline-block rounded-md bg-forest px-5 py-2.5 text-sm font-medium text-white hover:bg-forest-light">{% trans "Proceed to checkout" %}</a>
+        {% else %}
+          <p class="mt-3 text-sm font-medium text-red-700">{% trans "Resolve the issues above to continue." %}</p>
+        {% endif %}
+      </div>
+    </div>
+  {% else %}
+    {% url 'catalog:shop_index' as shop_url %}
+    {% include "components/empty_state.html" with title="Your cart is empty" message="Browse the shop and add products to your cart." action_url=shop_url action_label="Browse the shop" %}
+  {% endif %}
+</div>

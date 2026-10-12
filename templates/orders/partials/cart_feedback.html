@@ -1,0 +1,8 @@
+{% load i18n catalog_tags %}
+{% if error %}
+  {% include "components/alert.html" with type="error" message=error %}
+{% else %}
+  {% trans "Added to your cart." as added_message %}
+  {% include "components/alert.html" with type="success" message=added_message %}
+  {% include "orders/partials/cart_summary.html" %}
+{% endif %}

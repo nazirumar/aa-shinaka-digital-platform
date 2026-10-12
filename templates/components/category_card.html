@@ -1,0 +1,18 @@
+{% load i18n %}{% comment %}
+Category card for the catalogue (Phase 4+).
+Props: category — a catalogue Category exposing name, description and image.
+No values are hardcoded.
+{% endcomment %}
+<a href="{{ category.get_absolute_url }}" class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
+  <div class="aspect-[4/3] overflow-hidden bg-cream-dark">
+    {% if category.image %}
+      <img src="{{ category.image.url }}" alt="{{ category.name }}" loading="lazy" decoding="async" class="h-full w-full object-cover transition group-hover:scale-105">
+    {% else %}
+      <div class="grid h-full place-items-center text-2xl text-stone-300" aria-hidden="true">◆</div>
+    {% endif %}
+  </div>
+  <div class="p-4">
+    <h3 class="font-semibold text-stone-900 group-hover:text-forest">{{ category.name }}</h3>
+    {% if category.description %}<p class="mt-1 text-sm text-stone-500">{{ category.description|truncatewords:12 }}</p>{% endif %}
+  </div>
+</a>

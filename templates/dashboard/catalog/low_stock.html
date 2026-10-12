@@ -1,0 +1,42 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h2 class="text-lg font-semibold text-stone-900">Low stock</h2>
+  <a href="{% url 'catalog_dashboard:listing_list' %}" class="text-sm text-forest hover:underline">All listings</a>
+</div>
+<p class="mt-2 text-sm text-stone-600">Active listings at or below their low-stock threshold.</p>
+
+<div class="mt-4 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">Product</th>
+        <th scope="col" class="px-4 py-3">Origin</th>
+        <th scope="col" class="px-4 py-3">Package</th>
+        <th scope="col" class="px-4 py-3 text-right">On hand</th>
+        <th scope="col" class="px-4 py-3 text-right">Threshold</th>
+        <th scope="col" class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for listing in listings %}
+        <tr>
+          <td class="px-4 py-3 font-medium text-stone-900">{{ listing.product.name }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ listing.state.name }}{% if listing.lga %} · {{ listing.lga.name }}{% endif %}</td>
+          <td class="px-4 py-3 text-stone-600">{{ listing.packaging }}</td>
+          <td class="px-4 py-3 text-right font-semibold text-amber-700">{{ listing.available_stock|decimal_str }}</td>
+          <td class="px-4 py-3 text-right text-stone-500">{{ listing.low_stock_threshold|decimal_str }}</td>
+          <td class="px-4 py-3 text-right">
+            <a href="{% url 'catalog_dashboard:listing_detail' listing.pk %}" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Review</a>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-4 py-10 text-center text-stone-500">Nothing is low on stock.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% include "components/pagination.html" with page_obj=page_obj %}
+{% endblock %}

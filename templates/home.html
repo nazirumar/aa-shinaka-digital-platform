@@ -1,0 +1,318 @@
+{% extends "base.html" %}
+{% load i18n cms_tags %}
+{% comment %}
+Premium CMS-driven homepage. Every content block degrades gracefully: when the
+CMS or catalogue has no rows yet, a clearly-labelled placeholder or empty state
+is shown instead of fabricated prices, origins or business claims.
+{% endcomment %}
+
+{% block content %}
+{% hero_banners as banners %}
+{% business_divisions as cms_divisions %}
+{% product_categories as product_categories %}
+{% shop_by_state as states %}
+{% featured_products as products %}
+{% featured_testimonials as testimonials %}
+{% latest_posts as posts %}
+
+{% url 'cms:service_list' as services_url %}
+{% url 'cms:contact' as contact_url %}
+{% url 'cms:about' as about_url %}
+{% url 'cms:blog_list' as blog_url %}
+
+{% translate "Explore services" as t_explore %}
+{% translate "Talk to us" as t_talk %}
+{% translate "What we do" as t_what_we_do %}
+{% translate "Our services" as t_services %}
+{% translate "Seven agricultural divisions working together across the value chain." as t_services_sub %}
+{% translate "Marketplace" as t_marketplace %}
+{% translate "Product categories" as t_categories %}
+{% translate "Fresh produce and farm inputs, organised by category." as t_categories_sub %}
+{% translate "Onion" as t_onion %}
+{% translate "Garlic" as t_garlic %}
+{% translate "Seeds" as t_seeds %}
+{% translate "Other agricultural products" as t_other %}
+{% translate "Produce near you" as t_near_you %}
+{% translate "Shop by state" as t_states %}
+{% translate "Browse agricultural products by their state of origin." as t_states_sub %}
+{% translate "State listings are on the way" as t_states_empty_title %}
+{% translate "Origin-based listings appear here once the catalogue is live." as t_states_empty_message %}
+{% translate "Featured" as t_featured %}
+{% translate "Featured products" as t_products %}
+{% translate "Selected listings from verified origins." as t_products_sub %}
+{% translate "Training academy" as t_academy_eyebrow %}
+{% translate "Learn practical, modern farming." as t_academy %}
+{% translate "Our academy previews practical training for farmers, agripreneurs and field officers." as t_academy_sub %}
+{% translate "See training" as t_see_training %}
+{% translate "Our approach" as t_approach %}
+{% translate "Why choose us" as t_why %}
+{% translate "What our customers say" as t_testimonials %}
+{% translate "Testimonials" as t_testimonials_eyebrow %}
+{% translate "Testimonials coming soon" as t_test_empty_title %}
+{% translate "Approved customer testimonials appear here once published." as t_test_empty_message %}
+{% translate "News & insights" as t_news_eyebrow %}
+{% translate "From the field" as t_news %}
+{% translate "No articles yet" as t_news_empty_title %}
+{% translate "News and insights will appear here once published." as t_news_empty_message %}
+{% translate "Request a quote" as t_request_quote %}
+{% translate "Export enquiry" as t_export_enquiry %}
+{% translate "Send an enquiry" as t_send_enquiry %}
+{% translate "Chat on WhatsApp" as t_whatsapp %}
+{% translate "More about us" as t_more %}
+{% translate "AA Shinaka supports the agricultural value chain through consultancy, farming services, marketing, storage, export, product sales and training." as t_about_default %}
+
+{# ------------------------------------------------------------------ Hero #}
+<section class="relative overflow-hidden bg-forest text-cream">
+  <div class="absolute inset-0 opacity-20" aria-hidden="true">
+    <div class="h-full w-full bg-[radial-gradient(circle_at_top_right,_var(--color-harvest),_transparent_55%)]"></div>
+  </div>
+  {% if banners %}
+    <div class="relative mx-auto max-w-7xl px-4 py-20 sm:py-28" x-data="{ slide: 0 }">
+      {% for banner in banners %}
+        <div x-show="slide === {{ forloop.counter0 }}" {% if not forloop.first %}x-cloak{% endif %} class="grid items-center gap-10 lg:grid-cols-2">
+          <div>
+            {% if banner.eyebrow %}<p class="text-sm font-semibold uppercase tracking-wider text-harvest">{{ banner.eyebrow }}</p>{% endif %}
+            <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{{ banner.title }}</h1>
+            {% if banner.subtitle %}<p class="mt-4 max-w-xl text-lg text-cream/85">{{ banner.subtitle }}</p>{% endif %}
+            <div class="mt-8 flex flex-wrap gap-3">
+              {% if banner.cta_label %}{% include "components/button.html" with label=banner.cta_label href=banner.cta_url|default:services_url variant="secondary" size="lg" %}{% endif %}
+              {% if banner.secondary_cta_label %}{% include "components/button.html" with label=banner.secondary_cta_label href=banner.secondary_cta_url|default:contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}{% endif %}
+            </div>
+          </div>
+          <div>
+            {% if banner.image %}
+              {% include "components/lazy_image.html" with image=banner.image alt=banner.title ratio="h-80 w-full rounded-2xl object-cover shadow-2xl" eager=True %}
+            {% else %}
+              <div class="h-80 rounded-2xl border border-cream/20 bg-forest-light/40"></div>
+            {% endif %}
+          </div>
+        </div>
+      {% endfor %}
+      {% if banners|length > 1 %}
+        <div class="mt-8 flex gap-2" role="tablist" aria-label="{% translate 'Hero slides' %}">
+          {% for banner in banners %}
+            <button type="button" role="tab" :aria-selected="slide === {{ forloop.counter0 }}" @click="slide = {{ forloop.counter0 }}" class="h-2.5 w-8 rounded-full" :class="slide === {{ forloop.counter0 }} ? 'bg-harvest' : 'bg-cream/40'"></button>
+          {% endfor %}
+        </div>
+      {% endif %}
+    </div>
+  {% else %}
+    <div class="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-20 sm:py-28 lg:grid-cols-2">
+      <div>
+        <p class="text-sm font-semibold uppercase tracking-wider text-harvest">{% translate "Agriculture, end to end" %}</p>
+        <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{% translate "Nigeria's agricultural value chain, in one platform." %}</h1>
+        <p class="mt-4 max-w-xl text-lg text-cream/85">{% translate "Consultancy, farming, marketing, storage, export, agricultural product sales and training — delivered by AA Shinaka." %}</p>
+        <div class="mt-8 flex flex-wrap gap-3">
+          {% include "components/button.html" with label=t_explore href=services_url variant="secondary" size="lg" %}
+          {% include "components/button.html" with label=t_talk href=contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}
+        </div>
+      </div>
+      <div class="h-80 rounded-2xl border border-cream/20 bg-forest-light/40"></div>
+    </div>
+  {% endif %}
+</section>
+
+{# ------------------------------------------------------- Service grid #}
+<section class="mx-auto max-w-7xl px-4 py-16 sm:py-20" aria-labelledby="services-heading">
+  {% include "components/section_heading.html" with eyebrow=t_what_we_do title=t_services subtitle=t_services_sub heading_id="services-heading" %}
+  <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {% if cms_divisions %}
+      {% for division in cms_divisions %}
+        {% include "components/service_card.html" with service=division %}
+      {% endfor %}
+    {% else %}
+      {% for value, label in divisions %}
+        <article class="flex flex-col rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+          <span class="grid h-11 w-11 place-items-center rounded-lg bg-forest/10 text-xl text-forest" aria-hidden="true">🌱</span>
+          <h3 class="mt-4 text-lg font-semibold text-stone-900">{{ label }}</h3>
+          <p class="mt-2 flex-1 text-sm text-stone-600">{% translate "Details for this division are being added by our team." %}</p>
+        </article>
+      {% endfor %}
+    {% endif %}
+  </div>
+</section>
+
+{# ------------------------------------------------ Product category grid #}
+<section class="bg-cream-dark" aria-labelledby="categories-heading">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+    {% include "components/section_heading.html" with eyebrow=t_marketplace title=t_categories subtitle=t_categories_sub heading_id="categories-heading" %}
+    <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {% if product_categories %}
+        {% for category in product_categories %}
+          {% include "components/category_card.html" with category=category %}
+        {% endfor %}
+      {% else %}
+        {% include "components/product_card_placeholder.html" with name=t_onion %}
+        {% include "components/product_card_placeholder.html" with name=t_garlic %}
+        {% include "components/product_card_placeholder.html" with name=t_seeds %}
+        {% include "components/product_card_placeholder.html" with name=t_other %}
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------- Shop by state #}
+<section class="mx-auto max-w-7xl px-4 py-16 sm:py-20" aria-labelledby="states-heading">
+  {% include "components/section_heading.html" with eyebrow=t_near_you title=t_states subtitle=t_states_sub heading_id="states-heading" %}
+  <div class="mt-10">
+    {% if states %}
+      <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {% for state in states %}
+          {% include "components/state_card.html" with name=state.name url=state.get_absolute_url count=state.listing_count %}
+        {% endfor %}
+      </div>
+    {% else %}
+      {% include "components/empty_state.html" with title=t_states_empty_title message=t_states_empty_message %}
+    {% endif %}
+  </div>
+</section>
+
+{# ------------------------------------------------------- Featured products #}
+<section class="bg-cream-dark" aria-labelledby="products-heading">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+    {% include "components/section_heading.html" with eyebrow=t_featured title=t_products subtitle=t_products_sub heading_id="products-heading" %}
+    <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+      {% if products %}
+        {% for listing in products %}
+          {% include "components/product_card.html" with listing=listing %}
+        {% endfor %}
+      {% else %}
+        <p class="col-span-full text-sm text-stone-600">{% translate "Product listings arrive with the catalogue. Check back soon." %}</p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------ Wholesale / export CTA #}
+<section class="bg-forest text-cream" aria-labelledby="wholesale-heading">
+  <div class="mx-auto grid max-w-7xl items-center gap-8 px-4 py-16 sm:py-20 lg:grid-cols-2">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wider text-harvest">{% translate "Wholesale & export" %}</p>
+      <h2 id="wholesale-heading" class="mt-2 text-3xl font-bold">{% translate "Buy in bulk or export with confidence." %}</h2>
+      <p class="mt-4 text-cream/85">{% translate "Our export and sales teams handle wholesale volumes, documentation and logistics. Share your requirement and we will respond with availability." %}</p>
+    </div>
+    <div class="flex flex-wrap gap-3 lg:justify-end">
+      {% include "components/button.html" with label=t_request_quote href=contact_url variant="secondary" size="lg" %}
+      {% include "components/button.html" with label=t_export_enquiry href=contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------- Academy preview #}
+<section class="mx-auto max-w-7xl px-4 py-16 sm:py-20" aria-labelledby="academy-heading">
+  <div class="grid items-center gap-10 lg:grid-cols-2">
+    <div>
+      {% include "components/section_heading.html" with eyebrow=t_academy_eyebrow title=t_academy subtitle=t_academy_sub heading_id="academy-heading" %}
+      <div class="mt-6">{% include "components/button.html" with label=t_see_training href=services_url variant="primary" %}</div>
+    </div>
+    <div class="rounded-xl border border-dashed border-stone-300 bg-white p-6 text-sm text-stone-500">
+      {% translate "Training modules will be listed as they are published." %}
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------- About AA Shinaka #}
+<section class="bg-cream-dark" aria-labelledby="about-heading">
+  <div class="mx-auto grid max-w-7xl items-center gap-10 px-4 py-16 sm:py-20 lg:grid-cols-2">
+    <div>
+      <p class="text-sm font-semibold uppercase tracking-wider text-harvest-dark">{% translate "About AA Shinaka" %}</p>
+      <h2 id="about-heading" class="mt-2 text-3xl font-bold text-stone-900">{{ site.site_name|default:"AA Shinaka" }}</h2>
+      <p class="mt-4 text-stone-600">{{ site.description|default:t_about_default }}</p>
+      <div class="mt-6">{% include "components/button.html" with label=t_more href=about_url variant="outline" %}</div>
+    </div>
+    <div class="rounded-2xl border border-stone-200 bg-white p-8">
+      <h3 class="text-lg font-semibold text-stone-900">{% translate "Mission" %}</h3>
+      <p class="mt-2 text-sm text-stone-600">{% translate "To connect Nigerian farmers and buyers to reliable markets, services and knowledge." %}</p>
+      <h3 class="mt-6 text-lg font-semibold text-stone-900">{% translate "Vision" %}</h3>
+      <p class="mt-2 text-sm text-stone-600">{% translate "A trusted, transparent agricultural platform serving the whole value chain." %}</p>
+    </div>
+  </div>
+</section>
+
+{# -------------------------------------------------------- Why choose us #}
+<section class="mx-auto max-w-7xl px-4 py-16 sm:py-20" aria-labelledby="why-heading">
+  {% include "components/section_heading.html" with eyebrow=t_approach title=t_why heading_id="why-heading" %}
+  <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {% if site.value_props %}
+      {% for item in site.value_props %}
+        <div class="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+          <h3 class="font-semibold text-stone-900">{{ item.title }}</h3>
+          <p class="mt-2 text-sm text-stone-600">{{ item.body }}</p>
+        </div>
+      {% endfor %}
+    {% else %}
+      {% for value, label in divisions %}
+        <div class="rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+          <h3 class="font-semibold text-stone-900">{{ label }}</h3>
+          <p class="mt-2 text-sm text-stone-600">{% translate "One accountable team across this part of the value chain." %}</p>
+        </div>
+      {% endfor %}
+    {% endif %}
+  </div>
+</section>
+
+{# --------------------------------------------------------- Testimonials #}
+<section class="bg-cream-dark" aria-labelledby="testimonials-heading">
+  <div class="mx-auto max-w-7xl px-4 py-16 sm:py-20">
+    {% include "components/section_heading.html" with eyebrow=t_testimonials_eyebrow title=t_testimonials heading_id="testimonials-heading" align="center" %}
+    <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+      {% for testimonial in testimonials %}
+        <figure class="flex h-full flex-col rounded-xl border border-stone-200 bg-white p-6 shadow-sm">
+          {% if testimonial.rating %}
+            <div class="text-harvest" aria-label="{% blocktranslate with r=testimonial.rating %}{{ r }} out of 5{% endblocktranslate %}">
+              {% for i in "12345" %}{% if forloop.counter <= testimonial.rating %}★{% endif %}{% endfor %}
+            </div>
+          {% endif %}
+          <blockquote class="mt-3 flex-1 text-stone-700">“{{ testimonial.quote }}”</blockquote>
+          <figcaption class="mt-4 text-sm">
+            <span class="font-semibold text-stone-900">{{ testimonial.author_name }}</span>
+            {% if testimonial.author_role %}<span class="text-stone-500">, {{ testimonial.author_role }}</span>{% endif %}
+            {% if testimonial.company %}<span class="block text-stone-500">{{ testimonial.company }}</span>{% endif %}
+          </figcaption>
+        </figure>
+      {% empty %}
+        {% include "components/empty_state.html" with title=t_test_empty_title message=t_test_empty_message %}
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{# ------------------------------------------------------------ News/Blog #}
+<section class="mx-auto max-w-7xl px-4 py-16 sm:py-20" aria-labelledby="news-heading">
+  <div class="flex flex-wrap items-end justify-between gap-4">
+    {% include "components/section_heading.html" with eyebrow=t_news_eyebrow title=t_news heading_id="news-heading" %}
+    <a href="{{ blog_url }}" class="text-sm font-medium text-forest hover:text-leaf">{% translate "View all news" %} →</a>
+  </div>
+  <div class="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+    {% for post in posts %}
+      <article class="flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
+        {% if post.featured_image %}
+          <a href="{{ post.get_absolute_url }}" class="block aspect-[16/9] overflow-hidden bg-cream-dark">
+            {% include "components/lazy_image.html" with image=post.featured_image alt=post.title ratio="h-full w-full object-cover" %}
+          </a>
+        {% endif %}
+        <div class="flex flex-1 flex-col p-5">
+          {% if post.category %}<p class="text-xs font-semibold uppercase tracking-wide text-harvest-dark">{{ post.category.name }}</p>{% endif %}
+          <h3 class="mt-2 font-semibold text-stone-900"><a href="{{ post.get_absolute_url }}" class="hover:text-forest">{{ post.title }}</a></h3>
+          {% if post.excerpt %}<p class="mt-2 flex-1 text-sm text-stone-600">{{ post.excerpt|truncatewords:20 }}</p>{% endif %}
+          <p class="mt-4 text-xs text-stone-500">{{ post.published_at|default:post.created_at|date:"j M Y" }}</p>
+        </div>
+      </article>
+    {% empty %}
+      {% include "components/empty_state.html" with title=t_news_empty_title message=t_news_empty_message %}
+    {% endfor %}
+  </div>
+</section>
+
+{# ------------------------------------------------------- Contact CTA #}
+<section class="bg-forest text-cream">
+  <div class="mx-auto max-w-4xl px-4 py-16 text-center sm:py-20">
+    <h2 class="text-3xl font-bold">{% translate "Ready to work with AA Shinaka?" %}</h2>
+    <p class="mt-3 text-cream/85">{% translate "Tell us what you need — consultancy, produce, storage, export or training — and our team will get back to you." %}</p>
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      {% include "components/button.html" with label=t_send_enquiry href=contact_url variant="secondary" size="lg" %}
+      {% if site.whatsapp_url %}{% include "components/button.html" with label=t_whatsapp href=site.whatsapp_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}{% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

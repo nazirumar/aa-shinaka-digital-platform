@@ -1,0 +1,13 @@
+{% load i18n %}{% get_current_language as CURRENT_LANGUAGE %}
+<form action="{% url 'set_language' %}" method="post" class="{% if variant == 'block' %}w-full{% endif %}">
+  {% csrf_token %}
+  <input name="next" type="hidden" value="{{ request.get_full_path }}">
+  <label for="language-switch-{{ variant|default:'inline' }}" class="sr-only">{% trans "Language" %}</label>
+  <select id="language-switch-{{ variant|default:'inline' }}" name="language" onchange="this.form.submit()"
+          class="{% if variant == 'block' %}w-full {% endif %}rounded-md border border-stone-300 bg-white px-2 py-1 text-sm text-stone-700 focus:border-forest focus:outline-none focus:ring-2 focus:ring-leaf/30">
+    {% get_available_languages as AVAILABLE_LANGUAGES %}
+    {% for code, name in AVAILABLE_LANGUAGES %}
+      <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>
+    {% endfor %}
+  </select>
+</form>

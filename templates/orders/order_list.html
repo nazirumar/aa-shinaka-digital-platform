@@ -1,0 +1,42 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+<div class="mb-4 flex flex-wrap items-center gap-2">
+  <a href="{% url 'orders:order_list' %}" class="rounded-full px-3 py-1 text-sm {% if not status %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "All" %}</a>
+  {% for value, label in order_statuses %}
+    <a href="{% url 'orders:order_list' %}?status={{ value }}" class="rounded-full px-3 py-1 text-sm {% if status == value %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{{ label }}</a>
+  {% endfor %}
+</div>
+
+{% if orders %}
+  <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">{% trans "Order" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Placed" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+          <th scope="col" class="px-4 py-3 text-right">{% trans "Total" %}</th>
+          <th scope="col" class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for order in orders %}
+          <tr>
+            <td class="px-4 py-3 font-medium text-stone-900">{{ order.number }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ order.created_at|date:"j M Y" }}</td>
+            <td class="px-4 py-3"><span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">{{ order.get_status_display }}</span></td>
+            <td class="px-4 py-3 text-right font-semibold text-stone-900">{{ order.grand_total|money:order.currency }}</td>
+            <td class="px-4 py-3 text-right"><a href="{% url 'orders:order_detail' order.number %}" class="text-sm font-medium text-forest hover:underline">{% trans "View" %}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "components/pagination.html" %}
+{% else %}
+  {% trans "No orders yet" as empty_title %}
+  {% trans "When you place an order it will appear here." as empty_message %}
+  {% include "components/empty_state.html" with title=empty_title message=empty_message %}
+{% endif %}
+{% endblock %}

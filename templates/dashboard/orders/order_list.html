@@ -1,0 +1,59 @@
+{% extends "dashboard/base.html" %}
+{% load i18n catalog_tags %}
+{% block dashboard_content %}
+<form method="get" class="flex flex-wrap items-end gap-3 rounded-xl border border-stone-200 bg-white p-4">
+  <label class="text-sm">
+    <span class="block text-stone-600">{% trans "Search" %}</span>
+    <input type="search" name="q" value="{{ query }}" placeholder="{% trans 'Order no. or customer' %}" class="mt-1 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  </label>
+  <label class="text-sm">
+    <span class="block text-stone-600">{% trans "Status" %}</span>
+    <select name="status" class="mt-1 rounded-md border border-stone-300 px-3 py-2 text-sm">
+      <option value="">{% trans "All" %}</option>
+      {% for value, label in order_statuses %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <label class="text-sm">
+    <span class="block text-stone-600">{% trans "Payment" %}</span>
+    <select name="payment_status" class="mt-1 rounded-md border border-stone-300 px-3 py-2 text-sm">
+      <option value="">{% trans "All" %}</option>
+      {% for value, label in payment_statuses %}<option value="{{ value }}" {% if payment_status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">{% trans "Filter" %}</button>
+  <a href="{% url 'orders_dashboard:order_list' %}" class="text-sm text-stone-600 hover:text-forest">{% trans "Reset" %}</a>
+</form>
+
+<div class="mt-6 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">{% trans "Order" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Customer" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Placed" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Payment" %}</th>
+        <th scope="col" class="px-4 py-3 text-right">{% trans "Total" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for order in orders %}
+        <tr class="hover:bg-cream-50">
+          <td class="px-4 py-3"><a href="{% url 'orders_dashboard:order_detail' order.number %}" class="font-medium text-forest hover:underline">{{ order.number }}</a></td>
+          <td class="px-4 py-3 text-stone-700">{{ order.user.email }}</td>
+          <td class="px-4 py-3 text-stone-600">{{ order.created_at|date:"j M Y, H:i" }}</td>
+          <td class="px-4 py-3"><span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">{{ order.get_status_display }}</span></td>
+          <td class="px-4 py-3">
+            {% if order.payment_status == 'paid' %}<span class="rounded-full bg-leaf/10 px-2 py-0.5 text-xs text-leaf">{{ order.get_payment_status_display }}</span>
+            {% else %}<span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">{{ order.get_payment_status_display }}</span>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-right font-semibold text-stone-900">{{ order.grand_total|money:order.currency }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-4 py-8 text-center text-stone-500">{% trans "No orders match these filters." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "components/pagination.html" %}
+</div>
+{% endblock %}

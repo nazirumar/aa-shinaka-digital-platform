@@ -1,0 +1,20 @@
+{% comment %}Reusable bound-field renderer with accessible label, help text and errors.{% endcomment %}
+<div>
+  <label for="{{ field.id_for_label }}" class="block text-sm font-medium text-stone-700">
+    {{ field.label }}{% if field.field.required %}<span class="text-red-600" aria-hidden="true"> *</span>{% endif %}
+  </label>
+  {% if field.field.widget.input_type == 'checkbox' %}
+    <div class="mt-1 flex items-center gap-2">
+      {{ field }}
+      <span class="text-sm text-stone-600">{{ field.help_text }}</span>
+    </div>
+  {% else %}
+    {{ field }}
+  {% endif %}
+  {% if field.help_text and field.field.widget.input_type != 'checkbox' %}
+    <p class="mt-1 text-xs text-stone-500">{{ field.help_text }}</p>
+  {% endif %}
+  {% for error in field.errors %}
+    <p class="mt-1 text-xs font-medium text-red-700" role="alert">{{ error }}</p>
+  {% endfor %}
+</div>

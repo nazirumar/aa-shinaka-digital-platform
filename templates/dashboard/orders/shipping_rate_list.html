@@ -1,0 +1,42 @@
+{% extends "dashboard/base.html" %}
+{% load i18n catalog_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <nav class="flex flex-wrap gap-2 text-sm">
+    <a href="{% url 'orders_dashboard:shipping_zone_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-white">{% trans "Zones" %}</a>
+    <a href="{% url 'orders_dashboard:shipping_method_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-white">{% trans "Methods" %}</a>
+    <a href="{% url 'orders_dashboard:shipping_rate_list' %}" class="rounded-md bg-white px-3 py-1.5 font-medium text-forest">{% trans "Rates" %}</a>
+  </nav>
+  <a href="{% url 'orders_dashboard:shipping_rate_create' %}" class="rounded-md bg-brand-700 px-4 py-2 text-sm font-medium text-white hover:bg-brand-800">{% trans "New rate" %}</a>
+</div>
+
+<div class="mt-6 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">{% trans "Zone" %}</th>
+        <th scope="col" class="px-4 py-3">{% trans "Method" %}</th>
+        <th scope="col" class="px-4 py-3 text-right">{% trans "Fee" %}</th>
+        <th scope="col" class="px-4 py-3 text-right">{% trans "Free over" %}</th>
+        <th scope="col" class="px-4 py-3 text-right">{% trans "Min order" %}</th>
+        <th scope="col" class="px-4 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for rate in rates %}
+        <tr>
+          <td class="px-4 py-3 font-medium text-stone-900">{{ rate.zone.name }}</td>
+          <td class="px-4 py-3 text-stone-700">{{ rate.method.name }}</td>
+          <td class="px-4 py-3 text-right text-stone-700">{{ rate.fee|money:"NGN" }}</td>
+          <td class="px-4 py-3 text-right text-stone-700">{% if rate.free_over %}{{ rate.free_over|money:"NGN" }}{% else %}—{% endif %}</td>
+          <td class="px-4 py-3 text-right text-stone-700">{% if rate.min_order_amount %}{{ rate.min_order_amount|money:"NGN" }}{% else %}—{% endif %}</td>
+          <td class="px-4 py-3 text-right"><a href="{% url 'orders_dashboard:shipping_rate_edit' rate.pk %}" class="text-sm font-medium text-forest hover:underline">{% trans "Edit" %}</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-4 py-8 text-center text-stone-500">{% trans "No shipping rates configured yet. Checkout is blocked until a rate exists for the destination state." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% include "components/pagination.html" %}
+</div>
+{% endblock %}

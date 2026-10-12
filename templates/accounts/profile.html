@@ -1,0 +1,26 @@
+{% extends "accounts/account_base.html" %}
+
+{% block account_content %}
+<div class="rounded-xl border border-stone-200 bg-white p-6">
+  <h2 class="text-lg font-semibold text-stone-900">Profile</h2>
+  <p class="mt-1 text-sm text-stone-600">Keep your contact details up to date.</p>
+
+  {% if form.non_field_errors %}
+    <div class="mt-4 rounded-md border border-red-300 bg-red-50 px-4 py-3 text-sm text-red-800" role="alert">
+      {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+    </div>
+  {% endif %}
+
+  <form method="post" class="mt-6 space-y-4" novalidate>
+    {% csrf_token %}
+    <div class="grid gap-4 sm:grid-cols-2">
+      {% include "components/form_field.html" with field=form.first_name %}
+      {% include "components/form_field.html" with field=form.last_name %}
+    </div>
+    {% include "components/form_field.html" with field=form.phone %}
+    {% include "components/form_field.html" with field=form.state %}
+    {% include "components/form_field.html" with field=form.marketing_opt_in %}
+    <button type="submit" class="rounded-md bg-brand-600 px-4 py-2.5 font-medium text-white hover:bg-brand-700">Save changes</button>
+  </form>
+</div>
+{% endblock %}

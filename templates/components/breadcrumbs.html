@@ -1,0 +1,17 @@
+{% comment %}Breadcrumbs. ``items`` is a list of {label, url?|href?} dicts; the last item is current.{% endcomment %}
+<nav aria-label="Breadcrumb" class="text-xs text-stone-500">
+  <ol class="flex flex-wrap items-center gap-1">
+    {% for item in items %}
+      <li class="flex items-center gap-1">
+        {% if item.href %}
+          <a href="{{ item.href }}" class="hover:text-brand-700 hover:underline">{{ item.label }}</a>
+        {% elif item.url %}
+          <a href="{% url item.url %}" class="hover:text-brand-700 hover:underline">{{ item.label }}</a>
+        {% else %}
+          <span class="font-medium text-stone-700" aria-current="page">{{ item.label }}</span>
+        {% endif %}
+        {% if not forloop.last %}<span aria-hidden="true">/</span>{% endif %}
+      </li>
+    {% endfor %}
+  </ol>
+</nav>

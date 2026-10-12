@@ -1,0 +1,61 @@
+{% load static i18n %}<!doctype html>
+<html lang="{{ LANGUAGE_CODE|default:'en'|slice:':2' }}" class="h-full scroll-smooth">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% firstof seo_title page_title site.site_name "AA Shinaka" %}{% endblock %}{% if site.site_name %} · {{ site.site_name }}{% else %} · AA Shinaka{% endif %}</title>
+
+  {% block meta %}
+    <meta name="description" content="{% block meta_description %}{% firstof seo_description site.default_meta_description "AA Shinaka Digital Business Platform — agricultural consultancy, farming services, marketing, storage, export, products and training." %}{% endblock %}">
+    <link rel="canonical" href="{% block canonical %}{{ seo_canonical|default:request.build_absolute_uri }}{% endblock %}">
+    {% if seo_noindex %}<meta name="robots" content="noindex, follow">{% endif %}
+
+    {# Open Graph / social sharing #}
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{ site.site_name|default:'AA Shinaka' }}">
+    <meta property="og:title" content="{% firstof seo_title page_title site.site_name 'AA Shinaka' %}">
+    <meta property="og:description" content="{% firstof seo_description site.default_meta_description %}">
+    <meta property="og:url" content="{{ seo_canonical|default:request.build_absolute_uri }}">
+    {% if seo_og_image %}<meta property="og:image" content="{{ seo_og_image.file.url }}">{% endif %}
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="{% firstof seo_title page_title site.site_name 'AA Shinaka' %}">
+    <meta name="twitter:description" content="{% firstof seo_description site.default_meta_description %}">
+  {% endblock %}
+
+  {% if site.favicon %}<link rel="icon" href="{{ site.favicon.file.url }}">{% endif %}
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+  <style>[x-cloak] { display: none !important; }</style>
+  {% block head_extra %}{% endblock %}
+</head>
+<body class="flex min-h-full flex-col bg-cream text-stone-800 antialiased">
+  <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-forest focus:px-4 focus:py-2 focus:text-white">
+    {% trans "Skip to content" %}
+  </a>
+
+  {% if site.announcement_active and site.announcement_text %}
+    {% include "components/announcement_bar.html" %}
+  {% endif %}
+
+  {% include "components/navbar.html" %}
+
+  {% if messages %}
+    <div class="mx-auto w-full max-w-7xl px-4 pt-4" aria-live="polite">
+      {% for message in messages %}
+        {% if message.tags == 'success' %}{% include "components/alert.html" with type="success" message=message %}
+        {% elif message.tags == 'error' %}{% include "components/alert.html" with type="error" message=message %}
+        {% elif message.tags == 'warning' %}{% include "components/alert.html" with type="warning" message=message %}
+        {% else %}{% include "components/alert.html" with type="info" message=message %}{% endif %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <main id="main" class="flex-1">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% include "components/footer.html" %}
+  {% block body_extra %}{% endblock %}
+</body>
+</html>

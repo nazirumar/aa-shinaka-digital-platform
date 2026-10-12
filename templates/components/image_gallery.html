@@ -1,0 +1,20 @@
+{% load i18n %}{% comment %}
+Responsive image gallery with an Alpine lightbox.
+Props: images — a list of MediaAsset objects (each with file, alt_text/title).
+{% endcomment %}
+<div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" x-data="{ active: null }">
+  {% for image in images %}
+    <button type="button" class="group overflow-hidden rounded-lg border border-stone-200" @click="active = '{{ image.file.url }}'">
+      <img src="{{ image.file.url }}" alt="{{ image.alt_text|default:image.title }}" loading="lazy" decoding="async" class="aspect-square w-full object-cover transition group-hover:scale-105">
+    </button>
+  {% empty %}
+    <p class="col-span-full text-sm text-stone-500">{% trans "No images yet." %}</p>
+  {% endfor %}
+
+  <div x-show="active" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 p-4" @click="active = null" @keydown.escape.window="active = null" role="dialog" aria-modal="true" aria-label="{% trans 'Image preview' %}">
+    <img :src="active" alt="" class="max-h-[85vh] max-w-full rounded-lg shadow-2xl">
+    <button type="button" class="absolute right-4 top-4 rounded-md p-2 text-white hover:bg-white/10" @click="active = null" aria-label="{% trans 'Close' %}">
+      <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+</div>

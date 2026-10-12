@@ -1,0 +1,66 @@
+{% extends "accounts/account_base.html" %}
+
+{% block account_content %}
+<div class="space-y-6">
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <h2 class="text-lg font-semibold text-stone-900">Welcome back, {{ user.first_name|default:"there" }}</h2>
+    <p class="mt-1 text-sm text-stone-600">Here is the current state of your account.</p>
+
+    <div class="mt-5">
+      <div class="flex items-center justify-between text-sm">
+        <span class="font-medium text-stone-700">Profile completion</span>
+        <span class="text-stone-600">{{ profile_completion }}%</span>
+      </div>
+      <div class="mt-2 h-2 w-full overflow-hidden rounded-full bg-stone-200" role="progressbar" aria-valuenow="{{ profile_completion }}" aria-valuemin="0" aria-valuemax="100">
+        <div class="h-full bg-brand-500" style="width: {{ profile_completion }}%"></div>
+      </div>
+      {% if missing_profile_items %}
+        <p class="mt-2 text-xs text-stone-500">Still to add: {{ missing_profile_items|join:", " }}.</p>
+      {% endif %}
+    </div>
+
+    <dl class="mt-6 grid gap-4 sm:grid-cols-2">
+      <div class="rounded-lg border border-stone-200 p-4">
+        <dt class="text-xs uppercase tracking-wide text-stone-500">Email verification</dt>
+        <dd class="mt-1 font-medium {% if user.is_email_verified %}text-brand-700{% else %}text-amber-700{% endif %}">
+          {% if user.is_email_verified %}Verified{% else %}Not verified{% endif %}
+        </dd>
+      </div>
+      <div class="rounded-lg border border-stone-200 p-4">
+        <dt class="text-xs uppercase tracking-wide text-stone-500">Saved addresses</dt>
+        <dd class="mt-1 font-medium text-stone-800">{{ addresses|length }}</dd>
+      </div>
+    </dl>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <h2 class="text-lg font-semibold text-stone-900">Saved addresses</h2>
+    {% url 'account:address_add' as address_add_url %}
+    {% if addresses %}
+      <ul class="mt-3 divide-y divide-stone-100">
+        {% for address in addresses %}
+          <li class="py-3 text-sm">
+            <span class="font-medium text-stone-800">{{ address.recipient_name }}</span>
+            {% if address.is_default %}<span class="ml-2 rounded bg-brand-50 px-2 py-0.5 text-xs font-medium text-brand-700">Default</span>{% endif %}
+            <p class="text-stone-600">{{ address.street_address }}, {{ address.city }}, {{ address.state.name }}</p>
+          </li>
+        {% endfor %}
+      </ul>
+      <a href="{% url 'account:addresses' %}" class="mt-3 inline-block text-sm font-medium text-brand-700 hover:underline">Manage addresses</a>
+    {% else %}
+      {% include "components/empty_state.html" with title="No addresses yet" message="Add a delivery address to speed up future orders and enquiries." action_url=address_add_url action_label="Add address" %}
+    {% endif %}
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <h2 class="text-lg font-semibold text-stone-900">Quick links</h2>
+    <p class="mt-1 text-sm text-stone-500">These modules open in later phases.</p>
+    <div class="mt-4 grid gap-3 sm:grid-cols-2">
+      {% include "components/coming_soon_card.html" with title="My orders" note="Order history arrives with product sales." %}
+      {% include "components/coming_soon_card.html" with title="Consultancy requests" note="Book advisory sessions in a later phase." %}
+      {% include "components/coming_soon_card.html" with title="Training & Academy" note="Course enrolment will appear here." %}
+      {% include "components/coming_soon_card.html" with title="Export enquiries" note="Track export enquiries once live." %}
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,34 @@
+{% extends "dashboard/base.html" %}
+
+{% block title %}Edit {{ staff.full_name }}{% endblock %}
+
+{% block dashboard_content %}
+<div class="grid max-w-4xl gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <h1 class="text-lg font-semibold text-stone-900">Staff details</h1>
+    {% if profile_form.non_field_errors %}{% include "components/alert.html" with type="error" message=profile_form.non_field_errors.0 %}{% endif %}
+    <form method="post" class="mt-4 space-y-4" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="form_name" value="profile">
+      <div class="grid gap-4 sm:grid-cols-2">
+        {% include "components/form_field.html" with field=profile_form.first_name %}
+        {% include "components/form_field.html" with field=profile_form.last_name %}
+      </div>
+      {% include "components/form_field.html" with field=profile_form.phone %}
+      <button type="submit" class="rounded-md bg-brand-600 px-4 py-2.5 font-medium text-white hover:bg-brand-700">Save details</button>
+    </form>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <h1 class="text-lg font-semibold text-stone-900">Role</h1>
+    <p class="mt-1 text-sm text-stone-600">Only roles within your authority are listed.</p>
+    {% if role_form.non_field_errors %}{% include "components/alert.html" with type="error" message=role_form.non_field_errors.0 %}{% endif %}
+    <form method="post" class="mt-4 space-y-4" novalidate>
+      {% csrf_token %}
+      <input type="hidden" name="form_name" value="role">
+      {% include "components/form_field.html" with field=role_form.role %}
+      <button type="submit" class="rounded-md bg-brand-600 px-4 py-2.5 font-medium text-white hover:bg-brand-700">Save role</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

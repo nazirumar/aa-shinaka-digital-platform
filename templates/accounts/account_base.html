@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl px-4 py-8">
+  <div class="mb-6">
+    <h1 class="text-2xl font-semibold text-stone-900">{{ page_title|default:"My account" }}</h1>
+    <p class="text-sm text-stone-600">Signed in as {{ user.email }}</p>
+  </div>
+
+  {% if not user.is_email_verified %}
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900" role="status">
+      <span>Your email address is not verified yet. Please confirm it to secure your account.</span>
+      <form method="post" action="{% url 'accounts:resend_verification' %}">
+        {% csrf_token %}
+        <button type="submit" class="rounded-md border border-amber-400 bg-white px-3 py-1.5 font-medium hover:bg-amber-100">
+          Resend verification email
+        </button>
+      </form>
+    </div>
+  {% endif %}
+
+  <div class="grid gap-8 md:grid-cols-[220px_1fr]">
+    <nav aria-label="Account sections" class="h-max rounded-xl border border-stone-200 bg-white p-2 text-sm">
+      {% with url_name=request.resolver_match.url_name %}
+        <a href="{% url 'account:dashboard' %}" class="block rounded-md px-3 py-2 {% if url_name == 'dashboard' or url_name == 'dashboard_home' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Overview</a>
+        <a href="{% url 'orders:order_list' %}" class="block rounded-md px-3 py-2 {% if url_name == 'order_list' or url_name == 'order_detail' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Orders</a>
+        <a href="{% url 'orders:quotation_list' %}" class="block rounded-md px-3 py-2 {% if url_name == 'quotation_list' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Quotations</a>
+        <a href="{% url 'account:profile' %}" class="block rounded-md px-3 py-2 {% if url_name == 'profile' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Profile</a>
+        <a href="{% url 'account:addresses' %}" class="block rounded-md px-3 py-2 {% if 'address' in url_name %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Addresses</a>
+        <a href="{% url 'account:security' %}" class="block rounded-md px-3 py-2 {% if url_name == 'security' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-700 hover:bg-stone-100{% endif %}">Security</a>
+      {% endwith %}
+    </nav>
+
+    <section>
+      {% block account_content %}{% endblock %}
+    </section>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,15 @@
+{% comment %}
+Button / link. Props:
+  label, href (renders <a>), variant (primary|secondary|outline|ghost|danger),
+  size (sm|md|lg), type (button|submit), extra_class.
+{% endcomment %}
+{% if href %}<a href="{{ href }}"{% else %}<button type="{{ type|default:'button' }}"{% endif %}
+  class="inline-flex items-center justify-center gap-2 rounded-md font-medium transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2
+    {% if size == 'sm' %}px-3 py-1.5 text-sm{% elif size == 'lg' %}px-6 py-3 text-base{% else %}px-4 py-2 text-sm{% endif %}
+    {% if variant == 'secondary' %}bg-harvest text-forest hover:bg-harvest-light focus-visible:ring-harvest
+    {% elif variant == 'outline' %}border border-forest text-forest hover:bg-forest/5 focus-visible:ring-forest
+    {% elif variant == 'ghost' %}text-forest hover:bg-forest/5 focus-visible:ring-forest
+    {% elif variant == 'danger' %}bg-red-600 text-white hover:bg-red-700 focus-visible:ring-red-500
+    {% else %}bg-forest text-white hover:bg-forest-light focus-visible:ring-forest{% endif %} {{ extra_class }}">
+  {{ label }}
+{% if href %}</a>{% else %}</button>{% endif %}

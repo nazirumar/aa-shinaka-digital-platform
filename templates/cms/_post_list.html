@@ -1,0 +1,24 @@
+{% load i18n %}
+<div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+  {% for post in posts %}
+    <article class="flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
+      {% if post.featured_image %}
+        <a href="{{ post.get_absolute_url }}" class="block aspect-[16/9] overflow-hidden bg-cream-dark">
+          {% include "components/lazy_image.html" with image=post.featured_image alt=post.title ratio="h-full w-full object-cover" %}
+        </a>
+      {% endif %}
+      <div class="flex flex-1 flex-col p-5">
+        {% if post.category %}<p class="text-xs font-semibold uppercase tracking-wide text-harvest-dark">{{ post.category.name }}</p>{% endif %}
+        <h2 class="mt-2 text-lg font-semibold text-stone-900"><a href="{{ post.get_absolute_url }}" class="hover:text-forest">{{ post.title }}</a></h2>
+        {% if post.excerpt %}<p class="mt-2 flex-1 text-sm text-stone-600">{{ post.excerpt|truncatewords:24 }}</p>{% endif %}
+        <p class="mt-4 text-xs text-stone-500">
+          {{ post.published_at|default:post.created_at|date:"j M Y" }}
+          {% if post.reading_minutes %}· {{ post.reading_minutes }} {% translate "min read" %}{% endif %}
+        </p>
+      </div>
+    </article>
+  {% empty %}
+    {% include "components/empty_state.html" with title=empty_title message=empty_message %}
+  {% endfor %}
+</div>
+{% include "components/pagination.html" with page_obj=page_obj %}

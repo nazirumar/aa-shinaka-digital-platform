@@ -1,0 +1,83 @@
+@import "tailwindcss";
+
+/* Hide Alpine-controlled elements until Alpine initialises. */
+[x-cloak] {
+  display: none !important;
+}
+
+/* Tailwind v4 scans sources automatically from the project root, but the
+   Django apps/templates live outside the default glob, so declare them. */
+@source "../../templates";
+@source "../../apps";
+
+/* AA Shinaka brand tokens. Replace with owner-approved brand values. */
+@theme {
+  --color-brand-50: #f0f7f2;
+  --color-brand-100: #dcefe1;
+  --color-brand-200: #bbdfc6;
+  --color-brand-300: #8ac7a1;
+  --color-brand-400: #55a876;
+  --color-brand-500: #348b58;
+  --color-brand-600: #246f45;
+  --color-brand-700: #1d5838;
+  --color-brand-800: #19462e;
+  --color-brand-900: #153a27;
+  --color-brand-950: #0a2015;
+
+  /* Official AA Shinaka palette (semantic single-token colours). */
+  --color-forest: #174c38;
+  --color-forest-light: #1f6b4f;
+  --color-forest-dark: #0f3527;
+  --color-leaf: #2f855a;
+  --color-leaf-light: #3fa06f;
+  --color-harvest: #d4a64a;
+  --color-harvest-light: #e2be74;
+  --color-harvest-dark: #b0812f;
+  --color-cream: #f7f5ee;
+  --color-cream-dark: #ece7d8;
+
+  /* Subtle gold accents for the admin dashboard. */
+  --color-gold-50: #fdf9ec;
+  --color-gold-100: #faf0cf;
+  --color-gold-200: #f4df9c;
+  --color-gold-300: #ecc763;
+  --color-gold-400: #e5b23a;
+  --color-gold-500: #d69a20;
+  --color-gold-600: #b57818;
+  --color-gold-700: #915917;
+  --color-gold-800: #794719;
+  --color-gold-900: #673c19;
+
+  /* Warm cream backgrounds. */
+  --color-cream-50: #fdfcf8;
+  --color-cream-100: #faf6ec;
+  --color-cream-200: #f3ebd8;
+
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+/* Rich text rendered from CMS body fields (staff-authored HTML). */
+@layer components {
+  .rich-text {
+    @apply space-y-4 text-stone-700 leading-relaxed;
+  }
+  .rich-text h2 {
+    @apply mt-8 text-2xl font-semibold text-stone-900;
+  }
+  .rich-text h3 {
+    @apply mt-6 text-xl font-semibold text-stone-900;
+  }
+  .rich-text ul {
+    @apply list-disc space-y-2 pl-6;
+  }
+  .rich-text ol {
+    @apply list-decimal space-y-2 pl-6;
+  }
+  .rich-text a {
+    @apply text-forest underline hover:text-leaf;
+  }
+  .rich-text blockquote {
+    @apply border-l-4 border-harvest pl-4 italic text-stone-600;
+  }
+}
+

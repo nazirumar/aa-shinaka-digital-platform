@@ -1,0 +1,21 @@
+{% comment %}Accessible pagination for a Page object (``page_obj``).{% endcomment %}
+{% if page_obj.paginator.num_pages > 1 %}
+  <nav class="flex items-center justify-between border-t border-stone-200 px-4 py-3 text-sm" aria-label="Pagination">
+    <p class="text-stone-600">
+      Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+      <span class="text-stone-400">· {{ page_obj.paginator.count }} total</span>
+    </p>
+    <div class="flex gap-2">
+      {% if page_obj.has_previous %}
+        <a href="{% querystring page=page_obj.previous_page_number %}" class="rounded-md border border-stone-300 px-3 py-1.5 hover:bg-stone-100">Previous</a>
+      {% else %}
+        <span class="rounded-md border border-stone-200 px-3 py-1.5 text-stone-400" aria-disabled="true">Previous</span>
+      {% endif %}
+      {% if page_obj.has_next %}
+        <a href="{% querystring page=page_obj.next_page_number %}" class="rounded-md border border-stone-300 px-3 py-1.5 hover:bg-stone-100">Next</a>
+      {% else %}
+        <span class="rounded-md border border-stone-200 px-3 py-1.5 text-stone-400" aria-disabled="true">Next</span>
+      {% endif %}
+    </div>
+  </nav>
+{% endif %}

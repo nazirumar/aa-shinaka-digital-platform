@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+<div class="mx-auto max-w-3xl px-4 py-10">
+  <h1 class="text-2xl font-semibold text-stone-900">{% trans "Request a quotation" %}</h2>
+  <p class="mt-1 text-sm text-stone-600">
+    {{ listing.product.name }} · {{ listing.state.name }}{% if listing.lga %} · {{ listing.lga.name }}{% endif %} · {{ listing.packaging }}
+  </p>
+
+  <form method="post" class="mt-6 space-y-5 rounded-xl border border-stone-200 bg-white p-6">
+    {% csrf_token %}
+    {% if form.non_field_errors %}
+      {% for error in form.non_field_errors %}{% include "components/alert.html" with type="error" message=error %}{% endfor %}
+    {% endif %}
+    <div class="grid gap-5 sm:grid-cols-2">
+      {% include "components/form_field.html" with field=form.quantity %}
+      {% include "components/form_field.html" with field=form.packaging %}
+      {% include "components/form_field.html" with field=form.destination_state %}
+      {% include "components/form_field.html" with field=form.destination_lga %}
+      {% include "components/form_field.html" with field=form.destination_note %}
+      {% include "components/form_field.html" with field=form.contact_name %}
+      {% include "components/form_field.html" with field=form.contact_email %}
+      {% include "components/form_field.html" with field=form.contact_phone %}
+      <div class="sm:col-span-2">{% include "components/form_field.html" with field=form.requirements %}</div>
+    </div>
+    <button type="submit" class="rounded-md bg-forest px-5 py-2.5 text-sm font-medium text-white hover:bg-forest-light">{% trans "Submit request" %}</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,18 @@
+{% load i18n catalog_tags %}{% comment %}
+HTMX-swapped listing results: the inner content of ``#listing-results``.
+Shared by category, state, LGA and search pages. Public querysets are
+published + active only (see ``selectors._base_listing_queryset``).
+{% endcomment %}
+{% translate "No listings match your filters" as t_empty_title %}
+{% translate "Try widening the price range, clearing the origin filter, or searching a different term." as t_empty_message %}
+<div class="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+  {% for listing in listings %}
+    {% include "components/product_card.html" with listing=listing %}
+  {% empty %}
+    <div class="col-span-full">
+      {% include "components/empty_state.html" with title=t_empty_title message=t_empty_message %}
+    </div>
+  {% endfor %}
+</div>
+
+{% include "components/pagination.html" with page_obj=page_obj %}

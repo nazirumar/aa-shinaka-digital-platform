@@ -1,0 +1,76 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <h2 class="text-lg font-semibold text-stone-900">Categories</h2>
+  <a href="{% url 'catalog_dashboard:category_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">New category</a>
+</div>
+
+<p class="mt-2 text-sm text-stone-600">Categories may be nested. Ordering, visibility and nesting all drive the public shop navigation.</p>
+
+<div class="mt-4 overflow-x-auto rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th scope="col" class="px-4 py-3">Category</th>
+        <th scope="col" class="px-4 py-3">Sort</th>
+        <th scope="col" class="px-4 py-3">Status</th>
+        <th scope="col" class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for root in roots %}
+        <tr>
+          <td class="px-4 py-3">
+            <span class="font-medium text-stone-900">{{ root.name }}</span>
+            {% if root.is_featured %}<span class="ml-2 rounded-full bg-gold-100 px-2 py-0.5 text-xs text-gold-700">Featured</span>{% endif %}
+            {% if root.description %}<p class="mt-0.5 text-xs text-stone-500">{{ root.description|truncatewords:12 }}</p>{% endif %}
+          </td>
+          <td class="px-4 py-3 text-stone-600">{{ root.sort_order }}</td>
+          <td class="px-4 py-3">
+            <form method="post" action="{% url 'catalog_dashboard:category_toggle' root.pk %}">
+              {% csrf_token %}
+              <button type="submit" class="rounded-full px-2 py-0.5 text-xs {% if root.is_active %}bg-leaf/10 text-leaf{% else %}bg-stone-100 text-stone-500{% endif %}">{% if root.is_active %}Active{% else %}Hidden{% endif %}</button>
+            </form>
+          </td>
+          <td class="px-4 py-3">
+            <div class="flex flex-wrap items-center justify-end gap-2">
+              <form method="post" action="{% url 'catalog_dashboard:category_reorder' root.pk %}">{% csrf_token %}<input type="hidden" name="step" value="-1"><button type="submit" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream" aria-label="Move up">↑</button></form>
+              <form method="post" action="{% url 'catalog_dashboard:category_reorder' root.pk %}">{% csrf_token %}<input type="hidden" name="step" value="1"><button type="submit" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream" aria-label="Move down">↓</button></form>
+              <a href="{% url 'catalog_dashboard:category_edit' root.pk %}" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Edit</a>
+              <form method="post" action="{% url 'catalog_dashboard:category_delete' root.pk %}" onsubmit="return confirm('Archive this category?');">{% csrf_token %}<button type="submit" class="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Archive</button></form>
+            </div>
+          </td>
+        </tr>
+        {% for pk, child_list in children.items %}
+          {% if pk == root.pk %}
+            {% for child in child_list %}
+              <tr class="bg-cream-50">
+                <td class="px-4 py-3 pl-10">
+                  <span class="text-stone-400" aria-hidden="true">↳</span>
+                  <span class="font-medium text-stone-800">{{ child.name }}</span>
+                </td>
+                <td class="px-4 py-3 text-stone-600">{{ child.sort_order }}</td>
+                <td class="px-4 py-3">
+                  <form method="post" action="{% url 'catalog_dashboard:category_toggle' child.pk %}">
+                    {% csrf_token %}
+                    <button type="submit" class="rounded-full px-2 py-0.5 text-xs {% if child.is_active %}bg-leaf/10 text-leaf{% else %}bg-stone-100 text-stone-500{% endif %}">{% if child.is_active %}Active{% else %}Hidden{% endif %}</button>
+                  </form>
+                </td>
+                <td class="px-4 py-3">
+                  <div class="flex flex-wrap items-center justify-end gap-2">
+                    <a href="{% url 'catalog_dashboard:category_edit' child.pk %}" class="rounded border border-stone-300 px-2 py-1 text-xs hover:bg-cream">Edit</a>
+                    <form method="post" action="{% url 'catalog_dashboard:category_delete' child.pk %}" onsubmit="return confirm('Archive this category?');">{% csrf_token %}<button type="submit" class="rounded border border-red-200 px-2 py-1 text-xs text-red-700 hover:bg-red-50">Archive</button></form>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          {% endif %}
+        {% endfor %}
+      {% empty %}
+        <tr><td colspan="4" class="px-4 py-10 text-center text-stone-500">No categories yet. <a href="{% url 'catalog_dashboard:category_create' %}" class="text-forest hover:underline">Create the first one</a>.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

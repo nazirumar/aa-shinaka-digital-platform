@@ -1,0 +1,11 @@
+{% comment %}
+Lazy-loaded image from a MediaAsset.
+Props: image (MediaAsset), alt, ratio (utility classes on the <img>), eager (bool).
+{% endcomment %}
+{% if image %}
+  <img src="{{ image.file.url }}"
+       alt="{{ alt|default:image.alt_text|default:image.title }}"
+       {% if eager %}loading="eager"{% else %}loading="lazy"{% endif %}
+       decoding="async"
+       class="{{ ratio }}">
+{% endif %}

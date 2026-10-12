@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+{% translate "Apply filters" as t_apply %}
+{% translate "Origin" as t_origin %}
+{% translate "State" as t_state %}
+{% translate "LGA" as t_lga %}
+{% translate "Price (₦)" as t_price %}
+{% translate "In stock only" as t_in_stock %}
+{% translate "Subcategories" as t_subcategories %}
+
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <div class="mt-4 flex flex-col gap-6 lg:flex-row lg:items-center">
+      {% if category.image %}
+        <img src="{{ category.image.url }}" alt="{{ category.name }}" class="h-32 w-32 rounded-xl object-cover">
+      {% endif %}
+      <div>
+        <h1 class="text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{{ category.name }}</h1>
+        {% if category.description %}<p class="mt-3 max-w-2xl text-stone-600">{{ category.description }}</p>{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<section class="mx-auto max-w-7xl px-4 py-10 sm:py-12">
+  {% if children %}
+    <div class="mb-8">
+      <h2 class="text-sm font-semibold uppercase tracking-wide text-stone-500">{{ t_subcategories }}</h2>
+      <div class="mt-3 flex flex-wrap gap-2">
+        {% for child in children %}
+          <a href="{{ child.get_absolute_url }}" class="rounded-full border border-stone-300 bg-white px-4 py-1.5 text-sm font-medium text-stone-700 hover:border-forest hover:text-forest">{{ child.name }}</a>
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <form method="get" action="{{ request.path }}"
+        hx-get="{{ request.path }}" hx-target="#listing-results" hx-swap="innerHTML"
+        hx-trigger="change delay:200ms" hx-push-url="true"
+        class="rounded-xl border border-stone-200 bg-white p-4">
+    <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div>
+        <label for="filter-state" class="block text-sm font-medium text-stone-700">{{ t_state }}</label>
+        <select id="filter-state" name="state" class="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200"
+                hx-get="{% url 'catalog:lga_options' %}?value=slug" hx-target="#filter-lga" hx-trigger="change" hx-include="this">
+          <option value="">{% translate "All states" %}</option>
+          {% for state in states %}
+            <option value="{{ state.slug }}" {% if selected_state == state.slug %}selected{% endif %}>{{ state.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-lga" class="block text-sm font-medium text-stone-700">{{ t_lga }}</label>
+        <select id="filter-lga" name="lga" class="mt-1 w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-200">
+          <option value="">{% translate "All LGAs" %}</option>
+          {% for lga in lgas %}
+            <option value="{{ lga.slug }}" {% if selected_lga == lga.slug %}selected{% endif %}>{{ lga.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div>
+        <label for="filter-min" class="block text-sm font-medium text-stone-700">{{ t_price }}</label>
+        <div class="mt-1 flex items-center gap-2">
+          <input id="filter-min" type="number" name="min_price" min="0" step="1" value="{{ selected_min_price }}" placeholder="{% translate 'Min' %}" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900">
+          <span class="text-stone-400">–</span>
+          <input type="number" name="max_price" min="0" step="1" value="{{ selected_max_price }}" placeholder="{% translate 'Max' %}" aria-label="{% translate 'Maximum price' %}" class="w-full rounded-md border border-stone-300 bg-white px-3 py-2 text-stone-900">
+        </div>
+      </div>
+      <div class="flex items-end gap-3">
+        <label class="inline-flex items-center gap-2 text-sm text-stone-700">
+          <input type="checkbox" name="in_stock" value="1" {% if in_stock_only %}checked{% endif %} class="h-4 w-4 rounded border-stone-300 text-brand-600 focus:ring-brand-500">
+          {{ t_in_stock }}
+        </label>
+        <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">{{ t_apply }}</button>
+      </div>
+    </div>
+  </form>
+
+  <div id="listing-results" class="mt-8">
+    {% include "catalog/partials/_listing_results.html" %}
+  </div>
+</section>
+{% endblock %}

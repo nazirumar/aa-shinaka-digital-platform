@@ -1,0 +1,87 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block dashboard_content %}
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  {% include "components/metric_card.html" with label="Categories" value=counts.categories hint="Across all levels" tone="brand" %}
+  {% include "components/metric_card.html" with label="Products" value=counts.products hint=counts.products_published|stringformat:"%s published" tone="brand" %}
+  {% include "components/metric_card.html" with label="Listings" value=counts.listings hint=counts.listings_active|stringformat:"%s active" tone="stone" %}
+  {% include "components/metric_card.html" with label="Low stock" value=counts.listings_low_stock hint="At or below threshold" tone="amber" %}
+</div>
+
+<div class="mt-6 grid gap-4 lg:grid-cols-3">
+  <div class="rounded-xl border border-stone-200 bg-white p-5 lg:col-span-2">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-stone-900">Recently updated products</h2>
+      <a href="{% url 'catalog_dashboard:product_list' %}" class="text-sm text-forest hover:underline">View all</a>
+    </div>
+    <div class="mt-4 overflow-x-auto">
+      <table class="min-w-full divide-y divide-stone-100 text-sm">
+        <tbody class="divide-y divide-stone-100">
+          {% for product in recent_products %}
+            <tr>
+              <td class="py-3">
+                <a href="{% url 'catalog_dashboard:product_edit' product.pk %}" class="font-medium text-stone-800 hover:text-forest">{{ product.name }}</a>
+                <span class="block text-xs text-stone-500">{{ product.category.name }}{% if product.unit %} · {{ product.unit.code }}{% endif %}</p></span>
+              </td>
+              <td class="px-4 py-3 text-right">
+                <span class="rounded-full px-2 py-0.5 text-xs {{ product.status|status_class }}">{{ product.get_status_display }}</span>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td class="py-6 text-sm text-stone-500">No products yet. <a href="{% url 'catalog_dashboard:product_create' %}" class="text-forest hover:underline">Create one</a>.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-stone-900">Low stock</h2>
+      <a href="{% url 'catalog_dashboard:low_stock' %}" class="text-sm text-forest hover:underline">Inventory</a>
+    </div>
+    <div class="mt-4 space-y-3">
+      {% for listing in low_stock %}
+        <a href="{% url 'catalog_dashboard:listing_detail' listing.pk %}" class="block rounded-md border border-stone-100 p-3 hover:border-amber-300">
+          <p class="text-sm font-medium text-stone-800">{{ listing.product.name }}</p>
+          <p class="mt-0.5 text-xs text-stone-500">{{ listing.state.name }} · {{ listing.packaging }}</p>
+          <p class="mt-1 text-xs text-amber-700">{{ listing.available_stock|decimal_str }} on hand</p>
+        </a>
+      {% empty %}
+        <p class="text-sm text-stone-500">Nothing below threshold.</p>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-4 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-stone-900">Recent listings</h2>
+      <a href="{% url 'catalog_dashboard:listing_list' %}" class="text-sm text-forest hover:underline">View all</a>
+    </div>
+    <div class="mt-4 divide-y divide-stone-100">
+      {% for listing in recent_listings %}
+        <a href="{% url 'catalog_dashboard:listing_detail' listing.pk %}" class="flex items-center justify-between gap-3 py-3 hover:bg-cream-50">
+          <span>
+            <span class="block text-sm font-medium text-stone-800">{{ listing.product.name }}</span>
+            <span class="block text-xs text-stone-500">{{ listing.state.name }} · {{ listing.packaging }}</span>
+          </span>
+          <span class="text-sm font-semibold text-forest">{{ listing.price|money:listing.currency }}</span>
+        </a>
+      {% empty %}
+        <p class="py-6 text-sm text-stone-500">No listings yet.</p>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    <a href="{% url 'catalog_dashboard:category_create' %}" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm hover:border-forest/40">New category</a>
+    <a href="{% url 'catalog_dashboard:product_create' %}" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm hover:border-forest/40">New product</a>
+    <a href="{% url 'catalog_dashboard:listing_create' %}" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm hover:border-forest/40">New listing</a>
+    <a href="{% url 'catalog_dashboard:reference_create' %}" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm hover:border-forest/40">New market reference</a>
+    <a href="{% url 'catalog:shop_index' %}" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm hover:border-forest/40">View public shop</a>
+    <a href="{% url 'catalog_dashboard:low_stock' %}" class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm hover:border-forest/40">Inventory · {{ counts.listings_low_stock }} low</a>
+  </div>
+</div>
+{% endblock %}

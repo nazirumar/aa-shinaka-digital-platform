@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+{% translate "No FAQs yet" as t_empty_title %}
+{% translate "Answers to common questions will appear here once published." as t_empty_message %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-4 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{% translate "Frequently asked questions" %}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{% translate "Common questions about our services, products and processes." %}</p>
+  </div>
+</div>
+
+<section class="mx-auto max-w-3xl px-4 py-14 sm:py-16">
+  {% if faqs %}
+    <div class="divide-y divide-stone-200 rounded-xl border border-stone-200 bg-white">
+      {% for faq in faqs %}
+        <div x-data="{ open: false }" class="p-5">
+          <button type="button" class="flex w-full items-center justify-between gap-4 text-left font-medium text-stone-900" @click="open = !open" :aria-expanded="open">
+            <span>{{ faq.question }}</span>
+            <span aria-hidden="true" x-text="open ? '−' : '+'"></span>
+          </button>
+          <div x-show="open" x-cloak class="mt-3 text-sm text-stone-600">{{ faq.answer|linebreaks }}</div>
+        </div>
+      {% endfor %}
+    </div>
+  {% else %}
+    {% include "components/empty_state.html" with title=t_empty_title message=t_empty_message %}
+  {% endif %}
+</section>
+{% endblock %}
