@@ -1,0 +1,242 @@
+# ===========================================================================
+# AA Shinaka Digital Business Platform — LOCAL DEVELOPMENT stack (Docker).
+#
+# Run these from the REPOSITORY ROOT:
+#
+#   docker compose config              # validate / render the model
+#   docker compose up --build          # build the image and start the stack
+#   docker compose logs -f web         # follow the application log
+#   docker compose down                # stop everything (volumes are kept)
+#   docker compose down -v             # stop AND delete the database/uploads
+#
+#   Application: http://localhost:8000
+#
+# Scope
+#   A small, laptop-only stack that mirrors the PRODUCTION service topology:
+#   Django, PostgreSQL, Redis, one Celery worker and one Celery beat. It runs
+#   Django's development server (DEBUG on, automatic reload) and bind-mounts the
+#   source, and it publishes ONLY the web port.
+#
+#   This is NOT the production stack. It must never be used on staging or
+#   production. The hardened, nginx-fronted deployment lives in
+#   deploy/docker-compose.yml (+ the .staging / .local overlays); this file
+#   neither replaces nor modifies those. It exists so that `docker compose
+#   config` and `docker compose up` work from the repository root out of the
+#   box.
+#
+# Safety by default
+#   * PostgreSQL and Redis are published on NO host port — only `web` is
+#     reachable from the host.
+#   * Paystack is forced into TEST mode (PAYSTACK_LIVE_MODE=false); the app
+#     refuses a live key exactly as it does in production.
+#   * Every value is an environment variable with a development default; no
+#     secret is hardcoded. Override anything through the shell or the root
+#     `.env` file (Compose reads that file for `${...}` interpolation).
+#   * Settings module: config.settings.dev.
+# ===========================================================================
+
+name: aa-shinaka-dev
+
+# Environment shared by every application service. DATABASE_URL / CELERY_* use
+# the Compose service names (`db`, `redis`) — NOT 127.0.0.1 — because these run
+# inside containers on the Compose network.
+x-app-environment: &app-environment
+  DJANGO_SETTINGS_MODULE: config.settings.dev
+  DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY:-dev-only-insecure-key-not-for-production}
+  DATABASE_URL: postgres://${POSTGRES_USER:-aa_shinaka}:${POSTGRES_PASSWORD:-aa_shinaka_dev_pw}@db:5432/${POSTGRES_DB:-aa_shinaka}
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  CACHE_URL: redis://redis:6379/2
+  # Payments: test mode only — live mode is hard-off.
+  PAYSTACK_ENABLED: ${PAYSTACK_ENABLED:-false}
+  PAYSTACK_LIVE_MODE: "false"
+  PAYSTACK_SECRET_KEY: ${PAYSTACK_SECRET_KEY:-}
+  PAYSTACK_PUBLIC_KEY: ${PAYSTACK_PUBLIC_KEY:-}
+  # Only the single `migrate` service migrates, and nothing collectstatics here.
+  RUN_MIGRATIONS: "false"
+  RUN_COLLECTSTATIC: "false"
+
+# Common image/behaviour for the services built from the repository.
+x-app-service: &app-service
+  build:
+    context: .
+    dockerfile: deploy/Dockerfile
+  image: aa-shinaka:dev
+  restart: unless-stopped
+  init: true
+  security_opt:
+    - no-new-privileges:true
+
+services:
+  # ---------------------------------------------------------------------
+  # PostgreSQL — internal only, persistent named volume, health check.
+  # ---------------------------------------------------------------------
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aa_shinaka}
+      POSTGRES_USER: ${POSTGRES_USER:-aa_shinaka}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aa_shinaka_dev_pw}
+    # No `ports:` — the database is never reachable from the host.
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1G }
+
+  # ---------------------------------------------------------------------
+  # Redis — Celery broker/result backend and cache. Internal only,
+  # persistent named volume, health check.
+  # ---------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--save", "60", "1"]
+    # No `ports:` — Redis is never reachable from the host.
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
+
+  # ---------------------------------------------------------------------
+  # One-shot release step. Runs `migrate`, then exits; web/worker/beat wait
+  # for it to complete so migrations never race. Reuses the production
+  # entrypoint, which by default also runs `check --deploy` (warnings only
+  # under dev settings).
+  # ---------------------------------------------------------------------
+  migrate:
+    <<: *app-service
+    restart: "no"
+    command: ["python", "manage.py", "migrate", "--noinput"]
+    environment:
+      <<: *app-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 768M }
+
+  # ---------------------------------------------------------------------
+  # Django development server. The source is bind-mounted for live reload;
+  # the image's virtualenv is intentionally NOT shadowed by any mount.
+  # ---------------------------------------------------------------------
+  web:
+    <<: *app-service
+    command: ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+    environment:
+      <<: *app-environment
+    ports:
+      - "${WEB_PORT:-8000}:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - ./apps:/app/apps
+      - ./config:/app/config
+      - ./templates:/app/templates
+      - ./locale:/app/locale
+      - ./manage.py:/app/manage.py
+      - media:/app/media
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz/',timeout=5)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits: { cpus: "1.5", memory: 1G }
+
+  # ---------------------------------------------------------------------
+  # Celery worker. Media is shared so notification/export tasks can read and
+  # write uploaded files.
+  # ---------------------------------------------------------------------
+  worker:
+    <<: *app-service
+    command:
+      [
+        "celery",
+        "-A",
+        "config",
+        "worker",
+        "-l",
+        "info",
+        "--concurrency",
+        "${CELERY_CONCURRENCY:-2}",
+      ]
+    environment:
+      <<: *app-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    volumes:
+      - media:/app/media
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 768M }
+
+  # ---------------------------------------------------------------------
+  # Celery beat — the periodic-task scheduler. Run ONE instance only.
+  # ---------------------------------------------------------------------
+  beat:
+    <<: *app-service
+    command:
+      [
+        "celery",
+        "-A",
+        "config",
+        "beat",
+        "-l",
+        "info",
+        "--schedule",
+        "/tmp/celerybeat-schedule",
+        "--max-interval",
+        "300",
+      ]
+    environment:
+      <<: *app-environment
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 256M }
+
+volumes:
+  pgdata:
+    driver: local
+  redisdata:
+    driver: local
+  media:
+    driver: local

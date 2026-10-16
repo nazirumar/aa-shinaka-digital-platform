@@ -445,6 +445,7 @@ live Paystack. Later phases must not start without approval.
 | [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) | Load-test method and WCAG 2.2 AA accessibility checklist |
 | [`docs/LAUNCH_CONTENT_CHECKLIST.md`](docs/LAUNCH_CONTENT_CHECKLIST.md) | Owner-supplied content required before launch |
 | [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) | Per-release gate checklist |
+| [`docs/LOCAL_DOCKER_DEVELOPMENT.md`](docs/LOCAL_DOCKER_DEVELOPMENT.md) | Local development vs deployment Compose stacks, and the commands for each |
 | [`deploy/README.md`](deploy/README.md) | Deployment assets and topologies |
 
 ## Technology stack
