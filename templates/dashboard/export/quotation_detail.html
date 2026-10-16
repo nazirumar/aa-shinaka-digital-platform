@@ -1,0 +1,95 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">{{ quotation.reference }} <span class="text-sm font-normal text-stone-500">rev {{ quotation.revision }}</span></h1>
+    <p class="text-sm text-stone-500">{{ quotation.customer.email }} · {{ quotation.destination.country.name }} · {{ quotation.get_status_display }}</p>
+  </div>
+  <div class="flex gap-2">
+    {% if quotation.status == "pending_approval" or quotation.status == "draft" %}
+      <form method="post" action="{% url 'export_dashboard:quotation_approve' quotation.pk %}">{% csrf_token %}<button class="rounded-md bg-forest px-4 py-2 text-sm text-white hover:bg-forest-dark">{% trans "Approve & issue" %}</button></form>
+    {% endif %}
+    {% if order %}
+      <a href="{% url 'export_dashboard:order_detail' order.reference %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "View export order" %}</a>
+    {% endif %}
+  </div>
+</div>
+
+<div class="mt-4 grid gap-6 lg:grid-cols-3">
+  <div class="space-y-6 lg:col-span-2">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">{% trans "Terms" %}</h2>
+      <dl class="mt-3 grid gap-3 text-sm sm:grid-cols-2">
+        <div><dt class="text-stone-500">{% trans "Incoterm" %}</dt><dd class="font-medium">{{ quotation.incoterm }} ({{ quotation.incoterm_version }}) — {{ quotation.named_place }}</dd></div>
+        <div><dt class="text-stone-500">{% trans "Currency" %}</dt><dd class="font-medium">{{ quotation.currency }}</dd></div>
+        <div><dt class="text-stone-500">{% trans "Deposit" %}</dt><dd class="font-medium">{{ quotation.deposit_percentage }}%</dd></div>
+        <div><dt class="text-stone-500">{% trans "Valid until" %}</dt><dd class="font-medium">{{ quotation.valid_until|date:"Y-m-d"|default:"—" }}</dd></div>
+      </dl>
+      <p class="mt-3 text-sm text-stone-600">{{ quotation.payment_terms|default:"" }}</p>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white">
+      <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Lines" %}</h2>
+      <table class="min-w-full divide-y divide-stone-100 text-sm">
+        <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr><th class="px-5 py-2">{% trans "Description" %}</th><th class="px-5 py-2">{% trans "Type" %}</th><th class="px-5 py-2">{% trans "Qty" %}</th><th class="px-5 py-2">{% trans "Unit price" %}</th><th class="px-5 py-2">{% trans "Amount" %}</th></tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for item in items %}
+            <tr><td class="px-5 py-2">{{ item.description }}</td><td class="px-5 py-2">{{ item.get_charge_type_display }}</td><td class="px-5 py-2">{{ item.quantity }}</td><td class="px-5 py-2">{{ item.unit_price }}</td><td class="px-5 py-2">{{ item.amount }}</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="bg-stone-50">
+          <tr><td colspan="4" class="px-5 py-2 text-right text-stone-500">{% trans "Subtotal" %}</td><td class="px-5 py-2">{{ quotation.subtotal }}</td></tr>
+          <tr><td colspan="4" class="px-5 py-2 text-right font-medium">{% trans "Total" %}</td><td class="px-5 py-2 font-semibold">{{ quotation.currency }} {{ quotation.total }}</td></tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    {% if quotation.status == "issued" or quotation.status == "accepted" or quotation.status == "rejected" or quotation.status == "expired" %}
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h2 class="font-semibold text-stone-900">{% trans "Revise" %}</h2>
+        <p class="mt-1 text-xs text-stone-500">{% trans "Revising snapshots the current version and reopens the quotation for approval." %}</p>
+        <form method="post" action="{% url 'export_dashboard:quotation_revise' quotation.pk %}" class="mt-3">
+          {% csrf_token %}
+          {{ revise_form.as_p }}
+          <button class="mt-2 rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Create revision" %}</button>
+        </form>
+      </div>
+    {% endif %}
+
+    {% if quotation.status == "draft" or quotation.status == "pending_approval" %}
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h2 class="font-semibold text-stone-900">{% trans "Approval" %}</h2>
+        <form method="post" action="{% url 'export_dashboard:quotation_approve' quotation.pk %}" class="mt-3">
+          {% csrf_token %}
+          <button class="rounded-md bg-forest px-4 py-2 text-sm text-white hover:bg-forest-dark">{% trans "Approve & issue" %}</button>
+        </form>
+      </div>
+    {% endif %}
+
+    {% if revisions %}
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h2 class="font-semibold text-stone-900">{% trans "Revisions" %}</h2>
+        <ul class="mt-3 space-y-2 text-sm">
+          {% for r in revisions %}
+            <li><span class="font-medium">{% trans "Revision" %} {{ r.revision_number }}</span> <span class="text-stone-500">{{ r.created_at|date:"Y-m-d" }}</span>{% if r.changes_summary %}<p class="text-stone-600">{{ r.changes_summary }}</p>{% endif %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    {% endif %}
+
+    {% if order %}
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h2 class="font-semibold text-stone-900">{% trans "Export order" %}</h2>
+        <a href="{% url 'export_dashboard:order_detail' order.reference %}" class="mt-2 inline-block font-medium text-forest hover:underline">{{ order.reference }}</a>
+        <p class="text-sm text-stone-500">{{ order.get_status_display }}</p>
+      </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

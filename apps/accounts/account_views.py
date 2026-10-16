@@ -2,15 +2,19 @@
 
 from __future__ import annotations
 
+import os
+
 from django.contrib import messages
 from django.contrib.auth import update_session_auth_hash
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse
+from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import record_audit
 
+from . import documents as document_services
+from .activity import activity_feed
 from .forms import AddressForm, ProfileForm, StyledPasswordChangeForm
 from .models import Address
 from .services import (
@@ -34,6 +38,30 @@ def _profile_completion(user) -> tuple[int, list[str]]:
     return round(done_count / len(checks) * 100), missing
 
 
+def _account_metrics(user) -> dict:
+    """Real, non-fabricated counters for the unified portal dashboard."""
+    from apps.export.models import ExportEnquiry
+    from apps.notifications.models import Notification
+    from apps.orders.models import Order
+    from apps.orders.payment_models import Invoice
+    from apps.services.models import ServiceRequest
+    from apps.support.models import SupportStatus, SupportTicket
+    from apps.training.models import Enrollment
+
+    return {
+        "orders_total": Order.objects.filter(user=user).count(),
+        "invoices_total": Invoice.objects.filter(order__user=user).count(),
+        "service_requests_total": ServiceRequest.objects.filter(customer=user).count(),
+        "export_enquiries_total": ExportEnquiry.objects.filter(customer=user).count(),
+        "enrollments_total": Enrollment.objects.filter(student=user).count(),
+        "tickets_open": SupportTicket.objects.filter(customer=user)
+        .exclude(status__in=[SupportStatus.RESOLVED, SupportStatus.CLOSED])
+        .count(),
+        "notifications_unread": Notification.objects.filter(recipient=user, is_read=False).count(),
+        "documents_total": document_services.document_count(user),
+    }
+
+
 @login_required
 def dashboard(request: HttpRequest) -> HttpResponse:
     """Customer landing page with real account status only."""
@@ -46,6 +74,7 @@ def dashboard(request: HttpRequest) -> HttpResponse:
             "profile_completion": percentage,
             "missing_profile_items": missing,
             "addresses": request.user.addresses.all()[:3],
+            "metrics": _account_metrics(request.user),
         },
     )
 
@@ -157,3 +186,53 @@ def security(request: HttpRequest) -> HttpResponse:
     else:
         form = StyledPasswordChangeForm(request.user)
     return render(request, "accounts/security.html", {"form": form, "page_title": "Security"})
+
+
+@login_required
+def documents(request: HttpRequest) -> HttpResponse:
+    """The customer's documents across every domain, in one place."""
+    return render(
+        request,
+        "accounts/documents.html",
+        {
+            "page_title": "Documents",
+            "sections": document_services.document_sections(request.user),
+        },
+    )
+
+
+@login_required
+def document_download(request: HttpRequest, kind: str, pk) -> HttpResponse:
+    """Authorised download of a customer-owned service file.
+
+    Ownership is enforced by :func:`apps.accounts.documents.service_file`; an
+    unknown kind or a record that does not belong to the caller is a 404.
+    """
+    document = document_services.service_file(request.user, kind, pk)
+    if document is None or not document.file:
+        raise Http404("Document not found.")
+    record_audit(
+        actor=request.user,
+        action="account.document_downloaded",
+        target=document,
+        after={"kind": kind},
+        request=request,
+    )
+    return FileResponse(
+        document.file.open("rb"),
+        as_attachment=True,
+        filename=os.path.basename(document.file.name),
+    )
+
+
+@login_required
+def activity(request: HttpRequest) -> HttpResponse:
+    """Reverse-chronological feed of the customer's real activity."""
+    return render(
+        request,
+        "accounts/activity.html",
+        {
+            "page_title": "Activity",
+            "entries": activity_feed(request.user),
+        },
+    )

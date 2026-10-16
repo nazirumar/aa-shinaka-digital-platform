@@ -1,0 +1,17 @@
+{% load i18n %}
+{% with url_name=request.resolver_match.url_name %}
+<nav class="mb-6 flex flex-wrap gap-1 border-b border-stone-200 pb-3 text-sm" aria-label="{% trans 'Training sections' %}">
+  <a href="{% url 'training_dashboard:home' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'home' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Overview" %}</a>
+  <a href="{% url 'training_dashboard:course_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'course_list' or url_name == 'course_detail' or url_name == 'course_create' or url_name == 'course_edit' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Courses" %}</a>
+  <a href="{% url 'training_dashboard:category_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'category_list' or url_name == 'category_create' or url_name == 'category_edit' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Categories" %}</a>
+  <a href="{% url 'training_dashboard:instructor_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'instructor_list' or url_name == 'instructor_create' or url_name == 'instructor_edit' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Instructors" %}</a>
+  <a href="{% url 'training_dashboard:venue_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'venue_list' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Venues" %}</a>
+  <a href="{% url 'training_dashboard:session_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'session_list' or url_name == 'session_detail' or url_name == 'session_create' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Sessions" %}</a>
+  <a href="{% url 'training_dashboard:enrollment_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'enrollment_list' or url_name == 'enrollment_detail' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Enrolments" %}</a>
+  <a href="{% url 'training_dashboard:attendance_session_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'attendance_session_list' or url_name == 'attendance_detail' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Attendance" %}</a>
+  <a href="{% url 'training_dashboard:assessment_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'assessment_list' or url_name == 'assessment_detail' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Assessments" %}</a>
+  <a href="{% url 'training_dashboard:certificate_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'certificate_list' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Certificates" %}</a>
+  <a href="{% url 'training_dashboard:certificate_template_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'certificate_template_list' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Templates" %}</a>
+  <a href="{% url 'training_dashboard:reports' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'reports' %}bg-forest/10 font-medium text-forest{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Reports" %}</a>
+</nav>
+{% endwith %}

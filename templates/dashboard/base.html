@@ -1,4 +1,4 @@
-{% load static perm_tags %}{% has_capability user 'staff.view' as can_view_staff %}{% has_capability user 'audit.view' as can_view_audit %}{% has_capability user 'content.manage' as can_manage_content %}{% has_capability user 'contact.manage' as can_manage_contact %}{% has_capability user 'site.config' as can_config_site %}{% has_capability user 'catalog.manage' as can_manage_catalog %}{% has_capability user 'inventory.manage' as can_manage_inventory %}{% has_capability user 'orders.manage' as can_manage_orders %}{% has_capability user 'finance.manage' as can_confirm_payments %}<!doctype html>
+{% load static perm_tags %}{% has_capability user 'staff.view' as can_view_staff %}{% has_capability user 'audit.view' as can_view_audit %}{% has_capability user 'content.manage' as can_manage_content %}{% has_capability user 'contact.manage' as can_manage_contact %}{% has_capability user 'site.config' as can_config_site %}{% has_capability user 'catalog.manage' as can_manage_catalog %}{% has_capability user 'inventory.manage' as can_manage_inventory %}{% has_capability user 'orders.manage' as can_manage_orders %}{% has_capability user 'finance.manage' as can_confirm_payments %}{% has_capability user 'services.manage' as can_manage_services %}{% has_capability user 'export.manage' as can_manage_export %}{% has_capability user 'export.approve' as can_approve_export %}{% has_capability user 'training.manage' as can_manage_training %}{% has_capability user 'training.approve' as can_approve_training %}{% has_capability user 'support.manage' as can_manage_support %}{% has_capability user 'support.approve' as can_approve_support %}{% has_capability user 'customers.view' as can_view_customers %}{% has_capability user 'analytics.view' as can_view_analytics %}{% has_capability user 'analytics.finance' as can_view_analytics_finance %}{% has_capability user 'reports.build' as can_build_reports %}{% has_capability user 'reports.schedule' as can_schedule_reports %}<!doctype html>
 <html lang="en" class="h-full">
 <head>
   <meta charset="utf-8">
@@ -75,6 +75,91 @@
           <a href="{% url 'orders_dashboard:order_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'order_list' or url_name == 'order_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">All orders</a>
           <a href="{% url 'orders_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Quotations</a>
           <a href="{% url 'orders_dashboard:shipping_zone_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'shipping_zone_list' or url_name == 'shipping_zone_create' or url_name == 'shipping_zone_edit' or url_name == 'shipping_method_list' or url_name == 'shipping_method_create' or url_name == 'shipping_method_edit' or url_name == 'shipping_rate_list' or url_name == 'shipping_rate_create' or url_name == 'shipping_rate_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Shipping</a>
+          {% endwith %}
+        {% endif %}
+        {% if can_confirm_payments %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'finance_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'finance_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Finance</a>
+          <a href="{% url 'finance_dashboard:payment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'payment_list' or url_name == 'payment_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Payments</a>
+          <a href="{% url 'finance_dashboard:bank_transfer_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'bank_transfer_list' or url_name == 'bank_transfer_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Bank transfers</a>
+          <a href="{% url 'finance_dashboard:refund_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'refund_list' or url_name == 'refund_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Refunds</a>
+          <a href="{% url 'finance_dashboard:invoice_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'invoice_list' or url_name == 'invoice_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Invoices</a>
+          <a href="{% url 'finance_dashboard:bank_account_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'bank_account_list' or url_name == 'bank_account_create' or url_name == 'bank_account_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Bank accounts</a>
+          {% endwith %}
+        {% endif %}
+        {% if can_manage_services %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'services_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'services_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Services</a>
+          <a href="{% url 'services_dashboard:request_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'request_list' or url_name == 'request_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Service requests</a>
+          <a href="{% url 'services_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' or url_name == 'quotation_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Service quotations</a>
+          <a href="{% url 'services_dashboard:farm_project_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'farm_project_list' or url_name == 'farm_project_detail' or url_name == 'farm_project_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Farm projects</a>
+          <a href="{% url 'services_dashboard:marketing_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'marketing_list' or url_name == 'marketing_enquiry_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Marketing</a>
+          <a href="{% url 'services_dashboard:facility_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'facility_list' or url_name == 'facility_detail' or url_name == 'facility_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Storage facilities</a>
+          <a href="{% url 'services_dashboard:booking_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'booking_list' or url_name == 'booking_detail' or url_name == 'booking_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Storage bookings</a>
+          {% endwith %}
+        {% endif %}
+        {% if can_manage_export %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'export_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'export_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Export</a>
+          <a href="{% url 'export_dashboard:enquiry_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'enquiry_list' or url_name == 'enquiry_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Enquiries</a>
+          <a href="{% url 'export_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' or url_name == 'quotation_create' or url_name == 'quotation_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Quotations</a>
+          <a href="{% url 'export_dashboard:order_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'order_list' or url_name == 'order_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Export orders</a>
+          <a href="{% url 'export_dashboard:compliance_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'compliance_list' or url_name == 'compliance_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Compliance</a>
+          <a href="{% url 'export_dashboard:document_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'document_list' or url_name == 'document_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Documents</a>
+          <a href="{% url 'export_dashboard:shipment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'shipment_list' or url_name == 'shipment_detail' or url_name == 'shipment_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Shipments</a>
+          <a href="{% url 'export_dashboard:provider_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'provider_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Providers</a>
+          <a href="{% url 'export_dashboard:destination_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'destination_list' or url_name == 'destination_detail' or url_name == 'destination_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Destinations</a>
+          <a href="{% url 'export_dashboard:product_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'product_list' or url_name == 'product_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Product profiles</a>
+          <a href="{% url 'export_dashboard:reports' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reports' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Reports</a>
+          {% endwith %}
+        {% endif %}
+        {% if can_manage_training or can_approve_training %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'training_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'training_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Training</a>
+          <a href="{% url 'training_dashboard:course_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'course_list' or url_name == 'course_detail' or url_name == 'course_create' or url_name == 'course_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Courses</a>
+          <a href="{% url 'training_dashboard:category_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'category_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Categories</a>
+          <a href="{% url 'training_dashboard:instructor_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'instructor_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Instructors</a>
+          <a href="{% url 'training_dashboard:venue_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'venue_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Venues</a>
+          <a href="{% url 'training_dashboard:session_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'session_list' or url_name == 'session_detail' or url_name == 'session_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Sessions</a>
+          <a href="{% url 'training_dashboard:enrollment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'enrollment_list' or url_name == 'enrollment_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Enrolments</a>
+          <a href="{% url 'training_dashboard:attendance_session_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'attendance_session_list' or url_name == 'attendance_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Attendance</a>
+          <a href="{% url 'training_dashboard:assessment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'assessment_list' or url_name == 'assessment_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Assessments</a>
+          <a href="{% url 'training_dashboard:certificate_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'certificate_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Certificates</a>
+          <a href="{% url 'training_dashboard:reports' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reports' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Training reports</a>
+          {% endwith %}
+        {% endif %}
+        {% if can_manage_support %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'support_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'support_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Support</a>
+          <a href="{% url 'support_dashboard:ticket_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'ticket_list' or url_name == 'ticket_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Support tickets</a>
+          {% endwith %}
+        {% endif %}
+        {% if can_view_analytics %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace page=request.resolver_match.kwargs.page %}
+          <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Analytics</p>
+          <a href="{% url 'analytics:executive' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'executive' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Executive overview</a>
+          <a href="{% url 'analytics:page' 'sales' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'sales' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Sales</a>
+          <a href="{% url 'analytics:page' 'inventory' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'inventory' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Inventory</a>
+          <a href="{% url 'analytics:page' 'services' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'services' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Services</a>
+          <a href="{% url 'analytics:page' 'export' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'export' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Export</a>
+          <a href="{% url 'analytics:page' 'training' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'training' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Training</a>
+          <a href="{% url 'analytics:page' 'customers' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'customers' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Customers</a>
+          <a href="{% url 'analytics:page' 'support' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'support' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Support</a>
+          {% if can_view_analytics_finance %}
+            <a href="{% url 'analytics:page' 'finance' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'finance' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Finance</a>
+          {% endif %}
+          <a href="{% url 'analytics:data_quality' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'data_quality' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Data quality</a>
+          {% if can_build_reports %}
+            <a href="{% url 'analytics:report_history' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'report_history' or ns == 'analytics' and url_name == 'report_builder' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Report history</a>
+          {% endif %}
+          {% if can_schedule_reports %}
+            <a href="{% url 'analytics:scheduled_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'scheduled_list' or ns == 'analytics' and url_name == 'scheduled_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Scheduled reports</a>
+          {% endif %}
+          {% endwith %}
+        {% endif %}
+        {% if can_view_customers %}
+          {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+          <a href="{% url 'customers_dashboard:list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'list' or url_name == 'detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Customers</a>
           {% endwith %}
         {% endif %}
       </nav>

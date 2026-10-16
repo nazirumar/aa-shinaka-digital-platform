@@ -1,0 +1,56 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Data quality{% endblock %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">Data quality</h1>
+    <p class="text-sm text-stone-600">Integrity signals that would distort analytics. These checks are read-only and never change a record.</p>
+  </div>
+</div>
+
+{% if summary.healthy %}
+  <div class="mt-4 rounded-xl border border-brand-200 bg-brand-50 p-4 text-sm text-brand-900">
+    All {{ summary.check_count }} checks passed — no data-quality issues found.
+  </div>
+{% else %}
+  <div class="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
+    {{ summary.failing_checks }} of {{ summary.check_count }} checks flagged issues
+    ({{ summary.issue_count }} affected record{{ summary.issue_count|pluralize }}).
+  </div>
+{% endif %}
+
+<section class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <div class="overflow-x-auto">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <caption class="sr-only">Data-quality checks</caption>
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">Check</th>
+          <th scope="col" class="px-4 py-3">Severity</th>
+          <th scope="col" class="px-4 py-3">Affected</th>
+          <th scope="col" class="px-4 py-3">Result</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for result in results %}
+          <tr class="{% if result.ok %}hover:bg-cream-50{% else %}bg-amber-50/60{% endif %}">
+            <td class="px-4 py-3">
+              <p class="font-medium text-stone-800">{{ result.label }}</p>
+              <p class="mt-0.5 text-xs text-stone-500">{{ result.description }}</p>
+            </td>
+            <td class="whitespace-nowrap px-4 py-3 text-xs uppercase tracking-wide text-stone-500">{{ result.severity }}</td>
+            <td class="whitespace-nowrap px-4 py-3 text-stone-700">{% if result.count is None %}—{% else %}{{ result.count }}{% endif %}</td>
+            <td class="whitespace-nowrap px-4 py-3">
+              {% if result.ok %}
+                <span class="rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-800">OK</span>
+              {% else %}
+                <span class="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-medium text-amber-800">Review</span>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endblock %}

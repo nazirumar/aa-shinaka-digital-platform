@@ -160,7 +160,7 @@
 
 ---
 
-## 3. `accounts` — users, addresses, notifications
+## 3. `accounts` — users & addresses
 
 ### 3.1 `User` (implemented)
 
@@ -216,20 +216,14 @@
 - Index: `(user, is_default)` → `acct_addr_user_default_idx`.
 - Validation: `Address.clean()` rejects an LGA that is not in the selected state.
 
-### 3.3 `Notification` (planned, Phase 9)
+### 3.3 `Notification` (superseded — see §6c)
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | BigAuto | PK |
-| `user` | FK → `User` | `CASCADE`, `related_name="notifications"` |
-| `kind` | `CharField(32)` | `TextChoices` |
-| `title`,`body` | `CharField(200)` / `TextField` | |
-| `url` | `CharField(500)` | optional deep link |
-| `is_read` | `BooleanField` | indexed |
-| `created_at` | DateTime | indexed |
-| `read_at` | DateTime | nullable |
-
-- Index: `(user, is_read, -created_at)`.
+The `accounts.Notification` model sketched in earlier drafts was **not created**.
+Phase 10 delivered the notification centre in the dedicated
+**`apps.notifications`** app (`Notification`, `NotificationPreference`,
+`NotificationDelivery`) — see §6c for the implemented schema. Keeping the feed,
+its preferences and its delivery ledger with their channels and event builders in
+one domain app avoids a cross-cutting model in `accounts`.
 
 ---
 
@@ -458,8 +452,12 @@
 
 | Field | Type | Notes |
 |---|---|---|
+| Field | Type | Notes |
+|---|---|---|
 | `id` | UUID | PK |
 | `listing` | FK → `ProductListing` | `PROTECT`, `related_name="movements"` |
+| `variant` | FK → `ProductVariant` | `PROTECT`, nullable (Phase 5) |
+| `warehouse` | FK → `Warehouse` | `PROTECT`, nullable (Phase 5) |
 | `kind` | `CharField(16)` | `StockMovementKind` (`intake`,`adjustment`,`sale`,`return`,`damage`,`transfer`) |
 | `quantity_delta` | `DecimalField(14,3)` | signed |
 | `balance_after` | `DecimalField(14,3)` | snapshot |
@@ -469,11 +467,43 @@
 | `created_at` | DateTime | indexed |
 
 - Index: `(listing, -created_at)`.
-- **Append-only**: movements are never edited or deleted; `adjust_stock()` takes
-  a row lock, applies the delta, refuses to go negative and writes a movement in
-  one transaction.
+- **Append-only**: movements are never edited or deleted; stock writes take a row
+  lock on the `StockBalance` (and listing), apply the delta, refuse to go
+  negative/reserved, and write a movement in one transaction.
 
-### 4.7 Status enumerations (`catalog`)
+### 4.7 `Warehouse` (Phase 5)
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `name` | `CharField(120)` | |
+| `code` | `CharField(32)` | unique, indexed |
+| `address` | `CharField(255)` | blank |
+| `state`,`lga` | FK → `locations.State`/`LGA` | `PROTECT`, nullable; LGA must belong to state |
+| `is_active` | Boolean | indexed |
+| timestamps | | |
+
+- Warehouses are data-driven; the default (`code="MAIN"`) is created on first
+  use by `apps.catalog.inventory.default_warehouse()`.
+
+### 4.8 `StockBalance` (Phase 5 — authoritative per-warehouse stock)
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `warehouse` | FK → `Warehouse` | `CASCADE`, `related_name="balances"` |
+| `listing` | FK → `ProductListing` | `CASCADE`, `related_name="balances"` |
+| `variant` | FK → `ProductVariant` | `CASCADE`, nullable |
+| `on_hand` | `DecimalField(14,3)` | authoritative quantity |
+| `reserved` | `DecimalField(14,3)` | held by active reservations |
+| timestamps | | |
+
+- Constraint: unique `(warehouse, listing, variant)` (nulls not distinct).
+- The listing's `stock_on_hand`/`stock_reserved` are **roll-ups** across
+  warehouses; `available = on_hand − reserved`. Phase 4's `adjust_stock` now
+  delegates here, so the ledger and balances stay consistent.
+
+### 4.9 Status enumerations (`catalog`)
 
 ```
 PublishStatus       : draft | published | archived
@@ -488,254 +518,782 @@ StockMovementKind   : intake | adjustment | sale | return | damage | transfer
 
 ---
 
-## 5. `orders` — cart, orders, payments, refunds
+## 5. `orders` — cart, checkout, orders & fulfilment
 
-### 5.1 `Cart`
+Phase 5 implements cart/checkout/orders with a **provider-independent payment
+boundary**; Phase 6 adds the provider payment rows (`Payment`, `Refund`,
+`Invoice`, `Receipt`, bank-transfer and webhook records — see §5.12). Both the
+audited `confirm_payment` service and verified provider captures converge on the
+idempotent `settle_order` service.
 
-| Field | Type | Notes |
-|---|---|---|
-| `id` | BigAuto | PK |
-| `user` | OneToOne → `User` | `CASCADE` (persistent cart) |
-| `created_at`,`updated_at` | | |
-
-### 5.2 `CartItem`
+### 5.1 `ShippingZone`, `ShippingMethod`, `ShippingRate`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `cart` | FK → `Cart` | `CASCADE`, `related_name="items"` |
-| `listing` | FK → `ProductListing` | `CASCADE` |
-| `quantity` | `DecimalField(14,3)` | > 0 |
-| `unit_price_snapshot` | `DecimalField(14,2)` | price at add time |
+| `ShippingZone.id` | UUID | PK |
+| `ShippingZone.name` | `CharField(120)` | |
+| `ShippingZone.code` | `CharField(40)` | unique |
+| `ShippingZone.description` | `TextField` | blank |
+| `ShippingZone.states` | M2M → `State` | `related_name="shipping_zones"` |
+| `ShippingZone.is_active` | Bool | default `True` |
+| `ShippingMethod.name` | `CharField(120)` | |
+| `ShippingMethod.code` | `CharField(40)` | unique |
+| `ShippingMethod.description` | `TextField` | blank |
+| `ShippingMethod.sort_order` | `PositiveInteger` | default 0 |
+| `ShippingMethod.is_active` | Bool | default `True` |
+| `ShippingRate.zone` | FK → `ShippingZone` | `CASCADE`, `related_name="rates"` |
+| `ShippingRate.method` | FK → `ShippingMethod` | `CASCADE`, `related_name="rates"` |
+| `ShippingRate.fee` | `DecimalField(14,2)` | required |
+| `ShippingRate.free_over` | `DecimalField(14,2)` | nullable; free at/above |
+| `ShippingRate.min_order_amount` | `DecimalField(14,2)` | required, default 0 |
+| `ShippingRate.is_active` | Bool | default `True` |
+
+- Constraint: unique `(zone, method)`.
+- **No freighting is invented:** checkout is blocked unless a matching active
+  rate exists for the destination state.
+
+### 5.2 `Cart`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `user` | FK → `User` | `CASCADE`, nullable (guest carts) |
+| `session_key` | `CharField(64)` | blank; guest key |
+| `status` | `CharField(16)` | `CartStatus` (`active`,`converted`,`abandoned`) |
+| `checked_out_at` | DateTime | nullable |
 | timestamps | | |
 
-- Constraint: `UniqueConstraint(cart, listing)`.
+- Constraints: at most one **active** cart per user and per session (partial
+  unique constraints). Guest carts are merged into the user's cart on login.
 
-### 5.3 `Order`
+### 5.3 `CartItem`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `number` | `CharField(20)` | unique, human-readable |
+| `id` | UUID | PK |
+| `cart` | FK → `Cart` | `CASCADE`, `related_name="items"` |
+| `listing` | FK → `ProductListing` | `CASCADE` |
+| `variant` | FK → `ProductVariant` | `CASCADE`, nullable |
+| `quantity` | `DecimalField(14,3)` | > 0 |
+| `unit_price_snapshot` | `DecimalField(14,2)` | indicative; recomputed at checkout |
+
+- Constraint: unique `(cart, listing, variant)` (nulls not distinct).
+
+### 5.4 `StockReservation`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `order` | FK → `Order` | `PROTECT`, `related_name="reservations"` |
+| `order_item` | FK → `OrderItem` | `PROTECT`, nullable, `related_name="reservations"` |
+| `listing` | FK → `ProductListing` | `PROTECT` |
+| `variant` | FK → `ProductVariant` | `PROTECT`, nullable |
+| `warehouse` | FK → `Warehouse` | `PROTECT`, nullable |
+| `quantity` | `DecimalField(14,3)` | |
+| `status` | `CharField(16)` | `ReservationStatus` (`active`,`committed`,`released`,`expired`) |
+| `expires_at` | DateTime | indexed, nullable |
+| `released_at`,`committed_at` | DateTime | nullable |
+
+- One reservation per order item; each can leave `active` exactly once
+  (idempotent lifecycle).
+
+### 5.5 `Order`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `number` | `CharField(24)` | unique, `AS-YYYYMMDD-XXXXXX` |
+| `checkout_token` | `CharField(64)` | unique — idempotency key |
 | `user` | FK → `User` | `PROTECT`, `related_name="orders"` |
-| `status` | `CharField(20)` | `OrderStatus`, indexed |
+| `status` | `CharField(24)` | `OrderStatus`, indexed |
 | `payment_status` | `CharField(20)` | `PaymentStatus`, indexed |
-| `subtotal` | `DecimalField(14,2)` | |
-| `delivery_fee` | `DecimalField(14,2)` | default 0.00 |
-| `tax_amount` | `DecimalField(14,2)` | default 0.00 |
-| `total` | `DecimalField(14,2)` | |
+| `subtotal`,`shipping_amount`,`discount_amount`,`tax_amount`,`grand_total` | `DecimalField(14,2)` | |
 | `currency` | `CharField(3)` | default `NGN` |
 | `delivery_address` | FK → `Address` | `PROTECT`, nullable |
-| `contact_name`,`contact_phone` | `CharField` | snapshot for fulfilment |
+| `delivery_*` (`state`,`lga`,`city`, …) | snapshot `CharField` | fulfilment snapshot |
+| `shipping_method` | FK → `ShippingMethod` | `SET_NULL`, nullable |
+| `contact_name`,`contact_phone` | `CharField` | snapshot |
 | `customer_note` | `TextField` | blank |
-| `placed_at` | DateTime | nullable |
-| `cancelled_at` | DateTime | nullable |
-| `is_deleted`,`deleted_at` | soft delete | |
+| `placed_at`,`cancelled_at`,`cancelled_reason` | | |
+| `expires_at`,`reservation_released_at`,`stock_committed_at` | DateTime | lifecycle marks |
 | timestamps | | |
 
 - Indexes: `(user, -created_at)`, `status`, `payment_status`, `number`.
-- Immutability: financial fields are not edited after payment; corrections use
-  refunds/adjustments.
+- Totals are **recomputed server-side** and line prices snapshotted; financial
+  fields are never edited after payment.
 
-### 5.4 `OrderItem`
+### 5.6 `OrderItem`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
+| `id` | UUID | PK |
 | `order` | FK → `Order` | `CASCADE`, `related_name="items"` |
 | `listing` | FK → `ProductListing` | `PROTECT` |
-| `product_name` | `CharField(180)` | snapshot |
-| `origin_state`,`origin_lga` | `CharField` | snapshot (display) |
-| `package_size`,`package_unit` | snapshot | |
+| `variant` | FK → `ProductVariant` | `PROTECT`, nullable |
+| `product_name`,`product_slug`,`sku` | snapshot | |
+| `origin_state`,`origin_lga`,`packaging`,`variant_name` | snapshot | display |
 | `quantity` | `DecimalField(14,3)` | |
 | `unit_price` | `DecimalField(14,2)` | snapshot |
-| `line_total` | `DecimalField(14,2)` | |
+| `line_total` | `DecimalField(14,2)` | snapshot |
 | `fulfilment_status` | `CharField(16)` | `FulfilmentStatus` |
 
-- Snapshots ensure historical orders remain accurate if a listing changes.
+- Snapshots keep historical orders accurate when a listing later changes.
 
-### 5.5 `OrderStatusHistory`
+### 5.7 `OrderStatusHistory` (append-only)
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
+| `id` | UUID | PK |
 | `order` | FK → `Order` | `CASCADE`, `related_name="history"` |
-| `from_status`,`to_status` | `CharField(20)` | |
-| `changed_by` | FK → `User` | `SET_NULL` |
-| `note` | `TextField` | |
+| `from_status`,`to_status` | `CharField(24)` | |
+| `changed_by` | FK → `User` | `SET_NULL`, nullable |
+| `reason` | `TextField` | blank |
 | `created_at` | DateTime | indexed |
 
-### 5.6 `Payment`
+- `save()` rejects updates and `delete()` always raises — history is immutable.
+
+### 5.8 `Shipment`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `order` | FK → `Order` | `PROTECT`, `related_name="payments"` |
-| `provider` | `CharField(20)` | `paystack` (later phases) |
-| `reference` | `CharField(100)` | unique per provider |
-| `provider_reference` | `CharField(100)` | blank |
-| `amount` | `DecimalField(14,2)` | |
-| `currency` | `CharField(3)` | |
-| `status` | `CharField(20)` | `PaymentStatus`, indexed |
-| `raw_payload` | `JSONField` | stored callback/webhook body |
-| `verified_at` | DateTime | nullable |
-| `created_at`,`updated_at` | | |
+| `id` | UUID | PK |
+| `order` | FK → `Order` | `CASCADE`, `related_name="shipments"` |
+| `method` | FK → `ShippingMethod` | `SET_NULL`, nullable |
+| `carrier`,`tracking_number` | `CharField(120)` | blank |
+| `status` | `CharField(16)` | `ShipmentStatus` |
+| `notes` | `TextField` | blank |
+| `dispatched_at`,`delivered_at` | DateTime | nullable |
+| `handled_by` | FK → `User` | `SET_NULL`, nullable |
 
-- Constraint: `UniqueConstraint(provider, reference)`.
-- Webhooks are verified by signature then applied idempotently.
-
-### 5.7 `Refund`
+### 5.9 `QuotationRequest`
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `payment` | FK → `Payment` | `PROTECT`, `related_name="refunds"` |
-| `amount` | `DecimalField(14,2)` | ≤ payment amount |
-| `reason` | `TextField` | |
-| `status` | `CharField(16)` | `RefundStatus` |
-| `requested_by` | FK → `User` | `SET_NULL` |
-| `approved_by` | FK → `User` | `SET_NULL`, nullable |
-| `provider_reference` | `CharField(100)` | |
-| `created_at`,`approved_at` | | |
+| `id` | UUID | PK |
+| `user` | FK → `User` | `SET_NULL`, nullable (guests allowed) |
+| `listing` | FK → `ProductListing` | `PROTECT` |
+| `variant` | FK → `ProductVariant` | `PROTECT`, nullable |
+| `quantity` | `DecimalField(14,3)` | |
+| `packaging` | `CharField` | blank |
+| `destination_state`,`destination_lga`,`destination_note` | | optional |
+| `requirements` | `TextField` | blank |
+| `contact_name`,`contact_email`,`contact_phone` | | |
+| `status` | `CharField(20)` | `QuotationStatus` |
+| `response_note` | `TextField` | blank |
+| `reviewed_by` | FK → `User` | `SET_NULL`, nullable |
+| `reviewed_at` | DateTime | nullable |
+| timestamps | | |
 
-### 5.8 Status enumerations (`orders`)
+- Bulk pricing/acceptance workflows arrive in the quotations phase; Phase 5
+  captures the request and lets staff review/respond.
+
+### 5.10 Status enumerations (`orders`)
 
 ```
-OrderStatus      : pending_payment | paid | processing | dispatched | delivered | completed | cancelled | refunded
-PaymentStatus    : pending | authorized | paid | failed | refunded | partially_refunded
+CartStatus       : active | converted | abandoned
+OrderStatus      : pending_payment | payment_review | confirmed | processing
+                   | ready_for_dispatch | dispatched | delivered | completed
+                   | cancelled | expired | refunded
+PaymentStatus    : pending | paid | failed | refunded | partially_refunded
 FulfilmentStatus : pending | reserved | packed | dispatched | delivered | cancelled
-RefundStatus     : requested | approved | rejected | processed | failed
+ReservationStatus: active | committed | released | expired
+QuotationStatus  : submitted | reviewing | quoted | accepted | declined | closed
+ShipmentStatus   : pending | dispatched | in_transit | delivered | failed
 ```
 
-### 5.9 Order & inventory state transitions (invariants)
+### 5.11 Order & inventory state transitions (invariants)
 
 ```
-pending_payment --pay--> paid --pick--> processing --dispatch--> dispatched
-   |                                                   |
-   +--cancel--> cancelled                              +--deliver--> delivered --> completed
-paid/processing --refund--> refunded
+pending_payment --review--> payment_review --confirm--> confirmed --process--> processing
+     |                          |                          |                        |
+     +--cancel/expire--> cancelled/expired                 |                        +--> ready_for_dispatch --dispatch--> dispatched --deliver--> delivered --> completed
+                                                           +--cancel (releases)--> cancelled
+                                                           +--full refund--> refunded
 ```
 
-- Stock is **reserved** when an order is created, **deducted** (movement
-  `sale`) when payment is confirmed, and **released** on cancellation/refund.
+- Stock is **reserved** when an order is created, **committed** (movement `sale`)
+  when payment is confirmed, and **released** on cancellation/expiry.
+- `pending_payment`/`payment_review` → `confirmed` happens through
+  `services.settle_order`, which is called by the audited `confirm_payment`
+  (manual, capability `FINANCE_MANAGE`) **and** after a verified Paystack
+  capture or a finance-approved bank transfer (Phase 6). Settlement is
+  idempotent: re-verification, duplicate webhooks and repeated approvals are
+  no-ops.
+- Customers may move an order to `payment_review` (by starting a bank transfer)
+  but never to paid; only server-side verification can set `payment_status=paid`.
 - Every transition writes `OrderStatusHistory` and (where it touches stock) a
   `StockMovement`, inside one transaction.
 
+### 5.12 Phase 6 — payments, refunds, invoices & receipts (implemented)
+
+Phase 6 adds provider payments on top of the Phase 5 order model. All money is
+`DecimalField(14,2)`; provider smallest-unit amounts (kobo) exist only at the
+`apps.orders.paystack` boundary. Provider rows are UUID-pk.
+
+`CompanyBankAccount` — verified settlement accounts shown to bank-transfer
+customers (configured by finance staff only).
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `bank_name` | `CharField(120)` | |
+| `account_name` | `CharField(150)` | |
+| `account_number` | `CharField(34)` | |
+| `currency` | `CharField(3)` | default `NGN` |
+| `instructions` | `TextField` | blank |
+| `sort_order` | `PositiveInteger` | default 0 |
+| `is_active` | Bool | indexed |
+
+- Constraint: unique `(bank_name, account_number, currency)`.
+
+`Payment` — one settlement attempt for one order through one provider.
+
+| Field | Type | Notes |
+|---|---|---|
+| `order` | FK → `Order` | `PROTECT`, `related_name="payments"` |
+| `customer` | FK → `User` | `PROTECT`, `related_name="payments"` |
+| `reference` | `CharField(80)` | **unique**, internal reference |
+| `provider` | `CharField(20)` | `PaymentProvider` |
+| `method` | `CharField(20)` | `PaymentMethod`, blank |
+| `currency` | `CharField(3)` | default `NGN` |
+| `expected_amount` | `DecimalField(14,2)` | authoritative server total |
+| `verified_amount` | `DecimalField(14,2)` | nullable; set only after verification |
+| `status` | `CharField(20)` | `PaymentState`, indexed |
+| `provider_reference` | `CharField(120)` | indexed |
+| `channel` | `CharField(40)` | blank |
+| `requires_review`,`review_reason` | Bool / `TextField` | manual-review flag |
+| `verified_at` | DateTime | nullable |
+| `note` | `TextField` | blank |
+
+- Constraints: `expected_amount >= 0`; `verified_amount` null-or-`>= 0`.
+- Indexes: `(order, status)`, `(provider, provider_reference)`,
+  `(status, requires_review)`.
+
+`PaymentAttempt` — a provider round-trip per initialise/hosted checkout
+(`authorization_url`, `access_code`, `PaymentAttemptStatus`).
+
+`PaymentWebhookEvent` — durable provider webhook record used for deduplication
+and replay (`event_id`, `event_type`, redacted `payload`, `status`, `attempts`).
+Unique `(provider, event_id)`.
+
+`BankTransferSubmission` — a customer's claimed manual transfer, reviewed by
+finance (`bank_name_snapshot`, `account_number_snapshot`, `transfer_reference`,
+`claimed_amount`, `transfer_date`, `proof`, `status`, `settlement_confirmed`,
+`reviewed_by`, `review_notes`).
+
+- Constraints: `claimed_amount >= 0`; **unique approved transfer**
+  `(transfer_reference, account_number_snapshot)` where `status=approved`, so a
+  single bank transaction can never settle two orders.
+
+`Refund` — a finance-approved reversal against a settled payment.
+
+| Field | Type | Notes |
+|---|---|---|
+| `payment` | FK → `Payment` | `PROTECT`, `related_name="refunds"` |
+| `reference` | `CharField(80)` | unique |
+| `amount` | `DecimalField(14,2)` | `> 0` |
+| `reason` | `TextField` | blank |
+| `status` | `CharField(20)` | `RefundState` |
+| `provider_status` | `CharField(20)` | `RefundProviderState` |
+| `provider_reference` | `CharField(120)` | unique when non-blank |
+| `requested_by`,`approved_by` | FK → `User` | nullable |
+| `processed_at` | DateTime | nullable |
+| `failure_reason` | `TextField` | blank |
+
+- Constraints: `amount > 0`; unique `provider_reference` when set.
+
+`Invoice` — an issued, immutable per-order invoice with a billing snapshot
+(`customer_name`/`customer_email`/`customer_phone`, `billing_address`,
+`subtotal`, `shipping_amount`, `discount_amount`, `tax_amount`, `total`,
+`status`, `issued_at`, `due_at`, `notes`); `OneToOne` → `Order`, constraint
+`total >= 0`. Immutable fields are rejected by `save()` once issued; create a
+new/versioned document rather than editing it.
+
+`Receipt` — proof of a **verified** payment (`OneToOne` → `Payment`, `number`,
+`amount`, `currency`, `issued_at`, `amount >= 0`); immutable after issue and
+issuable only for captured payments.
+
+```
+PaymentProvider  : paystack | bank_transfer | manual
+PaymentState     : pending | processing | paid | failed | abandoned
+                   | cancelled | refunded | partially_refunded
+PaymentAttemptStatus : initialized | pending | succeeded | failed | abandoned
+WebhookEventStatus   : received | processed | failed | ignored
+BankTransferStatus   : submitted | under_review | approved | rejected
+RefundState          : requested | approved | processing | completed
+                       | failed | rejected
+RefundProviderState  : pending | processing | success | failed | reversed
+InvoiceState         : unpaid | partially_paid | paid | refunded | void
+```
+
+Phase 6 invariants:
+
+- A payment is only marked `paid` after a **server-side** Paystack verify call or
+  a signature-verified webhook whose currency and amount match `expected_amount`.
+- Webhooks are processed transactionally, row-locked (`select_for_update`) and
+  idempotently (`uniq_webhook_event`); duplicates and out-of-order events never
+  double-settle, re-commit stock or re-issue a receipt.
+- Late payment on an expired/cancelled order records the payment and flags it
+  `requires_review` instead of auto-completing the order.
+- `review_bank_transfer(approve=True)` requires `settlement_confirmed`, and the
+  unique-approved-transfer constraint blocks one transfer settling two orders.
+  Uploaded proof alone is never evidence of payment.
+- Refunds cannot exceed captured funds; only `FINANCE_MANAGE` staff request,
+  approve or complete refunds; a refund completes only when documented.
+
 ---
 
-## 6. `services` — consultancy, farming, storage, marketing, export, training
+## 6. `services` — consultancy, farming, storage, marketing (Phase 7, delivered)
 
-All request types share a common shape: requester, division, details,
-structured location, status, assigned staff, timestamps, history. They subclass
-`ServiceRequest` (abstract) so the dashboard can present unified queues.
+All four divisions share **one concrete** `ServiceRequest` plus per-division
+detail records that hang off it with a `OneToOneField`. Reads live in
+`apps/services/selectors.py`; every write goes through
+`apps/services/services.py`. Money and quantities are always `Decimal`. Primary
+keys are UUIDs. References are human-readable (`AS-SR`, `AS-QT`, `AS-FP`,
+`AS-MP`, `AS-MC`, `AS-SB`) and allocated on save.
 
-### 6.1 `ServiceRequest` (abstract base)
+### 6.1 `ServiceRequest` (shared request record)
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `reference` | `CharField(20)` | unique per concrete table |
-| `requester` | FK → `User` | `PROTECT`, `related_name="%(class)ss"` |
-| `status` | `CharField(20)` | concrete `TextChoices` |
+| `id` | UUID | PK |
+| `reference` | `CharField(32)` | unique, `AS-SR-YYYYMMDD-XXXXXX` |
+| `customer` | FK → `User` | `PROTECT`, `related_name="service_requests"` |
+| `service_type` | `CharField(20)` | `ServiceType`: consultancy \| farming \| marketing \| storage |
+| `status` | `CharField(20)` | `ServiceRequestStatus`, default `submitted` |
+| `priority` | `CharField(10)` | `ServicePriority`: low \| normal \| high \| urgent |
+| `title` / `description` | `CharField(160)` / `TextField` | |
 | `assigned_to` | FK → `User` | `SET_NULL`, nullable |
-| `state` | FK → `State` | `PROTECT`, nullable |
-| `lga` | FK → `LGA` | `PROTECT`, nullable |
-| `details` | `TextField` | |
+| `state` / `lga` | FK → `locations.State` / `LGA` | `PROTECT`, nullable |
 | `preferred_date` | Date | nullable |
-| `is_deleted`,`deleted_at` | soft delete | |
-| timestamps | | |
+| `closed_at` | DateTime | set when completed/rejected/cancelled |
+| `created_at` / `updated_at` | | |
 
-### 6.2 `ConsultancyRequest`
+Indexes: `(service_type, status)`, `(customer, service_type)`. A custom
+`ServiceRequestQuerySet` adds `.open()` and `.for_customer(user)`.
 
-Adds: `topic` (`CharField`), `crop` (`CharField`), `consultation_mode`
-(`TextChoices`: phone | onsite | online), `status`
-(`ConsultancyStatus`: submitted | triaged | assigned | in_progress | completed | cancelled).
+### 6.2 Request support tables
 
-### 6.3 `FarmingServiceRequest`
+| Table | Purpose | Key fields |
+|---|---|---|
+| `ServiceRequestStatusHistory` | Append-only status transitions | `request`, `from_status`, `to_status`, `actor`, `note`, `created_at` |
+| `ServiceAssignment` | Staff assignment to a request | `request`, `staff`, `role`, `is_active`, `note`; unique `(request, staff, role)` |
+| `ServiceComment` | Thread comments | `request`, `author`, `body`, `visibility` (`customer` \| `internal`) |
+| `ServiceAttachment` | Uploaded file (visibility-controlled) | `request`, `uploaded_by`, `file`, `label`, `content_type`, `size`, `is_customer_visible` |
+| `ServiceActivityLog` | Append-only activity trail | `request`, `actor`, `action`, `target_type`, `target_id`, `summary`, `metadata` (JSON) |
+| `ServiceNotificationLog` | Notification dedupe ledger | `event`, unique `dedupe_key` |
 
-Adds: `service_type` (`TextChoices`: land_preparation | planting | spraying |
-harvesting | mechanisation | agronomy | other), `acreage` (`DecimalField(10,2)`),
-`farm_location` (`CharField`), `status` (`FarmingStatus`).
+### 6.3 Consultancy
 
-### 6.4 `MarketingRequest`
+- `ConsultancyService` — bookable offering: `name`, `slug`, `summary`,
+  `duration_minutes`, `supports_online`, `supports_onsite`, `is_active`.
+- `Consultant` — `OneToOne` → `User`, plus `specialities`, `bio`, `is_active`.
+- `ConsultantAvailability` — `consultant`, either a recurring `weekday`
+  (`0=Mon…6=Sun`) or a one-off `specific_date` (exactly one, DB-checked),
+  `start_time` < `end_time`, `is_active`.
+- `ConsultationAppointment` | `request` (OneToOne → `ServiceRequest`), `service`,
+  `consultant`, `mode` (`ConsultationMode`), `scheduled_start`/`scheduled_end`,
+  `status` (`AppointmentStatus`), confirmation/rejection/reschedule fields.
+- `ConsultationReport` | `appointment` (OneToOne), `summary`,
+  `recommendations`, `file`, `recorded_by`.
 
-Adds: `produce` (`CharField`), `volume` (`DecimalField(14,2)`), `volume_unit`
-(`UnitOfMeasure`), `target_market` (`CharField`), `status` (`MarketingStatus`).
+### 6.4 Farming
 
-### 6.5 `StorageFacility`
+- `FarmingService` — a farming service offering.
+- `FarmServiceRequest` | `request` (OneToOne), `requested_service`, farm
+  location, `farm_size`/`area_unit` (`FarmAreaUnit`), `crop_type`, `season`
+  (`FarmingSeason`), expected dates, budget min/max.
+- `FarmProject` — `OneToOne` to its request; `status` (`FarmProjectStatus`),
+  manager, `approved_by`/`approved_at`, `agreement_reference`, activated/
+  completed timestamps. Activation requires approval **and** an agreement.
+- `FarmProjectMilestone` (`related_name="milestones"`) — sequence, due date,
+  status (`MilestoneStatus`).
+- `FarmVisit` — scheduled/actual dates, purpose, status (`VisitStatus`).
+- `FarmProgressReport` — `progress_percent` (`CheckConstraint` ≤ 100), file,
+  `is_customer_visible`.
+
+### 6.4 Marketing
+
+- `MarketingService` — offering.
+- `MarketingEnquiry` — `OneToOne` to the shared request; product type,
+  available quantity + unit, location, target market, requirements.
+- `MarketingProposal` — narrative (`scope`, `approach`) linked to an enquiry and
+  optionally a `ServiceQuotation`; `status` (`MarketingProposalStatus`:
+  draft \| issued \| accepted \| rejected).
+- `MarketingCampaign` — must follow an accepted proposal; `status`
+  (`MarketingCampaignStatus`: planned \| active \| completed \| cancelled), officer.
+- `MarketingActivity` — dated activity log entry on a campaign.
+- **No third-party seller accounts** are ever created; AA Shinaka remains the
+  direct seller.
+
+### 6.5 Storage & warehousing
+
+- `ProduceType` — reference list of accepted produce.
+- `StorageFacility` — name, generated `code`, location, `capacity` + unit
+  (`StorageCapacityUnit`), accepted produce types (M2M), conditions, active.
+- `StorageUnit` — a capacity bay/silo inside a facility; unique `(facility, name)`.
+- `StorageServiceRequest` — `OneToOne` to the shared request; produce type,
+  quantity + unit, preferred facility/location, requested dates, special handling.
+- `StorageBooking` — `OneToOne` to its request; facility/unit, optional
+  `quotation`, quantity, `[start_date, end_date)`, `status`
+  (`StorageBookingStatus`: requested \| confirmed \| checked_in \| checked_out \|
+  completed \| cancelled); CheckConstraints on dates and quantity.
+- `StorageCapacityAllocation` — the durable capacity ledger: booking, facility,
+  unit, quantity, date range, `released_at`; CheckConstraints for positive
+  quantity and ordered dates; index `(facility, start_date, end_date)`.
+  Overbooking is prevented in the service layer under `select_for_update`.
+- `StorageCheckIn` / `StorageCheckOut` — physical intake/release with quantity
+  and condition notes; `StorageInspection` — notes/file/condition.
+
+### 6.6 Reusable quotations
+
+- `ServiceQuotation` — UUID pk, unique `reference` (`AS-QT`), `customer`,
+  optional `request`, `currency`, `subtotal`/`tax_amount`/`total`
+  (`DecimalField(14,2)`, recomputed server-side), `valid_until`, `terms`,
+  `status` (`QuotationStatus`: draft \| pending_approval \| issued \| accepted \|
+  rejected \| expired \| cancelled), `revision` + `supersedes` (self-FK),
+  approval fields, `issued_at`/`decided_at`, and payment tracking
+  (`payment_status` (`QuotationPaymentStatus`), `paid_at`). Accepted quotations
+  are frozen — `save()` rejects changes to `_FROZEN_FIELDS`.
+- `ServiceQuotationItem` — description, quantity, unit, `unit_price`,
+  `line_total`, `sort_order`.
+- `orders.Payment` gains an optional `service_quotation` FK with a check
+  constraint (`chk_payment_single_target`) so a payment targets exactly one of
+  order/quotation. Settlement flows through the Phase 6 verification pipeline
+  (`apps.services.payments.settle_quotation_payment`).
+
+### 6.7 Status enumerations (`services`)
+
+```
+ServiceType            : consultancy | farming | marketing | storage
+ServiceRequestStatus   : submitted | under_review | quoted | confirmed |
+                         in_progress | completed | rejected | cancelled
+ServicePriority        : low | normal | high | urgent
+AppointmentStatus      : requested | confirmed | rescheduled | completed |
+                         rejected | cancelled
+FarmProjectStatus      : draft | approved | active | on_hold | completed | cancelled
+MilestoneStatus        : pending | in_progress | completed | blocked
+VisitStatus            : planned | completed | missed | cancelled
+MarketingProposalStatus: draft | issued | accepted | rejected
+MarketingCampaignStatus: planned | active | completed | cancelled
+StorageBookingStatus   : requested | confirmed | checked_in | checked_out |
+                         completed | cancelled
+QuotationStatus        : draft | pending_approval | issued | accepted |
+                         rejected | expired | cancelled
+QuotationPaymentStatus : unpaid | paid
+```
+
+`REQUEST_TRANSITIONS` declares the legal shared-request moves; a request acted
+on straight from `submitted` is implicitly reviewed first so history reflects the
+pipeline.
+
+---
+
+## 6a. `export` — agricultural export & international trade (Phase 8, delivered)
+
+The dedicated `apps/export` app (kept separate from `catalog`/`orders`, matching
+the domain-oriented layout). Reads live in `apps/export/selectors.py`; **every
+write goes through `apps/export/services.py`**. Money and quantities are always
+`Decimal`; primary keys are UUIDs (local `UUIDTimeStampedModel`, references via
+`generate_reference`). Cross-app foreign keys use string references
+(`catalog.*`, `locations.*`, `settings.AUTH_USER_MODEL`, `export.*`).
+
+### 6a.1 Destination & product configuration
+
+- `ExportDestination` — one per `locations.Country` (unique). `approval_status`
+  (`ApprovalStatus`: pending/approved/rejected) and `is_active` are **separate**:
+  a destination must be approved *and* activated (`EXPORT_APPROVE`) before it is
+  selectable. Carries `notes`, `source`, `approved_by`/`approved_at`,
+  `activated_at`. `country_code`/`country_name` are convenience properties.
+- `ExportDestinationRequirement` — `RequirementType`, optional `product`/
+  `category` narrow the scope; `is_active`, description, source/provenance.
+- `ExportTradeRestriction` — `RestrictionType` (prohibited/restricted); optional
+  `product`/`category` scope. `selectors.active_restriction_for` prefers a
+  product-specific restriction over a category-wide one.
+- `ExportDocumentRequirement` — ties an `ExportDocumentType` to a destination
+  (optional product/category scope) and drives checklist generation.
+- `ExportProductProfile` — `OneToOneField(catalog.Product)` (**no duplication**):
+  `is_export_eligible`, `export_grade`, packaging, `min_export_quantity` +
+  unit, specifications (`JSONField`), `export_availability`, inspection flags,
+  and an `allowed_destinations` M2M (positive allow-list). `allows_destination()`
+  combines the allow-list with active trade restrictions.
+
+### 6a.2 Enquiries, quotations & orders
+
+- `ExportEnquiry` — `reference` (`AS-EXQ`), `customer`, `destination`,
+  `origin_state`/`origin_lga`, `delivery_destination`, shipping mode, requested
+  period/date, `priority`, `status` (`ExportEnquiryStatus`), `closed_at`.
+  `ExportEnquiryItem` (product/listing, quantity, unit, packaging);
+  `ExportEnquiryStatusHistory` (append-only; `from_status`/`to_status`/actor/note).
+- `ExportQuotation` — `reference`, `enquiry`, `customer`, `destination`, `status`
+  (`ExportQuotationStatus`), `currency`, **`incoterm` + `incoterm_version`
+  (Incoterms 2020) + `named_place`**, payment and delivery terms,
+  `deposit_percentage`, `exchange_rate_reference`, `valid_until`, server-computed
+  `subtotal`/`total`, approval/issue audit fields. `ExportQuotationItem`
+  (product/listing, quantity, unit, `unit_price`, `charge_type` =
+  product/freight/insurance/other, `line_total`). `ExportQuotationRevision`
+  snapshots a quotation before it is revised; the previous revision is
+  superseded. An accepted quotation is **frozen**.
+- `ExportOrder` — `reference` (`AS-EXO`), `customer`, `destination`,
+  `OneToOneField(ExportQuotation)`, `status` (`ExportOrderStatus`), `currency`
+  (default `USD`), the frozen Incoterms/terms, `commercial_terms` (`JSONField`
+  snapshot), `compliance_status`, `fulfillment_status`, `total`/`deposit_amount`/
+  `balance_amount`/`amount_paid`, assignee, lifecycle timestamps. Constraints:
+  `total >= 0`, `amount_paid >= 0`; index on `(status, destination)`.
+  `is_compliance_cleared`, `is_fully_paid`, `balance_due` derived.
+  `ExportOrderItem` copies product/listing/description/quantity/unit/unit_price
+  and origin from the quotation. `ExportOrderStatusHistory` is append-only.
+
+### 6a.3 Compliance, documents & shipments
+
+- `ExportDocumentType` — configurable registry; `requires_expiry` means an
+  official type must carry an expiry date. Seeded by `0002_seed_document_types`.
+- `ExportDocument` — `order`, `document_type`, `file` (private storage),
+  issuing org/reference, issue/expiry dates, `verification_status`
+  (`DocumentVerificationStatus`), `is_customer_visible`. `ExportDocumentReview`
+  records each review decision (`DocumentReviewDecision`).
+- `ExportComplianceChecklist` — one per order; `status`
+  (`ComplianceStatus`/`ComplianceChecklistStatus`), generated from the
+  destination's document requirements. `ExportComplianceChecklistItem` —
+  requirement, `status` (`ComplianceItemStatus`), linked document, notes.
+- `LogisticsProvider` — freight-forwarding provider records. `ExportShipment` —
+  `reference`, `order`, provider, mode (`ShippingMode`), carrier/booking,
+  departure/arrival, `status` (`ShipmentStatus`). `ExportShipmentItem` mirrors the
+  order items. `ShipmentMilestone` — **staff-entered only**
+  (`is_staff_entered=True`, `recorded_by`), never fabricated live tracking.
+
+### 6a.4 Settlement (`orders`)
+
+`orders.Payment.export_order` (nullable FK, `related_name="payments"`) is a third
+payment target alongside shop `order` and `service_quotation`; the
+`chk_payment_single_target` check constraint enforces exactly one target. Export
+payments reuse the Phase 6 verification pipeline — the **browser callback is
+never trusted**; `apps/export/payments.py` settles only on a server-verified
+payment and calls `services.record_verified_payment` (a trusted, system actor).
+The settlement path uses the internal `_advance_export_order` helper, which is
+not capability-gated; staff-driven order transitions use the gated
+`transition_export_order`.
+
+### 6a.5 Status enumerations (`export`)
+
+```
+ApprovalStatus             : pending | approved | rejected
+ExportAvailability         : unavailable | limited | available
+ExportEnquiryStatus        : submitted | under_review | requirements_requested |
+                             quoted | converted | rejected | cancelled
+ExportQuotationStatus      : draft | pending_approval | issued | accepted |
+                             rejected | expired | superseded
+ExportOrderStatus          : pending_payment | payment_verified | in_production |
+                             ready_for_shipment | shipped | delivered |
+                             completed | cancelled
+Incoterm                   : EXW | FCA | FAS | FOB | CFR | CIF | CPT | CIP | DAP | DPU | DDP
+ShippingMode               : sea | air | road | multimodal
+ComplianceStatus           : pending | in_review | cleared | blocked
+DocumentVerificationStatus : submitted | under_review | verified | rejected | expired
+ShipmentStatus             : planned | booked | dispatched | in_transit |
+                             customs_processing | arrived | delivered | cancelled
+```
+
+`EXPORT_ENQUIRY_TRANSITIONS`, `EXPORT_ORDER_TRANSITIONS` and
+`SHIPMENT_TRANSITIONS` declare the legal moves. Reaching
+`ready_for_shipment`/`shipped` (order) or `dispatched` (shipment) is blocked
+until the order's compliance checklist is approved.
+
+## 6b. `training` — training academy (Phase 9, delivered)
+
+The dedicated `apps.training` app (kept separate from `catalog`/`orders`,
+matching the domain-oriented layout). Reads live in `apps/training/selectors.py`;
+writes live in `apps/training/services.py`. Course payment reuses the Phase 6
+pipeline through `orders.Payment.training_enrollment`; certificates are rendered
+with the dependency-free `apps/orders/documents` PDF helper. Primary keys are
+UUIDs; money is `Decimal`. Nothing is hardcoded — categories, courses, cohorts,
+instructors, venues, fees and capacities are records.
+
+### 6b.1 Catalogue
+
+- `TrainingCategory` — configurable and self-nesting (`parent`), `is_active`;
+  never a hardcoded list. `SluggedMixin` (slug from `name`).
+- `Course` — category, `title`/`slug`, summary/description and objectives,
+  `delivery_mode`, duration, fee, cover image, `status` (`CourseStatus`),
+  `certificate_eligible`, published timestamp. Enrolment is via a cohort.
+- `CourseModule` (ordered) → `CourseLesson` (ordered, unique per module;
+  `lesson_type`, `is_preview`, estimated minutes, optional media/content).
+- `CourseResource` — a private document/link attached to a course or a lesson.
+
+### 6b.2 Instructors, venues & cohorts
+
+- `InstructorProfile` (one per user) and `InstructorAssignment` (course and/or
+  session, role, active window).
+- `TrainingVenue`; `TrainingSession` (cohort) with `status` (`SessionStatus`),
+  capacity, fee, start/end, enrolment deadline, venue and instructor;
+  `TrainingSessionSchedule` for dated topic lines.
+
+### 6b.3 Enrolment & attendance
+
+- `Enrollment` — `reference`, student, session, `status` (`EnrollmentStatus`),
+  payment fields (`amount_paid`, `payment_status`,
+  `settled_payment_references`), confirmed/completed timestamps and a derived
+  `balance_due`. Capacity is enforced transactionally; a full cohort yields
+  `WAITLISTED`. `EnrollmentRequirement` and `EnrollmentStatusHistory`
+  (append-only).
+- `AttendanceSession` (one per cohort per date, optional schedule entry) and
+  `AttendanceRecord` (one per enrolment, status `AttendanceStatus`).
+
+### 6b.4 Assessments, progress & certificates
+
+- `Assessment` (type, max attempts, pass mark, completion-required flag,
+  published) → `AssessmentQuestion` → `AssessmentOption`. Learner attempts are
+  `AssessmentSubmission` (answers JSON) + `AssessmentResult` (score, pass,
+  grader). Objective questions auto-grade; written answers are graded by staff.
+- `LessonProgress` and `CourseProgress`; completion is **derived** from real
+  records (all lessons complete **and** all published completion-required
+  assessments passed), never assumed.
+- `CertificateTemplate` and `Certificate` (student, course, session, issued by,
+  status) plus `CertificateVerificationLog` for public look-ups.
+
+### 6b.5 Settlement (`orders`)
+
+`orders.Payment.training_enrollment` (nullable FK) is a fourth payment target
+alongside shop `order`, `service_quotation` and `export_order`; the
+`chk_payment_single_target` check constraint enforces exactly one target.
+`apps.training.payments.settle_training_payment` is invoked only from the Phase 6
+**verified** branch — the browser callback is never trusted. It calls the
+idempotent `services.settle_enrollment_payment` (keyed on
+`settled_payment_references`), applies the verified amount, and confirms the
+enrolment once the required fee is met.
+
+### 6b.6 Status enumerations (`training`)
+
+```
+CourseStatus           : draft | published | archived
+DeliveryMode           : in_person | online | hybrid | self_paced
+LessonType             : text | document | video | activity
+ResourceType           : document | video | link | image | other
+SessionStatus          : draft | scheduled | enrollment_open | enrollment_closed |
+                         in_progress | completed | cancelled
+EnrollmentStatus       : pending | payment_pending | confirmed | waitlisted |
+                         cancelled | completed
+EnrollmentPaymentStatus: not_required | pending | paid | partially_paid |
+                         refunded | failed
+AttendanceStatus       : present | absent | late | excused
+AssessmentType         : quiz | assignment | practical | exam
+QuestionType           : multiple_choice | true_false | short_answer
+SubmissionStatus       : draft | submitted | graded | returned
+CertificateStatus      : issued | revoked
+```
+
+`COURSE_TRANSITIONS`, `SESSION_TRANSITIONS` and `ENROLLMENT_TRANSITIONS` declare
+the legal moves; enrolment completion is terminal.
+
+---
+
+## 6c. `notifications` — unified notification centre (Phase 10, delivered)
+
+> Delivered in the dedicated `apps.notifications` app (migration
+> `notifications.0001_initial`, generated/applied). Primary keys are UUIDs.
+
+### 6c.1 `Notification`
+
+One in-app notification for one recipient, created **synchronously inside the
+same transaction as the business event** (so it rolls back with it) and
+idempotent on `dedupe_key`.
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `name` | `CharField(150)` | |
-| `state` | FK → `State` | `PROTECT` |
-| `lga` | FK → `LGA` | `PROTECT` |
-| `capacity` | `DecimalField(14,2)` | owner-provided (no invented default) |
-| `capacity_unit` | `CharField(16)` | |
-| `facility_type` | `CharField(60)` | e.g. dry, cold |
-| `is_active` | `BooleanField` | indexed |
-| timestamps | | |
+| `id` | UUID | PK |
+| `recipient` | FK → `User` | `CASCADE`, `related_name="notifications"` |
+| `category` | `CharField(20)` | `NotificationCategory`, indexed |
+| `event` | `CharField(80)` | indexed; stable event key e.g. `order.created` |
+| `title` / `message` | `CharField(200)` / `TextField` | |
+| `url` | `CharField(300)` | safe, same-site relative link only (`services.safe_url`) |
+| `reference_type` / `reference_id` | `CharField(60/64)` | soft link to the domain object |
+| `dedupe_key` | `CharField(180)` | **unique**; retried events never duplicate |
+| `is_read` | `Bool` | indexed |
+| `read_at` | `DateTime` | null |
+| `created_at` | `DateTime` | `auto_now_add`, indexed |
 
-### 6.6 `StorageRequest`
+Indexes: `(recipient, -created_at)`, `(recipient, is_read, -created_at)`,
+`(recipient, category, -created_at)`.
 
-Adds: `facility` (FK, nullable until assigned), `produce` (`CharField`),
-`quantity` + `quantity_unit`, `intake_date`, `expected_release_date`,
-`status` (`StorageStatus`: submitted | quoted | accepted | stored | released | cancelled`),
-and child `StorageRecord` rows for intake/release events.
+### 6c.2 `NotificationPreference`
 
-### 6.7 `StorageRecord`
-
-`storage_request` FK, `kind` (`intake` | `release` | `adjustment`),
-`quantity`, `recorded_by` FK, `recorded_at`, `note`.
-
-### 6.8 `ExportEnquiry`
-
-Adds: `product` (`CharField`), `volume` + `volume_unit`,
-`destination_country` (`CharField(80)`), `incoterm` (`CharField(3)`, blank),
-`target_currency` (`CharField(3)`, default `USD`), `target_date`, `status`
-(`ExportStatus`: submitted | reviewing | quoted | negotiating | won | lost | cancelled`).
-
-- **Destination is an external market**; there is no branch/location concept.
-
-### 6.9 `TrainingCourse`
+Per-user channel toggles and per-category opt-outs (one-to-one with `User`).
 
 | Field | Type | Notes |
 |---|---|---|
-| `id` | BigAuto | PK |
-| `title` | `CharField(180)` | |
-| `slug` | `SlugField(200)` | unique |
-| `summary` | `CharField(255)` | |
-| `description` | `TextField` | |
-| `level` | `CharField(20)` | `TextChoices` (beginner/intermediate/advanced) |
-| `duration_hours` | `PositiveIntegerField` | |
-| `fee` | `DecimalField(14,2)` | nullable (owner sets real value in dashboard) |
-| `currency` | `CharField(3)` | default `NGN` |
-| `status` | `CharField(16)` | `CourseStatus` (draft/published/archived) |
-| timestamps | | |
+| `id` | UUID | PK |
+| `user` | OneToOne → `User` | `CASCADE`, `related_name="notification_preference"` |
+| `in_app_enabled` / `email_enabled` | `Bool` | default `True` |
+| `sms_enabled` / `whatsapp_enabled` | `Bool` | default `False` (inert until a provider is configured) |
+| `categories` | `JSONField` | `{category: bool}`, all enabled by default |
+| `created_at` / `updated_at` | `DateTime` | |
 
-### 6.10 `TrainingCohort`
+### 6c.3 `NotificationDelivery`
 
-`course` FK, `name`, `start_date`, `end_date`, `capacity`
-(`PositiveIntegerField`, owner-provided), `location`, `status`
-(`CohortStatus`: scheduled | open | full | in_progress | completed | cancelled`).
+An audit-grade ledger of one delivery attempt per `(notification, channel)`.
 
-### 6.11 `TrainingEnrollment`
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `notification` | FK → `Notification` | `CASCADE`, `related_name="deliveries"` |
+| `channel` | `CharField(20)` | `NotificationChannel` |
+| `status` | `CharField(16)` | `pending \| delivered \| skipped \| failed` |
+| `attempt_count` | `PositiveSmallInt` | default 0 |
+| `last_attempt_at` / `delivered_at` | `DateTime` | null |
+| `provider_reference` | `CharField(200)` | optional provider id |
+| `error_detail` | `TextField` | last error (never secrets) |
+| `created_at` / `updated_at` | `DateTime` | |
 
-`cohort` FK, `trainee` FK → `User`, `status` (`EnrollmentStatus`: pending |
-confirmed | attended | completed | cancelled), `enrolled_at`,
-`unique(cohort, trainee)`, index `(trainee, status)`.
+Constraint `uniq_notification_channel` (`notification`, `channel`).
 
-### 6.12 Status enumerations (`services`)
+**Enumerations:** `NotificationCategory` (`orders`, `payments`, `export`,
+`services`, `training`, `support`, `account`, `general`);
+`NotificationChannel` (`in_app`, `email`, `sms`, `whatsapp`);
+`NotificationDeliveryStatus` (`pending`, `delivered`, `skipped`, `failed`).
 
-```
-ConsultancyStatus : submitted | triaged | assigned | in_progress | completed | cancelled
-FarmingStatus     : submitted | reviewed | scheduled | in_progress | completed | cancelled
-MarketingStatus   : submitted | reviewed | matched | closed | cancelled
-StorageStatus     : submitted | quoted | accepted | stored | released | cancelled
-ExportStatus      : submitted | reviewing | quoted | negotiating | won | lost | cancelled
-CourseStatus      : draft | published | archived
-EnrollmentStatus  : pending | confirmed | attended | completed | cancelled
-```
+---
+
+## 6d. `support` — customer support centre (Phase 10, delivered)
+
+> Delivered in the dedicated `apps.support` app (migration
+> `support.0001_initial`). `SupportTicket`/`SupportMessage`/`SupportAttachment`
+> use `core.UUIDTimeStampedModel`; `SupportStatusHistory` has a UUID PK and
+> `created_at` only (append-only).
+
+### 6d.1 `SupportTicket`
+
+| Field | Type | Notes |
+|---|---|---|
+| `reference` | `CharField(32)` | **unique**, `AS-ST-…`, generated on save |
+| `customer` | FK → `User` | `CASCADE`, `related_name="support_tickets"` |
+| `subject` | `CharField(200)` | |
+| `category` | `CharField(32)` | `SupportCategory` |
+| `priority` | `CharField(16)` | `SupportPriority`, default `normal` |
+| `status` | `CharField(24)` | `SupportStatus`, indexed, default `open` |
+| `related_type` / `related_id` | `CharField(40/64)` | optional soft link to an owned order/payment/enquiry/request/enrolment |
+| `assigned_to` | FK → `User` | null, `SET_NULL`, `related_name="assigned_support_tickets"` |
+| `resolved_at` / `closed_at` / `reopened_at` | `DateTime` | null |
+| `last_activity_at` | `DateTime` | indexed (queue ordering) |
+| `created_at` / `updated_at` | `DateTime` | |
+
+Index `(customer, -last_activity_at)`.
+
+### 6d.2 `SupportMessage`, `SupportAttachment`, `SupportStatusHistory`
+
+- `SupportMessage` — `ticket` FK, `sender` FK (`SET_NULL`), `message`,
+  `is_internal` (internal notes never reach the customer and never notify).
+  Ordered oldest-first.
+- `SupportAttachment` — `ticket` FK, optional `message` FK, private
+  `file` (`support_attachments/%Y/%m/`), `original_filename`, `uploaded_by`.
+  Validated by `support.validators` (allow-list + 10 MB cap).
+- `SupportStatusHistory` — append-only `previous_status`/`new_status`,
+  `changed_by`, `reason`, `created_at`.
+
+**Enumerations:** `SupportCategory`, `SupportPriority`
+(`low|normal|high|urgent`), `SupportStatus` (`open | assigned | in_progress |
+waiting_for_customer | resolved | closed | reopened`), `SupportRelatedType`.
+`SUPPORT_TRANSITIONS` declares the legal status moves; `REOPEN_WINDOW_DAYS = 30`
+bounds reopening.
 
 ---
 
@@ -763,15 +1321,72 @@ EnrollmentStatus  : pending | confirmed | attended | completed | cancelled
   `(actor, -created_at)` → `audit_actor_idx`.
 - Never records passwords, tokens or secrets.
 
-### 7.2 `ReportExport` (Phase 10)
+### 7.2 Reporting artefacts moved to `apps.analytics` (Phase 11)
 
-`requested_by` FK, `report_key` `CharField`, `params` `JSONField`,
-`status` (`pending | ready | failed`), `file` `FileField`, `created_at`,
-`completed_at`.
+> **Superseded.** The reporting models drafted here as `dashboard.ReportExport` /
+> `SavedReport` were delivered in the new **`apps.analytics`** app as
+> `ReportExport`, `ScheduledReport`, `ReportExecution` and `ReportDelivery` (see
+> §7b below). There is no `dashboard.ReportExport` or `dashboard.SavedReport`; a
+> `SavedReport` (saved ad-hoc report definitions) was **not** built — scheduled
+> reports cover the recurring-report need.
 
-### 7.3 `SavedReport` (Phase 10, optional)
+---
 
-`owner` FK, `name`, `report_key`, `params` `JSONField`, `is_shared`.
+## 7b. `analytics` — reporting artefacts (Phase 11)
+
+Analytics is **read-only** against the business domain: these four models only
+record reporting artefacts (generated files, schedules, executions, deliveries)
+and never store business figures of their own — every number is derived from the
+authoritative source models at request time. Primary keys are UUIDs.
+
+### 7b.1 `ReportExport`
+
+| Field | Type | Notes |
+|---|---|---|
+| `id` | UUID | PK |
+| `reference` | `CharField(32)` | unique, indexed, `AS-RPT-…`, generated |
+| `report_key` | `CharField(64)` | indexed, allow-listed key |
+| `export_format` | `CharField(8)` | `csv` / `xlsx` / `pdf` |
+| `filters` | `JSONField` | validated, allow-listed filter snapshot |
+| `currency` | `CharField(3)` | blank |
+| `requested_by` | FK → `User` | `SET_NULL`, nullable |
+| `status` | `CharField(12)` | `pending` / `running` / `succeeded` / `failed` / `expired` |
+| `is_financial` | Bool | indexed; requires `analytics.finance` to download |
+| `row_count` | `PositiveIntegerField` | |
+| `file` | `FileField` | private, `analytics_reports/%Y/%m/` |
+| `error` | `TextField` | blank |
+| `generated_at` / `expires_at` | DateTime | `expires_at` indexed (retention) |
+| `created_at` / `updated_at` | DateTime | |
+
+- Indexes: `rpt_export_key_idx` (`report_key`, `-created_at`),
+  `rpt_export_user_idx` (`requested_by`, `-created_at`).
+- Files are served **only** through the permission-checked download view.
+
+### 7b.2 `ScheduledReport`
+
+`name`, `report_key` (indexed), `filters` `JSONField`, `frequency`
+(`daily`/`weekly`/`monthly`), `export_format`, `recipients` M2M → `User`,
+`is_enabled` (indexed), `next_run_at` (indexed), `last_run_at`, `created_by` FK,
+timestamps.
+
+### 7b.3 `ReportExecution`
+
+`scheduled_report` FK (`SET_NULL`, nullable), `report_key`, `filters`,
+`period_key` (indexed), `triggered_by`, `export` FK (`SET_NULL`), `triggered_by_user`
+FK, `row_count`, `status`, `error`, `started_at`/`finished_at`, timestamps.
+
+- Constraint `uniq_schedule_period_execution`: unique `(scheduled_report,
+  period_key)` where `period_key <> ''` — **at most one run per period** (races
+  also caught via `IntegrityError`).
+- Index `rpt_exec_idx` (`status`, `-created_at`).
+
+### 7b.4 `ReportDelivery`
+
+`execution` FK (cascade), `recipient` FK (`SET_NULL`, nullable), `email`,
+`status` (`pending`/`sent`/`failed`/`skipped`), `error`, `sent_at`, `created_at`.
+
+- A recipient who no longer holds the report's capability is recorded `skipped`
+  and never emailed.
 
 ---
 
@@ -788,10 +1403,18 @@ EnrollmentStatus  : pending | confirmed | attended | completed | cancelled
 
 ### 8.2 Constraints
 - Uniqueness: email, state code/name, lga per state, category slug,
-  listing origin+package, cart item, enrollment.
+  listing origin+package, cart item, enrollment, `Payment.reference`,
+  `Invoice.number`, `Receipt.number`, `Refund.reference`, company bank account,
+  `PaymentWebhookEvent(provider, event_id)` and an approved
+  `BankTransferSubmission(transfer_reference, account_number_snapshot)`.
 - CheckConstraints: non-negative money and stock; `stock_reserved <=
-  stock_on_hand`; `selling_price >= 0`; `refund.amount <= payment.amount`
-  enforced in the service layer with a DB check where possible.
+  stock_on_hand`; `selling_price >= 0`; Phase 6 adds `Payment.expected_amount
+  >= 0`, `Payment.verified_amount >= 0`, `Invoice.total >= 0`,
+  `Receipt.amount >= 0`, `Refund.amount > 0` and `BankTransferSubmission.claimed_amount
+  >= 0`.
+- Refunds never exceed captured funds: `refund.amount <= payment.settled_amount`
+  is enforced in the service layer (inside a row-locked transaction), because it
+  is a multi-row, cumulative rule rather than a single-table check.
 
 ### 8.3 Money
 - All money is `DecimalField(14, 2)`. Quantities may use `DecimalField(14, 3)`.
@@ -837,9 +1460,46 @@ ProductListing 1─* WholesalePriceTier, ProductListing 1─* ProductVariant
 Product 1─* ProductImage, Product *─1 UnitOfMeasure
 Product 1─* MarketReferencePrice *─1 State (nullable)
 Country 1─* State 1─* LGA 1─* City
-User 1─* ServiceRequest (Consultancy/Farming/Marketing/Storage/Export)
+User 1─* ServiceRequest (Consultancy/Farming/Marketing/Storage)
 StorageRequest 1─* StorageRecord
-TrainingCourse 1─* TrainingCohort 1─* TrainingEnrollment *─1 User
+ServiceQuotation 1─* ServiceQuotationItem
+
+# export (Phase 8, implemented)
+User 1─* ExportEnquiry 1─* ExportEnquiryItem | ExportEnquiryStatusHistory
+Country 1─1 ExportDestination 1─* ExportDestinationRequirement
+        ExportDestination 1─* ExportTradeRestriction | ExportDocumentRequirement
+ExportProductProfile 1─1 Product (extends the catalogue, no duplication)
+ExportQuotation 1─* ExportQuotationItem; ExportQuotation 1─* ExportQuotationRevision
+ExportQuotation 1─1 ExportOrder (terms frozen from the accepted quotation)
+ExportOrder 1─* ExportOrderItem | ExportOrderStatusHistory | ExportDocument | ExportShipment
+ExportOrder 1─1 ExportComplianceChecklist 1─* ExportComplianceChecklistItem
+ShipmentMilestone *─1 ExportShipment (staff-entered only)
+Order 1─* Payment | ServiceQuotation 1─* Payment | ExportOrder 1─* Payment |
+Enrollment 1─* Payment
+        (chk_payment_single_target: exactly one target)
+
+# notifications (Phase 10, delivered)
+User 1─* Notification 1─* NotificationDelivery
+User 1─1 NotificationPreference
+
+# support (Phase 10, delivered)
+User 1─* SupportTicket 1─* SupportMessage | SupportAttachment | SupportStatusHistory
+
+# training (Phase 9, delivered)
+TrainingCategory 1─* TrainingCategory (self-nesting) 1─* Course
+Course 1─* CourseModule 1─* CourseLesson; CourseLesson *─1 CourseModule
+CourseResource *─1 Course | CourseLesson
+InstructorProfile 1─1 User; InstructorAssignment *─1 InstructorProfile, Course, TrainingSession
+TrainingVenue 1─* TrainingSession; Course 1─* TrainingSession
+TrainingSession 1─* TrainingSessionSchedule | Enrollment | AttendanceSession
+Enrollment 1─* EnrollmentRequirement | EnrollmentStatusHistory;
+Enrollment 1─1 AttendanceRecord *─1 AttendanceSession
+Course 1─* Assessment 1─* AssessmentQuestion 1─* AssessmentOption
+AssessmentSubmission *─1 Enrollment, Assessment; AssessmentResult 1─1 AssessmentSubmission
+LessonProgress *─1 Enrollment, CourseLesson; CourseProgress 1─1 Enrollment
+Certificate *─1 Student, Course, TrainingSession; CertificateTemplate 1─* Certificate
+CertificateVerificationLog *─1 Certificate
+
 User 1─* Notification
 User 1─* AuditLog
 

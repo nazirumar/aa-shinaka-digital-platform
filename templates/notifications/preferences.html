@@ -1,0 +1,36 @@
+{% extends "accounts/account_base.html" %}
+
+{% block account_content %}
+  <form method="post" class="space-y-6">
+    {% csrf_token %}
+    <fieldset class="rounded-xl border border-stone-200 bg-white p-5">
+      <legend class="px-1 text-sm font-semibold text-stone-900">Channels</legend>
+      <p class="mb-3 text-sm text-stone-500">Email is sent through the configured mail backend. SMS and WhatsApp stay off until an approved provider is configured and you opt in.</p>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {% for field in form %}
+          {% if field.name == "in_app_enabled" or field.name == "email_enabled" or field.name == "sms_enabled" or field.name == "whatsapp_enabled" %}
+            <label class="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm">
+              {{ field }} {{ field.label }}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <fieldset class="rounded-xl border border-stone-200 bg-white p-5">
+      <legend class="px-1 text-sm font-semibold text-stone-900">Categories</legend>
+      <p class="mb-3 text-sm text-stone-500">Turn a category off to stop receiving those notifications entirely.</p>
+      <div class="grid gap-2 sm:grid-cols-2">
+        {% for field in form %}
+          {% if field.name != "in_app_enabled" and field.name != "email_enabled" and field.name != "sms_enabled" and field.name != "whatsapp_enabled" %}
+            <label class="flex items-center gap-2 rounded-md border border-stone-200 px-3 py-2 text-sm">
+              {{ field }} {{ field.label }}
+            </label>
+          {% endif %}
+        {% endfor %}
+      </div>
+    </fieldset>
+
+    <button type="submit" class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Save preferences</button>
+  </form>
+{% endblock %}

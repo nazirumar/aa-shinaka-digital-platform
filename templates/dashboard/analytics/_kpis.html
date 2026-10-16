@@ -1,0 +1,18 @@
+{% load catalog_tags %}
+{% comment %}KPI grid. ``kpis`` is a list of {label, value, kind, currency, help}.{% endcomment %}
+{% if kpis %}
+<dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5">
+  {% for kpi in kpis %}
+    <div class="rounded-xl border border-stone-200 bg-white p-4">
+      <dt class="text-xs uppercase tracking-wide text-stone-500">{{ kpi.label }}</dt>
+      <dd class="mt-1 text-2xl font-semibold text-stone-900">
+        {% if kpi.kind == 'money' %}{{ kpi.value|money:kpi.currency }}
+        {% elif kpi.kind == 'percent' %}{{ kpi.value }}%
+        {% elif kpi.kind == 'decimal' %}{{ kpi.value|decimal_str }}
+        {% else %}{{ kpi.value }}{% endif %}
+      </dd>
+      {% if kpi.help %}<p class="mt-1 text-xs text-stone-500">{{ kpi.help }}</p>{% endif %}
+    </div>
+  {% endfor %}
+</dl>
+{% endif %}

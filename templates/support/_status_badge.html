@@ -1,0 +1,10 @@
+{% comment %}Status pill. Props: status (value), label.{% endcomment %}
+<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium
+  {% if status == 'open' %}bg-amber-100 text-amber-800
+  {% elif status == 'assigned' %}bg-sky-100 text-sky-800
+  {% elif status == 'in_progress' %}bg-blue-100 text-blue-800
+  {% elif status == 'waiting_for_customer' %}bg-purple-100 text-purple-800
+  {% elif status == 'resolved' %}bg-emerald-100 text-emerald-800
+  {% elif status == 'closed' %}bg-stone-200 text-stone-700
+  {% elif status == 'reopened' %}bg-rose-100 text-rose-800
+  {% else %}bg-stone-100 text-stone-700{% endif %}">{{ label }}</span>

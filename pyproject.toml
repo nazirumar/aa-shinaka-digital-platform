@@ -12,6 +12,7 @@ dependencies = [
     "celery[redis]>=5.4",
     "redis>=5.2",
     "whitenoise>=6.8",
+    "gunicorn>=23.0",
 ]
 
 [dependency-groups]
@@ -28,7 +29,7 @@ dev = [
 package = false
 
 [tool.pytest.ini_options]
-DJANGO_SETTINGS_MODULE = "config.settings.dev"
+DJANGO_SETTINGS_MODULE = "config.settings.test"
 pythonpath = ["."]
 python_files = ["test_*.py", "*_test.py"]
 testpaths = ["tests"]

@@ -45,7 +45,10 @@ def test_setting_price_syncs_headline_and_records_history(listing):
     listing.refresh_from_db()
 
     assert listing.selling_price == 250
-    history = PriceHistory.objects.filter(listing=listing).order_by("-created_at").first()
+    # ``created_at`` is ``auto_now_add`` and rows created within the same clock
+    # tick tie, so select the historical row by its unique new price rather than
+    # relying on recency ordering.
+    history = PriceHistory.objects.get(listing=listing, new_price="250.00")
     assert history.old_price == 100
     assert history.new_price == 250
 
@@ -57,7 +60,7 @@ def test_successive_prices_build_an_append_only_chain(listing):
 
     assert listing.selling_price == 310
     assert PriceHistory.objects.filter(listing=listing).count() == 3
-    latest = PriceHistory.objects.filter(listing=listing).order_by("-created_at").first()
+    latest = PriceHistory.objects.get(listing=listing, new_price="310.00")
     assert (latest.old_price, latest.new_price) == (250, 310)
 
 

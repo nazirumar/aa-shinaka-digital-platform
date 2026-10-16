@@ -1,0 +1,27 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block title %}Executive overview{% endblock %}
+
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">Executive overview</h1>
+    <p class="text-sm text-stone-600">Live business intelligence derived from the operational records.</p>
+  </div>
+</div>
+
+<div class="mt-4">{% include "dashboard/analytics/_filters.html" %}</div>
+
+<div class="mt-4">{% include "dashboard/analytics/_kpis.html" %}</div>
+
+<nav class="mt-4 flex flex-wrap gap-2 text-xs" aria-label="Analytics sections">
+  {% for key, label in pages.items %}
+    <a href="{% url 'analytics:page' key %}" class="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-100">{{ label }}</a>
+  {% endfor %}
+  <a href="{% url 'analytics:data_quality' %}" class="rounded-full border border-stone-300 px-3 py-1 text-stone-600 hover:bg-stone-100">Data quality</a>
+</nav>
+
+{% include "dashboard/analytics/_charts.html" %}
+
+{% for table in tables %}{% include "dashboard/analytics/_table.html" with table=table %}{% endfor %}
+{% endblock %}

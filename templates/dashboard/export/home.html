@@ -1,0 +1,80 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+<div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Enquiries" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.enquiries }}</p><p class="text-xs text-stone-500">{{ metrics.open_enquiries }} {% trans "open" %}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Quotations issued" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.quotations_issued }}</p><p class="text-xs text-stone-500">{{ metrics.accepted_quotations }} {% trans "accepted" %}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Open orders" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.open_orders }}</p><p class="text-xs text-stone-500">{{ metrics.orders }} {% trans "total" %}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Verified revenue" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.verified_revenue }}</p><p class="text-xs text-stone-500">{% trans "from verified payments only" %}</p></div>
+</div>
+
+<div class="mt-8 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent enquiries" %}</h2>
+      <a href="{% url 'export_dashboard:enquiry_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for e in recent_enquiries %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export_dashboard:enquiry_detail' e.reference %}" class="font-medium text-forest hover:underline">{{ e.reference }}</a>
+          <span class="text-stone-500">{{ e.destination.country.name }} · {{ e.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No enquiries yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent export orders" %}</h2>
+      <a href="{% url 'export_dashboard:order_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for o in recent_orders %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export_dashboard:order_detail' o.reference %}" class="font-medium text-forest hover:underline">{{ o.reference }}</a>
+          <span class="text-stone-500">{{ o.currency }} {{ o.total }} · {{ o.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No orders yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Compliance awaiting clearance" %}</h2>
+      <a href="{% url 'export_dashboard:compliance_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for c in pending_compliance %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export_dashboard:order_detail' c.order.reference %}" class="font-medium text-forest hover:underline">{{ c.order.reference }}</a>
+          <span class="text-stone-500">{{ c.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "Nothing pending." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent shipments" %}</h2>
+      <a href="{% url 'export_dashboard:shipment_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for s in recent_shipments %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export_dashboard:shipment_detail' s.reference %}" class="font-medium text-forest hover:underline">{{ s.reference }}</a>
+          <span class="text-stone-500">{{ s.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No shipments yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

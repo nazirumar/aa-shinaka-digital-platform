@@ -1,0 +1,32 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Assessments" %}</h1>
+<p class="mt-1 text-sm text-stone-500">{% trans "Create assessments from a course's detail page." %}</p>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Title" %}</th>
+        <th class="px-5 py-3">{% trans "Course" %}</th>
+        <th class="px-5 py-3">{% trans "Type" %}</th>
+        <th class="px-5 py-3">{% trans "Published" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for assessment in assessments %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_dashboard:assessment_detail' assessment.pk %}" class="font-medium text-forest hover:underline">{{ assessment.title }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ assessment.course.title }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ assessment.get_assessment_type_display }}</td>
+          <td class="px-5 py-3">{% if assessment.is_published %}<span class="text-green-700">{% trans "Yes" %}</span>{% else %}<span class="text-stone-500">{% trans "No" %}</span>{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-5 py-6 text-sm text-stone-500">{% trans "No assessments yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=assessments %}
+{% endblock %}

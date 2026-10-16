@@ -1,0 +1,20 @@
+# Build context exclusions for the production image.
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+media
+staticfiles
+node_modules
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+docs
+tests
+*.sqlite3
+backups

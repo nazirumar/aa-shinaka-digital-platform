@@ -7,6 +7,8 @@ Choice fields that depend on a specific order (status transitions) or user
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django import forms
 from django.urls import reverse
 
@@ -133,7 +135,7 @@ class QuotationReviewForm(OrdersPlainForm):
 
 class QuotationRequestForm(OrdersPlainForm):
     quantity = forms.DecimalField(
-        max_digits=14, decimal_places=3, min_value="0.001", label="Quantity needed"
+        max_digits=14, decimal_places=3, min_value=Decimal("0.001"), label="Quantity needed"
     )
     packaging = forms.CharField(max_length=64, required=False)
     destination_state = forms.ModelChoiceField(
@@ -181,9 +183,9 @@ class CheckoutForm(OrdersPlainForm):
     def __init__(self, *args, user=None, **kwargs):
         super().__init__(*args, **kwargs)
         if user is not None and getattr(user, "is_authenticated", False):
-            self.fields["address"].queryset = Address.objects.filter(
-                user=user, is_active=True
-            ).order_by("-is_default", "recipient_name")
+            self.fields["address"].queryset = Address.objects.filter(user=user).order_by(
+                "-is_default", "recipient_name"
+            )
         self.fields["shipping_method"].queryset = ShippingMethod.objects.filter(
             is_active=True
         ).order_by("sort_order", "name")

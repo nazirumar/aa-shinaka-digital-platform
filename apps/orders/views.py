@@ -45,7 +45,7 @@ def _quantity_from_post(request: HttpRequest) -> Decimal:
 def _address_for(user, address_id):
     if not address_id:
         return None
-    return Address.objects.filter(user=user, pk=address_id, is_active=True).first()
+    return Address.objects.filter(user=user, pk=address_id).first()
 
 
 # ---------------------------------------------------------------------------
@@ -161,6 +161,7 @@ def _shipping_options(request: HttpRequest, state_id=None) -> list[dict]:
     ]
 
 
+@login_required
 @require_GET
 def checkout_shipping_options(request: HttpRequest) -> HttpResponse:
     address = _address_for(request.user, request.GET.get("address"))
@@ -267,6 +268,8 @@ def order_detail(request: HttpRequest, number: str) -> HttpResponse:
     if order is None:
         messages.error(request, "Order not found.")
         return redirect(reverse("orders:order_list"))
+    from . import paystack
+
     return render(
         request,
         "orders/order_detail.html",
@@ -281,6 +284,8 @@ def order_detail(request: HttpRequest, number: str) -> HttpResponse:
                 OrderStatus.PENDING_PAYMENT,
                 OrderStatus.PAYMENT_REVIEW,
             },
+            "online_payment_available": paystack.is_enabled(),
+            "invoice": getattr(order, "invoice", None),
             "shipments": order.shipments.select_related("method").all(),
         },
     )

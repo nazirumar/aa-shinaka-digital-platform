@@ -105,6 +105,19 @@ def _sync_listing_status(listing: ProductListing) -> None:
         listing.save(update_fields=["status", "updated_at"])
 
 
+def _sync_caller(original: ProductListing, locked: ProductListing) -> None:
+    """Copy DB-authoritative stock fields back onto the caller's instance.
+
+    Stock operations lock and re-read the listing row, so the object the caller
+    passed in would otherwise keep stale in-memory ``stock_on_hand`` /
+    ``stock_reserved`` / ``status`` values after the operation.
+    """
+    original.stock_on_hand = locked.stock_on_hand
+    original.stock_reserved = locked.stock_reserved
+    original.status = locked.status
+    original.updated_at = locked.updated_at
+
+
 def _write_movement(
     listing: ProductListing,
     *,
@@ -147,6 +160,7 @@ def adjust_stock(
         raise ValidationError(f"Unknown stock movement kind '{kind}'.")
     amount = _as_decimal(delta)
     resolved = resolve_warehouse(warehouse)
+    caller = listing
 
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
@@ -184,6 +198,7 @@ def adjust_stock(
             },
             request=request,
         )
+    _sync_caller(caller, listing)
     return movement
 
 
@@ -234,6 +249,7 @@ def transfer_stock(
     if from_warehouse.pk == to_warehouse.pk:
         raise ValidationError("Source and destination warehouses must differ.")
 
+    caller = listing
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
         source = get_balance(listing, warehouse=from_warehouse, variant=variant, for_update=True)
@@ -281,6 +297,7 @@ def transfer_stock(
             },
             request=request,
         )
+    _sync_caller(caller, listing)
     return out_movement, in_movement
 
 
@@ -301,6 +318,7 @@ def place_reservation(
     if amount <= 0:
         raise ValidationError("Reservation quantity must be positive.")
     resolved = resolve_warehouse(warehouse)
+    caller = listing
 
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
@@ -314,6 +332,7 @@ def place_reservation(
         balance.save(update_fields=["reserved", "updated_at"])
         listing.stock_reserved = listing.stock_reserved + amount
         listing.save(update_fields=["stock_reserved", "updated_at"])
+    _sync_caller(caller, listing)
     return amount
 
 
@@ -326,6 +345,7 @@ def release_reservation(
 ) -> None:
     """Release a previously placed reservation (never below zero)."""
     amount = _as_decimal(quantity)
+    caller = listing
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
         balance = get_balance(listing, warehouse=warehouse, variant=variant, for_update=True)
@@ -333,6 +353,7 @@ def release_reservation(
         balance.save(update_fields=["reserved", "updated_at"])
         listing.stock_reserved = max(listing.stock_reserved - amount, ZERO)
         listing.save(update_fields=["stock_reserved", "updated_at"])
+    _sync_caller(caller, listing)
 
 
 def commit_reservation(
@@ -346,6 +367,7 @@ def commit_reservation(
 ) -> StockMovement:
     """Turn a reservation into a sale: reduce on-hand and reserved together."""
     amount = _as_decimal(quantity)
+    caller = listing
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
         balance = get_balance(listing, warehouse=warehouse, variant=variant, for_update=True)
@@ -369,4 +391,5 @@ def commit_reservation(
             actor=actor,
         )
         _sync_listing_status(listing)
+    _sync_caller(caller, listing)
     return movement

@@ -1,0 +1,28 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">{{ page_title }}</h1>
+    <p class="text-sm text-stone-600">Derived live from the source records — never estimated.</p>
+  </div>
+  <nav class="flex flex-wrap gap-2 text-xs" aria-label="Analytics pages">
+    <a href="{% url 'analytics:executive' %}" class="rounded-full border px-3 py-1 {% if active_nav == 'analytics_executive' %}border-brand-600 bg-brand-600 text-white{% else %}border-stone-300 text-stone-600 hover:bg-stone-100{% endif %}">Executive</a>
+    {% for key, label in pages.items %}
+      <a href="{% url 'analytics:page' key %}" class="rounded-full border px-3 py-1 {% if key == page %}border-brand-600 bg-brand-600 text-white{% else %}border-stone-300 text-stone-600 hover:bg-stone-100{% endif %}">{{ label }}</a>
+    {% endfor %}
+  </nav>
+</div>
+
+<div class="mt-4">{% include "dashboard/analytics/_filters.html" %}</div>
+<div class="mt-4">{% include "dashboard/analytics/_kpis.html" %}</div>
+{% include "dashboard/analytics/_charts.html" %}
+{% for table in tables %}{% include "dashboard/analytics/_table.html" with table=table %}{% endfor %}
+
+{% if notes %}
+  <ul class="mt-4 space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-4 text-xs text-amber-900">
+    {% for note in notes %}<li>• {{ note }}</li>{% endfor %}
+  </ul>
+{% endif %}
+{% endblock %}

@@ -33,6 +33,50 @@
     </dl>
   </div>
 
+  <div>
+    <h2 class="mb-3 text-lg font-semibold text-stone-900">Your activity at a glance</h2>
+    <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      {% include "components/metric_card.html" with label="Orders" value=metrics.orders_total tone="brand" %}
+      {% include "components/metric_card.html" with label="Service requests" value=metrics.service_requests_total tone="stone" %}
+      {% include "components/metric_card.html" with label="Export enquiries" value=metrics.export_enquiries_total tone="stone" %}
+      {% include "components/metric_card.html" with label="Enrolments" value=metrics.enrollments_total tone="stone" %}
+      {% include "components/metric_card.html" with label="Documents" value=metrics.documents_total tone="gold" %}
+      {% include "components/metric_card.html" with label="Open support tickets" value=metrics.tickets_open tone="amber" %}
+      {% include "components/metric_card.html" with label="Unread notifications" value=metrics.notifications_unread tone="amber" %}
+      {% include "components/metric_card.html" with label="Invoices" value=metrics.invoices_total tone="stone" %}
+    </dl>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <h2 class="text-lg font-semibold text-stone-900">Quick links</h2>
+    <div class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <a href="{% url 'orders:order_list' %}" class="rounded-lg border border-stone-200 p-4 hover:border-brand-300 hover:bg-brand-50">
+        <span class="font-medium text-stone-800">My orders</span>
+        <span class="mt-1 block text-sm text-stone-500">Order history, payments and invoices.</span>
+      </a>
+      <a href="{% url 'services:request_list' %}" class="rounded-lg border border-stone-200 p-4 hover:border-brand-300 hover:bg-brand-50">
+        <span class="font-medium text-stone-800">Service requests</span>
+        <span class="mt-1 block text-sm text-stone-500">Consultancy, farming, marketing and storage.</span>
+      </a>
+      <a href="{% url 'export:home' %}" class="rounded-lg border border-stone-200 p-4 hover:border-brand-300 hover:bg-brand-50">
+        <span class="font-medium text-stone-800">Export</span>
+        <span class="mt-1 block text-sm text-stone-500">Enquiries, quotations and shipments.</span>
+      </a>
+      <a href="{% url 'training_account:home' %}" class="rounded-lg border border-stone-200 p-4 hover:border-brand-300 hover:bg-brand-50">
+        <span class="font-medium text-stone-800">Training &amp; Academy</span>
+        <span class="mt-1 block text-sm text-stone-500">Courses, enrolments and certificates.</span>
+      </a>
+      <a href="{% url 'account:documents' %}" class="rounded-lg border border-stone-200 p-4 hover:border-brand-300 hover:bg-brand-50">
+        <span class="font-medium text-stone-800">Documents</span>
+        <span class="mt-1 block text-sm text-stone-500">Invoices, receipts, certificates and reports.</span>
+      </a>
+      <a href="{% url 'support:home' %}" class="rounded-lg border border-stone-200 p-4 hover:border-brand-300 hover:bg-brand-50">
+        <span class="font-medium text-stone-800">Support</span>
+        <span class="mt-1 block text-sm text-stone-500">Raise and track support tickets.</span>
+      </a>
+    </div>
+  </div>
+
   <div class="rounded-xl border border-stone-200 bg-white p-6">
     <h2 class="text-lg font-semibold text-stone-900">Saved addresses</h2>
     {% url 'account:address_add' as address_add_url %}
@@ -50,17 +94,6 @@
     {% else %}
       {% include "components/empty_state.html" with title="No addresses yet" message="Add a delivery address to speed up future orders and enquiries." action_url=address_add_url action_label="Add address" %}
     {% endif %}
-  </div>
-
-  <div class="rounded-xl border border-stone-200 bg-white p-6">
-    <h2 class="text-lg font-semibold text-stone-900">Quick links</h2>
-    <p class="mt-1 text-sm text-stone-500">These modules open in later phases.</p>
-    <div class="mt-4 grid gap-3 sm:grid-cols-2">
-      {% include "components/coming_soon_card.html" with title="My orders" note="Order history arrives with product sales." %}
-      {% include "components/coming_soon_card.html" with title="Consultancy requests" note="Book advisory sessions in a later phase." %}
-      {% include "components/coming_soon_card.html" with title="Training & Academy" note="Course enrolment will appear here." %}
-      {% include "components/coming_soon_card.html" with title="Export enquiries" note="Track export enquiries once live." %}
-    </div>
   </div>
 </div>
 {% endblock %}

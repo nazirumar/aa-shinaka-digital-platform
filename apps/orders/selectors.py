@@ -31,6 +31,18 @@ from .models import (
     ShippingRate,
     StockReservation,
 )
+from .payment_models import (
+    BankTransferStatus,
+    BankTransferSubmission,
+    CompanyBankAccount,
+    Invoice,
+    InvoiceState,
+    Payment,
+    PaymentState,
+    Receipt,
+    Refund,
+    RefundState,
+)
 
 # ---------------------------------------------------------------------------
 # Cart
@@ -352,25 +364,246 @@ def staff_quotations(*, status: str = "", query: str = "") -> QuerySet[Quotation
     return queryset
 
 
+# ---------------------------------------------------------------------------
+# Payments, invoices & receipts (Phase 6)
+# ---------------------------------------------------------------------------
+
+
+def invoice_billing_snapshot(order) -> dict:
+    """Billing details captured onto an immutable invoice at issuance."""
+    address_parts = [
+        order.delivery_street,
+        order.delivery_landmark,
+        order.delivery_city,
+        order.delivery_lga.name if order.delivery_lga else "",
+        order.delivery_state.name if order.delivery_state else "",
+        order.delivery_postal_code,
+        order.delivery_country,
+    ]
+    name = order.delivery_recipient_name or order.contact_name or order.user.get_full_name() or ""
+    return {
+        "name": name.strip() or order.user.email,
+        "email": order.user.email,
+        "phone": order.delivery_phone or order.contact_phone or "",
+        "address": "\n".join(part for part in address_parts if part),
+    }
+
+
+def payments_for_user(user) -> QuerySet[Payment]:
+    return Payment.objects.filter(customer=user).select_related("order").order_by("-created_at")
+
+
+def payment_for_user(user, pk) -> Payment | None:
+    return Payment.objects.filter(customer=user, pk=pk).select_related("order").first()
+
+
+def invoices_for_user(user) -> QuerySet[Invoice]:
+    return Invoice.objects.filter(order__user=user).select_related("order").order_by("-created_at")
+
+
+def invoice_for_user(user, number: str) -> Invoice | None:
+    return Invoice.objects.filter(order__user=user, number=number).select_related("order").first()
+
+
+def receipt_for_user(user, number: str) -> Receipt | None:
+    return (
+        Receipt.objects.filter(payment__customer=user, number=number)
+        .select_related("payment__order")
+        .first()
+    )
+
+
+def receipts_for_user(user) -> QuerySet[Receipt]:
+    return (
+        Receipt.objects.filter(payment__customer=user)
+        .select_related("payment__order")
+        .order_by("-created_at")
+    )
+
+
+def refunds_for_payment(payment) -> QuerySet[Refund]:
+    return payment.refunds.select_related("approved_by", "requested_by").order_by("-created_at")
+
+
+def active_bank_accounts(*, currency: str = "") -> QuerySet[CompanyBankAccount]:
+    queryset = CompanyBankAccount.objects.filter(is_active=True)
+    if currency:
+        queryset = queryset.filter(currency=currency)
+    return queryset
+
+
+def staff_bank_accounts() -> QuerySet[CompanyBankAccount]:
+    """Every company bank account (active and inactive) for finance staff."""
+    return CompanyBankAccount.objects.order_by("sort_order", "bank_name")
+
+
+def staff_payments(*, status: str = "", provider: str = "", query: str = "", review=False):
+    queryset = Payment.objects.select_related("order", "customer").order_by("-created_at")
+    if status:
+        queryset = queryset.filter(status=status)
+    if provider:
+        queryset = queryset.filter(provider=provider)
+    if query:
+        queryset = queryset.filter(
+            Q(reference__icontains=query) | Q(order__number__icontains=query)
+        )
+    if review:
+        queryset = queryset.filter(requires_review=True)
+    return queryset
+
+
+def staff_bank_transfers(*, status: str = "", query: str = "") -> QuerySet[BankTransferSubmission]:
+    queryset = BankTransferSubmission.objects.select_related(
+        "payment__order", "customer", "bank_account", "reviewed_by"
+    ).order_by("-created_at")
+    if status:
+        queryset = queryset.filter(status=status)
+    if query:
+        queryset = queryset.filter(
+            Q(transfer_reference__icontains=query)
+            | Q(payment__order__number__icontains=query)
+            | Q(customer__email__icontains=query)
+        )
+    return queryset
+
+
+def staff_refunds(*, status: str = "") -> QuerySet[Refund]:
+    queryset = Refund.objects.select_related(
+        "payment__order", "payment__customer", "requested_by", "approved_by"
+    ).order_by("-created_at")
+    if status:
+        queryset = queryset.filter(status=status)
+    return queryset
+
+
+def staff_invoices(*, status: str = "") -> QuerySet[Invoice]:
+    queryset = Invoice.objects.select_related("order").order_by("-created_at")
+    if status:
+        queryset = queryset.filter(status=status)
+    return queryset
+
+
+def finance_overview(*, days: int = 30) -> dict:
+    """Headline finance metrics from *verified* payments only (never estimates)."""
+    from datetime import timedelta
+
+    from django.db.models import Count
+    from django.utils import timezone as _tz
+
+    settled_states = [PaymentState.PAID, PaymentState.REFUNDED, PaymentState.PARTIALLY_REFUNDED]
+    settled = Payment.objects.filter(status__in=settled_states)
+    gross = settled.aggregate(total=Sum("verified_amount"))["total"] or 0
+    refunded = (
+        Refund.objects.filter(status=RefundState.COMPLETED).aggregate(total=Sum("amount"))["total"]
+        or 0
+    )
+    refunds_pending = (
+        Refund.objects.filter(
+            status__in=[RefundState.REQUESTED, RefundState.APPROVED, RefundState.PROCESSING]
+        ).aggregate(total=Sum("amount"))["total"]
+        or 0
+    )
+    since = _tz.now() - timedelta(days=days)
+    recent_gross = (
+        settled.filter(verified_at__gte=since).aggregate(total=Sum("verified_amount"))["total"] or 0
+    )
+    by_method = list(
+        settled.values("method")
+        .annotate(total=Sum("verified_amount"), count=Count("id"))
+        .order_by("-total")
+    )
+    return {
+        "gross_revenue": gross,
+        "refunded_total": refunded,
+        "net_revenue": gross - refunded,
+        "refunds_pending": refunds_pending,
+        "payments_pending": Payment.objects.filter(
+            status__in=[PaymentState.PENDING, PaymentState.PROCESSING]
+        ).count(),
+        "payments_requiring_review": Payment.objects.filter(requires_review=True).count(),
+        "payments_failed": Payment.objects.filter(status=PaymentState.FAILED).count(),
+        "bank_transfers_pending": BankTransferSubmission.objects.filter(
+            status__in=[BankTransferStatus.SUBMITTED, BankTransferStatus.UNDER_REVIEW]
+        ).count(),
+        "refunds_awaiting_approval": Refund.objects.filter(status=RefundState.REQUESTED).count(),
+        "invoices_unpaid": Invoice.objects.filter(
+            status__in=[InvoiceState.UNPAID, InvoiceState.PARTIALLY_PAID]
+        ).count(),
+        "recent_gross": recent_gross,
+        "recent_days": days,
+        "by_method": by_method,
+        "settled_count": settled.count(),
+    }
+
+
+def revenue_by_day(*, days: int = 30) -> list[dict]:
+    """Verified gross revenue per day for the charts (last ``days`` days)."""
+    from datetime import timedelta
+
+    from django.db.models.functions import TruncDate
+    from django.utils import timezone as _tz
+
+    since = _tz.now() - timedelta(days=days)
+    settled_states = [PaymentState.PAID, PaymentState.REFUNDED, PaymentState.PARTIALLY_REFUNDED]
+    rows = (
+        Payment.objects.filter(status__in=settled_states, verified_at__gte=since)
+        .annotate(day=TruncDate("verified_at"))
+        .values("day")
+        .annotate(total=Sum("verified_amount"))
+        .order_by("day")
+    )
+    return [{"day": row["day"], "total": row["total"]} for row in rows]
+
+
+def refunds_by_status() -> list[dict]:
+    from django.db.models import Count
+
+    return list(Refund.objects.values("status").annotate(count=Count("id")).order_by("status"))
+
+
+def payments_by_status() -> list[dict]:
+    from django.db.models import Count
+
+    return list(Payment.objects.values("status").annotate(count=Count("id")).order_by("status"))
+
+
 __all__ = [
+    "active_bank_accounts",
     "active_cart_for_session",
     "active_cart_for_user",
     "cart_lines",
     "cart_totals",
+    "finance_overview",
     "inventory_counts",
+    "invoice_billing_snapshot",
+    "invoice_for_user",
+    "invoices_for_user",
     "order_counts",
     "order_for_user",
     "order_timeline",
     "orders_for_user",
+    "payment_for_user",
+    "payments_by_status",
+    "payments_for_user",
     "quotations_for_user",
+    "receipt_for_user",
+    "receipts_for_user",
+    "revenue_by_day",
+    "refunds_by_status",
+    "refunds_for_payment",
     "reserved_overview",
     "shipping_options_for_state",
     "shipping_rate_for",
     "shipping_rates",
     "shipping_zones",
     "shipping_methods_list",
+    "staff_bank_accounts",
+    "staff_bank_transfers",
+    "staff_invoices",
     "staff_orders",
+    "staff_payments",
     "staff_quotations",
+    "staff_refunds",
     "stock_balances",
     "stock_movements",
     "unit_price_for",

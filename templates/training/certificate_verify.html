@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-3xl px-4 py-10 sm:py-12">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-3 text-3xl font-bold tracking-tight text-stone-900">{% trans "Verify a certificate" %}</h1>
+    <p class="mt-3 text-stone-600">{% trans "Enter the verification code printed on a certificate to confirm it was genuinely issued by AA Shinaka. Only the minimum approved information is shown." %}</p>
+  </div>
+</div>
+
+<div class="mx-auto max-w-2xl px-4 py-12">
+  <form method="get" class="flex flex-wrap items-end gap-3 rounded-xl border border-stone-200 bg-white p-5">
+    <label class="flex-1 text-sm font-medium text-stone-700" for="code">
+      {% trans "Verification code" %}
+      <input id="code" type="text" name="code" value="{{ submitted }}" required autocomplete="off" class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm" placeholder="{% trans 'Enter the code printed on the certificate' %}">
+    </label>
+    <button type="submit" class="rounded-md bg-forest px-5 py-2.5 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Verify" %}</button>
+  </form>
+
+  {% if submitted %}
+    <div class="mt-6">
+      {% if is_valid %}
+        <div class="rounded-xl border border-green-300 bg-green-50 p-5" role="status">
+          <h2 class="font-semibold text-green-900">{% trans "Certificate verified" %}</h2>
+          <dl class="mt-3 space-y-1 text-sm text-green-900">
+            <div><dt class="inline font-medium">{% trans "Certificate number" %}:</dt> <dd class="inline">{{ certificate.certificate_number }}</dd></div>
+            <div><dt class="inline font-medium">{% trans "Student" %}:</dt> <dd class="inline">{{ certificate.student.full_name|default:certificate.student.email }}</dd></div>
+            <div><dt class="inline font-medium">{% trans "Course" %}:</dt> <dd class="inline">{{ certificate.course.title }}</dd></div>
+            <div><dt class="inline font-medium">{% trans "Issued" %}:</dt> <dd class="inline">{{ certificate.issue_date|date:"d M Y" }}</dd></div>
+          </dl>
+        </div>
+      {% elif certificate %}
+        <div class="rounded-xl border border-red-300 bg-red-50 p-5" role="alert">
+          <h2 class="font-semibold text-red-900">{% trans "Certificate revoked" %}</h2>
+          <p class="mt-2 text-sm text-red-900">{% trans "This certificate was issued but has since been revoked and is no longer valid." %}</p>
+        </div>
+      {% else %}
+        <div class="rounded-xl border border-stone-300 bg-stone-50 p-5" role="alert">
+          <h2 class="font-semibold text-stone-800">{% trans "No matching certificate" %}</h2>
+          <p class="mt-2 text-sm text-stone-600">{% trans "We could not find a certificate with that code. Please check the code and try again." %}</p>
+        </div>
+      {% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

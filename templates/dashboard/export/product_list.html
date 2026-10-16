@@ -1,0 +1,30 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Export product configuration" %}</h1>
+<p class="mt-1 text-sm text-stone-500">{% trans "Configure which catalogue products may be exported, their grading, packaging, minimum quantities and destination eligibility." %}</p>
+<form method="get" class="mt-4 flex gap-2">
+  <input type="text" name="q" value="{{ q }}" placeholder="{% trans 'Search product' %}" class="w-64 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Search" %}</button>
+</form>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr><th class="px-5 py-3">{% trans "Product" %}</th><th class="px-5 py-3">{% trans "Category" %}</th><th class="px-5 py-3">{% trans "Export eligible" %}</th><th class="px-5 py-3">{% trans "Availability" %}</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for p in products %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'export_dashboard:product_edit' p.pk %}" class="font-medium text-forest hover:underline">{{ p.name }}</a></td>
+          <td class="px-5 py-3">{{ p.category.name }}</td>
+          <td class="px-5 py-3">{% if p.export_profile.is_export_eligible %}<span class="text-green-700">{% trans "Yes" %}</span>{% else %}<span class="text-stone-500">{% trans "No / not set" %}</span>{% endif %}</td>
+          <td class="px-5 py-3 text-stone-500">{{ p.export_profile.get_export_availability_display|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-5 py-6 text-center text-stone-500">{% trans "No products found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

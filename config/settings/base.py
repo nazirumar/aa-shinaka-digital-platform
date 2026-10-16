@@ -55,8 +55,13 @@ LOCAL_APPS = [
     "apps.catalog",
     "apps.orders",
     "apps.services",
+    "apps.export",
     "apps.dashboard",
     "apps.cms",
+    "apps.training",
+    "apps.notifications",
+    "apps.support",
+    "apps.analytics",
 ]
 
 THIRD_PARTY_APPS: list[str] = []
@@ -89,6 +94,7 @@ TEMPLATES = [
                 "django.template.context_processors.i18n",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
+                "apps.notifications.context_processors.unread_notifications",
                 "apps.dashboard.context_processors.notifications",
                 "apps.cms.context_processors.site_context",
                 "apps.orders.context_processors.cart_summary",
@@ -146,8 +152,18 @@ SESSION_COOKIE_HTTPONLY = True
 SESSION_COOKIE_SAMESITE = "Lax"
 SESSION_COOKIE_AGE = env("SESSION_COOKIE_AGE")
 CSRF_COOKIE_SAMESITE = "Lax"
+# No JavaScript in the project reads the CSRF cookie (HTMX/Alpine submit the
+# hidden ``{% csrf_token %}`` input), so the cookie can be kept HTTP-only.
+CSRF_COOKIE_HTTPONLY = True
 SECURE_REFERRER_POLICY = "same-origin"
+SECURE_CONTENT_TYPE_NOSNIFF = True
+SECURE_CROSS_ORIGIN_OPENER_POLICY = "same-origin"
 X_FRAME_OPTIONS = "DENY"
+
+# Upload / request-size guards (defence in depth against memory-exhaustion).
+FILE_UPLOAD_MAX_MEMORY_SIZE = env.int("FILE_UPLOAD_MAX_MEMORY_SIZE", default=5 * 1024 * 1024)
+DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=5 * 1024 * 1024)
+DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DATA_UPLOAD_MAX_NUMBER_FIELDS", default=2000)
 
 # Authentication rate limiting (attempts / window in seconds).
 LOGIN_RATE_LIMIT_ATTEMPTS = env.int("LOGIN_RATE_LIMIT_ATTEMPTS", default=10)
@@ -162,6 +178,54 @@ FORM_RATE_LIMIT_WINDOW = env.int("FORM_RATE_LIMIT_WINDOW", default=3600)
 ORDER_RESERVATION_TTL_HOURS = env.int("ORDER_RESERVATION_TTL_HOURS", default=48)
 # Tax is applied only when finance configures a rate (ASSUMPTION-04).
 ORDER_TAX_RATE = env("ORDER_TAX_RATE", default="0.00")
+
+# ---------------------------------------------------------------------------
+# Paystack (Phase 6). Test mode is the default: nothing is enabled until a
+# secret key is configured, and CI never needs live credentials.
+# ---------------------------------------------------------------------------
+PAYSTACK_ENABLED = env.bool("PAYSTACK_ENABLED", default=False)
+PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY", default="")
+PAYSTACK_PUBLIC_KEY = env("PAYSTACK_PUBLIC_KEY", default="")
+# Paystack signs webhooks with the secret key; set this only if you enable a
+# separate webhook secret in the dashboard.
+PAYSTACK_WEBHOOK_SECRET = env("PAYSTACK_WEBHOOK_SECRET", default="")
+PAYSTACK_API_BASE_URL = env("PAYSTACK_API_BASE_URL", default="https://api.paystack.co")
+PAYSTACK_CURRENCY = env("PAYSTACK_CURRENCY", default="NGN")
+PAYSTACK_TIMEOUT = env.int("PAYSTACK_TIMEOUT", default=20)
+# Absolute URL Paystack redirects to after checkout. Leave blank to derive it
+# from the request (recommended); set it explicitly behind a proxy.
+PAYSTACK_CALLBACK_URL = env("PAYSTACK_CALLBACK_URL", default="")
+
+# ---------------------------------------------------------------------------
+# Notifications & support (Phase 10). Real channels only: email is on by
+# default via the configured mail backend; SMS/WhatsApp stay disabled until an
+# approved provider is configured. No provider credentials are hardcoded.
+# ---------------------------------------------------------------------------
+NOTIFICATION_EMAIL_ENABLED = env.bool("NOTIFICATION_EMAIL_ENABLED", default=True)
+NOTIFICATION_MAX_ATTEMPTS = env.int("NOTIFICATION_MAX_ATTEMPTS", default=3)
+# Absolute site URL used to build links inside notification emails.
+SITE_URL = env("SITE_URL", default="")
+# Optional channels — inert until a provider is configured and the user opts in.
+SMS_PROVIDER_URL = env("SMS_PROVIDER_URL", default="")
+SMS_PROVIDER_API_KEY = env("SMS_PROVIDER_API_KEY", default="")
+WHATSAPP_PROVIDER_URL = env("WHATSAPP_PROVIDER_URL", default="")
+WHATSAPP_PROVIDER_API_KEY = env("WHATSAPP_PROVIDER_API_KEY", default="")
+
+# ---------------------------------------------------------------------------
+# Analytics & reporting (Phase 11). Figures are always derived from the
+# authoritative source tables; nothing here stores business data.
+# ---------------------------------------------------------------------------
+# The single currency used for the "base currency" KPIs. Other currencies are
+# still reported per currency and are never summed into this one.
+ANALYTICS_BASE_CURRENCY = env("ANALYTICS_BASE_CURRENCY", default="NGN")
+# Reserved: a mapping of currency code -> rate against the base currency. No
+# cross-currency total is ever produced while this is empty.
+ANALYTICS_EXCHANGE_RATES = env.dict("ANALYTICS_EXCHANGE_RATES", default={})
+# Generated report files are deleted this many days after generation.
+ANALYTICS_REPORT_RETENTION_DAYS = env.int("ANALYTICS_REPORT_RETENTION_DAYS", default=30)
+# When True the request queues a report and a worker renders it; when False
+# (the default) reports render synchronously so no worker is required.
+ANALYTICS_EXPORT_ASYNC = env.bool("ANALYTICS_EXPORT_ASYNC", default=False)
 
 # ---------------------------------------------------------------------------
 # Internationalisation
@@ -213,6 +277,24 @@ CELERY_BEAT_SCHEDULE = {
     "expire-order-reservations": {
         "task": "orders.expire_reservations",
         "schedule": 60 * 30,  # every 30 minutes
+    },
+    "reconcile-paystack-payments": {
+        "task": "orders.reconcile_payments",
+        "schedule": 60 * 60,  # every hour
+    },
+    "training-send-session-reminders": {
+        "task": "training.send_session_reminders",
+        "schedule": 60 * 60 * 12,  # twice a day
+    },
+    # Generate any due scheduled reports (idempotent per period).
+    "run-scheduled-reports": {
+        "task": "analytics.run_scheduled_reports",
+        "schedule": 60 * 60,  # every hour
+    },
+    # Delete stored report exports past their retention window.
+    "cleanup-report-exports": {
+        "task": "analytics.cleanup_report_exports",
+        "schedule": 60 * 60 * 24,  # daily
     },
 }
 

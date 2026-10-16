@@ -1,12 +1,12 @@
 """Public/customer order URLs (``/cart/``, ``/checkout/``, ``/orders/``).
 
 Mounted at the site root by ``config.urls``. Writes (cart, checkout, order
-actions) all go through the service layer.
+actions, payments) all go through the service layer.
 """
 
 from django.urls import path
 
-from . import views
+from . import payment_views, views
 
 app_name = "orders"
 
@@ -31,6 +31,26 @@ urlpatterns = [
         views.order_payment_review,
         name="order_payment_review",
     ),
+    # Phase 6 — payments, bank transfers, invoices & receipts
+    path("orders/<str:number>/pay/", payment_views.payment_start, name="payment_start"),
+    path(
+        "orders/<str:number>/payment/callback/",
+        payment_views.payment_callback,
+        name="payment_callback",
+    ),
+    path(
+        "orders/<str:number>/bank-transfer/",
+        payment_views.bank_transfer_submit,
+        name="bank_transfer_submit",
+    ),
+    path("payments/", payment_views.payment_list, name="payment_list"),
+    path("payments/<uuid:pk>/", payment_views.payment_detail, name="payment_detail"),
+    path("payments/paystack/webhook/", payment_views.paystack_webhook, name="paystack_webhook"),
+    path("invoices/", payment_views.invoice_list, name="invoice_list"),
+    path("invoices/<str:number>/", payment_views.invoice_detail, name="invoice_detail"),
+    path("invoices/<str:number>/pdf/", payment_views.invoice_pdf, name="invoice_pdf"),
+    path("receipts/<str:number>/", payment_views.receipt_detail, name="receipt_detail"),
+    path("receipts/<str:number>/pdf/", payment_views.receipt_pdf, name="receipt_pdf"),
     path("quotations/", views.quotation_list, name="quotation_list"),
     path(
         "quotations/new/<uuid:listing_pk>/",

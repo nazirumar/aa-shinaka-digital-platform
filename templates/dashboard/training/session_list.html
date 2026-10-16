@@ -1,0 +1,46 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<div class="flex flex-wrap items-center justify-between gap-2">
+  <h1 class="text-lg font-semibold text-stone-900">{% trans "Training sessions" %}</h1>
+  <a href="{% url 'training_dashboard:session_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "New session" %}</a>
+</div>
+<form method="get" class="mt-4 flex flex-wrap gap-2">
+  <input type="search" name="q" value="{{ search }}" placeholder="{% trans 'Search reference or course' %}" class="w-64 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <select name="status" class="rounded-md border border-stone-300 px-3 py-2 text-sm">
+    <option value="">{% trans "All statuses" %}</option>
+    {% for value, label in status_choices %}
+      <option value="{{ value }}" {% if value == current_status %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Filter" %}</button>
+</form>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Reference" %}</th>
+        <th class="px-5 py-3">{% trans "Course" %}</th>
+        <th class="px-5 py-3">{% trans "Dates" %}</th>
+        <th class="px-5 py-3">{% trans "Seats" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for session in sessions %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_dashboard:session_detail' session.pk %}" class="font-medium text-forest hover:underline">{{ session.reference }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ session.course.title }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ session.start_date|date:"d M Y" }} – {{ session.end_date|date:"d M Y" }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ session.confirmed_seats }}{% if session.capacity %}/{{ session.capacity }}{% endif %}</td>
+          <td class="px-5 py-3">{{ session.get_status_display }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-sm text-stone-500">{% trans "No sessions found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=sessions %}
+{% endblock %}

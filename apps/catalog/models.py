@@ -29,6 +29,9 @@ from .validators import validate_image_size
 
 User = settings.AUTH_USER_MODEL
 
+# Sentinel for the per-instance ``ProductListing.primary_image`` memo.
+_IMAGE_UNSET = object()
+
 
 # ---------------------------------------------------------------------------
 # Enumerations
@@ -599,21 +602,31 @@ class ProductListing(SoftDeleteModel):
         return f"{size}{symbol}" if symbol else size
 
     def primary_image(self):
-        """Best image for display: listing-specific first, then the product's."""
+        """Best image for display: listing-specific first, then the product's.
+
+        The result is memoised on the instance so a template that references the
+        image several times (or a list re-render) does not repeat the queries.
+        """
+        cached = self.__dict__.get("_primary_image_cache", _IMAGE_UNSET)
+        if cached is not _IMAGE_UNSET:
+            return cached
         listing_image = (
             ProductImage.objects.filter(product=self.product, listing=self)
             .order_by("sort_order", "created_at")
             .first()
         )
         if listing_image is not None:
-            return listing_image
-        if self.product.primary_image_id:
-            return self.product.primary_image
-        return (
-            ProductImage.objects.filter(product=self.product, listing__isnull=True)
-            .order_by("sort_order", "created_at")
-            .first()
-        )
+            result = listing_image
+        elif self.product.primary_image_id:
+            result = self.product.primary_image
+        else:
+            result = (
+                ProductImage.objects.filter(product=self.product, listing__isnull=True)
+                .order_by("sort_order", "created_at")
+                .first()
+            )
+        self.__dict__["_primary_image_cache"] = result
+        return result
 
     def clean(self):
         if self.lga_id and self.state_id and self.lga.state_id != self.state_id:

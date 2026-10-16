@@ -1,0 +1,33 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+{% include "training/customer/_nav.html" %}
+
+<h2 class="text-lg font-semibold text-stone-900">{% trans "Upcoming sessions" %}</h2>
+<p class="mt-1 text-sm text-stone-500">{% trans "Confirmed enrolments with sessions that have not yet ended." %}</p>
+
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Course" %}</th>
+        <th class="px-5 py-3">{% trans "Dates" %}</th>
+        <th class="px-5 py-3">{% trans "Venue" %}</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for enrollment in upcoming %}
+        <tr>
+          <td class="px-5 py-3 text-stone-700">{{ enrollment.session.course.title }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ enrollment.session.start_date|date:"d M Y" }}{% if enrollment.session.end_date != enrollment.session.start_date %} – {{ enrollment.session.end_date|date:"d M Y" }}{% endif %}</td>
+          <td class="px-5 py-3 text-stone-600">{{ enrollment.session.venue.name|default:"—" }}</td>
+          <td class="px-5 py-3 text-right"><a href="{% url 'training_account:enrollment_detail' enrollment.reference %}" class="text-sm font-medium text-forest hover:underline">{% trans "Details" %}</a></td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-5 py-6 text-sm text-stone-500">{% trans "No upcoming sessions." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

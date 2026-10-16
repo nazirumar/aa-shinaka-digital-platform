@@ -219,60 +219,102 @@ IDs follow `FR-<DOMAIN>-<n>`. Priority uses MoSCoW (M/S/C/W).
 | FR-ORD-9 | S | Delivery fee rules by state/zone **[ASSUMPTION]** |
 | FR-ORD-10 | S | Order cancellation window rules **[ASSUMPTION]** |
 
+> **Implementation status (Phase 5 — delivered).** FR-ORD-1/2/3/4/5/6/7 and
+> FR-ORD-9 are implemented: a persistent cart (guest carts merge at login) whose
+> totals are recomputed server-side; transactional checkout that snapshots line
+> prices and reserves per-warehouse stock; an enforced order state machine with
+> an append-only `OrderStatusHistory`; a customer order portal; and shipping
+> zones/methods/rates. FR-ORD-4 reserves rather than decrements at creation;
+> stock is decremented when payment is confirmed. FR-ORD-8 is resolved as **guest
+> checkout not permitted** (checkout is authenticated-only). No payment provider
+> ships in Phase 5 — orders stay `pending_payment` until an audited staff
+> manual-payment approval (see FR-PAY-1 and `docs/PHASE_5_COMPLETION_REPORT.md`).
+
 ### 5.6 Payments and refunds (`PAY`)
 
 | ID | Priority | Requirement |
 |---|---|---|
-| FR-PAY-1 | M | Payment integration is **deferred to a later phase** (Paystack) |
-| FR-PAY-2 | M | The data model must support a payment lifecycle independent of the provider |
-| FR-PAY-3 | M | Payments record provider reference, amount, currency, status and raw callback |
-| FR-PAY-4 | M | Webhooks are verified (signature) and idempotent |
-| FR-PAY-5 | M | Refunds are recorded with reason, approver and amount |
-| FR-PAY-6 | S | Partial refunds and multiple payments per order **[ASSUMPTION]** |
-| FR-PAY-7 | S | Reconciliation report between orders and settlements **[ASSUMPTION]** |
+| FR-PAY-1 | M | Payment uses **Paystack** (Phase 6). Provider calls are server-side only; keys come from `PAYSTACK_*` env vars and are never rendered, logged or returned |
+| FR-PAY-2 | M | The data model supports a payment lifecycle independent of the provider (`Payment`, `PaymentAttempt`) |
+| FR-PAY-3 | M | Payments record reference, provider, currency, expected/verified amount, status and provider reference |
+| FR-PAY-4 | M | Payments are marked paid **only** after server-side verification; the browser redirect alone is never trusted |
+| FR-PAY-5 | M | Webhooks are HMAC-SHA512 signature-verified over the raw body, deduplicated and idempotent |
+| FR-PAY-6 | M | Refunds reference a payment, carry a reason and approver, cannot exceed captured funds, and are finance-only |
+| FR-PAY-7 | S | Partial refunds and multiple payments per order are supported |
+| FR-PAY-8 | M | Customers may submit a bank-transfer claim, but only finance approval (with settlement confirmed) settles the order |
+| FR-PAY-9 | M | One bank transfer cannot settle more than one order |
+| FR-PAY-10 | M | Invoices and receipts are issued immutably (versioned rather than edited); receipts exist only for verified payments |
+| FR-PAY-11 | M | Customers can view only their own payments, invoices and receipts |
+| FR-PAY-12 | S | Finance metrics derive only from verified payments (gross/refunds/net/pending/unpaid); open payments are reconciled against the provider |
+| FR-PAY-13 | M | A late payment on an expired/cancelled order is recorded and flagged for review, never auto-completed |
 
-### 5.7 Consultancy and service bookings (`CON`)
-
-| ID | Priority | Requirement |
-|---|---|---|
-| FR-CON-1 | M | Customers submit consultancy requests (topic, crop, location, notes) |
-| FR-CON-2 | M | Staff triage, assign a consultant and set a status |
-| FR-CON-3 | M | Requests carry a status lifecycle and history |
-| FR-CON-4 | S | Scheduling/calendar of consultations **[ASSUMPTION]** |
-| FR-CON-5 | S | Deliverables/reports attached to the request **[ASSUMPTION]** |
-
-### 5.8 Farming, marketing and storage services (`SRV`)
+### 5.7 Consultancy and service bookings (`CON`) — Phase 7, delivered
 
 | ID | Priority | Requirement |
 |---|---|---|
-| FR-SRV-1 | M | Customers submit **farming service requests** (service type, farm location, acreage, schedule) |
-| FR-SRV-2 | M | Customers submit **marketing requests** (produce, volume, target market) |
-| FR-SRV-3 | M | Customers submit **storage requests** (produce, quantity, duration, facility preference) |
-| FR-SRV-4 | M | Warehouse staff record intake, storage and release for storage requests |
-| FR-SRV-5 | M | All service requests share a common request/status/history pattern |
-| FR-SRV-6 | S | Quotations/estimates attached to requests **[ASSUMPTION]** |
+| FR-CON-1 | M | Customers submit consultancy bookings (service, online/on-site mode where supported, preferred slot, notes) |
+| FR-CON-2 | M | Staff triage, assign a consultant, and confirm/reschedule/reject/complete; completion records a report |
+| FR-CON-3 | M | Requests carry a shared status lifecycle, history and activity log |
+| FR-CON-4 | M | Consultant availability is data-driven; conflicting confirmed appointments for the same consultant are rejected under a row lock |
+| FR-CON-5 | M | Customers see only their own appointments/reports; division queues are capability-gated |
 
-### 5.9 Export enquiries (`EXP`)
+### 5.8 Farming, marketing and storage services (`SRV`) — Phase 7, delivered
 
 | ID | Priority | Requirement |
 |---|---|---|
-| FR-EXP-1 | M | Export buyers submit enquiries: product, volume, destination country, incoterms, timeline |
-| FR-EXP-2 | M | Destination is an **international market**, not a company branch |
-| FR-EXP-3 | M | Export officers issue quotations and track status |
-| FR-EXP-4 | S | Export documents/compliance checklist per destination **[ASSUMPTION]** |
-| FR-EXP-5 | S | Incoterm and currency support beyond NGN **[ASSUMPTION / needs approval]** |
+| FR-SRV-1 | M | Customers submit **farming service requests** (requested service, farm location, area/size, crop, season, expected start, budget range) |
+| FR-SRV-2 | M | Customers submit **marketing enquiries** (product, available quantity, target market); staff issue a narrative proposal the customer accepts or rejects |
+| FR-SRV-3 | M | Customers submit **storage requests** (produce type, quantity/unit, facility preference, dates, special handling) |
+| FR-SRV-4 | M | Warehouse staff manage facilities/units, capacity allocations, bookings, check-in/out and inspections |
+| FR-SRV-5 | M | All service requests share a common `ServiceRequest` engine: reference, status pipeline + append-only history, activity log, assignment, comments and visibility-controlled attachments |
+| FR-SRV-6 | M | A single quotation engine prices any request (line items, server-recomputed totals, revision/`supersedes`, approval → issue → accept/reject/expire); accepted quotations are frozen |
+| FR-SRV-7 | M | A paid service is activated only by a **verified** payment (Phase 6), never by the browser callback |
+| FR-SRV-8 | M | Storage capacity cannot be over-allocated; end dates must follow start dates; quantities must be positive |
+| FR-SRV-9 | M | Each division maps to a `REQUESTS_*` capability; the shared dashboard to `SERVICES_MANAGE` / `QUOTATIONS_MANAGE`; customers see only their own records |
+
+### 5.9 Export management & international trade (`EXP`) — Phase 8, delivered
+
+| ID | Priority | Requirement |
+|---|---|---|
+| FR-EXP-1 | M | Export buyers submit enquiries: product(s), volume, destination country, preferred shipping mode, timeline |
+| FR-EXP-2 | M | Destination is an **international market** (`locations.Country`), not a company branch; only approved **and** active destinations are selectable |
+| FR-EXP-3 | M | Export officers issue quotations and track status; a quotation names an explicit **Incoterms 2020** rule **and a named place**, a currency and a validity |
+| FR-EXP-4 | S | Export documents/compliance checklist per destination; official document types enforce an expiry date |
+| FR-EXP-5 | S | Incoterm and currency support beyond NGN; an accepted quotation is **frozen** and totals are always recomputed server-side |
+| FR-EXP-6 | M | An accepted quotation produces an export order whose terms are copied from the quotation, never from the browser |
+| FR-EXP-7 | M | Shipments use freight-forwarding providers and **staff-entered milestones** only; live tracking is never fabricated |
+| FR-EXP-8 | M | An export payment is `paid` only after server-side verification and counts as revenue only once verified |
+
+> **Delivery note.** Phase 8 lives in the dedicated `apps.export` app and extends
+> `catalog.Product` through `ExportProductProfile` — the catalogue is **not**
+> duplicated.
 
 ### 5.10 Training and academy (`TRN`)
+
+> **Phase 9 delivered.** The training academy is implemented in the dedicated
+> `apps.training` app. Courses are configurable records (never a hardcoded list),
+> cohorts are capacity-limited `TrainingSession`s, enrolment supports waitlisting
+> and free/paid seats, attendance and assessments feed derived completion, and
+> certificates are staff-approved (`TRAINING_APPROVE`) with public code
+> verification. A paid seat confirms **only** after a server-verified payment
+> (Phase 6 pipeline); the browser callback is never trusted.
 
 | ID | Priority | Requirement |
 |---|---|---|
 | FR-TRN-1 | M | Publish training courses (title, description, level, duration, fee optional) |
 | FR-TRN-2 | M | Courses may have cohorts/schedules with capacity |
-| FR-TRN-3 | M | Users enroll; enrollment status tracked (pending/confirmed/completed/cancelled) |
-| FR-TRN-4 | S | Attendance records and certificates **[ASSUMPTION]** |
-| FR-TRN-5 | S | Course payments integrate with the payment lifecycle **[ASSUMPTION]** |
+| FR-TRN-3 | M | Users enroll; enrollment status tracked (pending/payment_pending/confirmed/waitlisted/cancelled/completed) |
+| FR-TRN-4 | S | Attendance records and **approved** certificates (with public code verification) |
+| FR-TRN-5 | S | Course payments integrate with the Phase 6 verified-payment lifecycle |
 
-### 5.11 Customer portal (`PORTAL`)
+### 5.11 Customer portal (`PORTAL`) — Phase 10, delivered
+
+> **Phase 10 delivered.** The unified portal is consolidated under `/account/`
+> with a metrics dashboard, an aggregated cross-domain **activity timeline**, a
+> **document centre** (one central, per-type ownership-checked download route)
+> and links to each division's portal. `FR-PORTAL-1`–`4` are complete;
+> `FR-PORTAL-5` (wishlist) remains a later-phase saving feature; `FR-PORTAL-6`
+> (in-app notifications) is delivered by the Phase 10 notification centre below.
 
 | ID | Priority | Requirement |
 |---|---|---|
@@ -300,12 +342,27 @@ IDs follow `FR-<DOMAIN>-<n>`. Priority uses MoSCoW (M/S/C/W).
 
 | ID | Priority | Requirement |
 |---|---|---|
-| FR-REP-1 | M | Sales summary by period, division, category, origin |
-| FR-REP-2 | M | Stock position and low-stock report |
-| FR-REP-3 | M | Service request volumes and turnaround |
-| FR-REP-4 | M | Export enquiry pipeline report |
-| FR-REP-5 | S | CSV export of reports **[ASSUMPTION]** |
-| FR-REP-6 | S | Chart.js visual dashboards **[ASSUMPTION on chart set]** |
+| FR-REP-1 | M | Sales summary by period, division, category, origin **(delivered Phase 11)** |
+| FR-REP-2 | M | Stock position and low-stock report **(delivered Phase 11)** |
+| FR-REP-3 | M | Service request volumes and turnaround **(delivered Phase 11)** |
+| FR-REP-4 | M | Export enquiry pipeline report **(delivered Phase 11)** |
+| FR-REP-5 | S | CSV export of reports **[ASSUMPTION]** — **delivered Phase 11** as dependency-free CSV, XLSX and PDF with a spreadsheet formula-injection guard |
+| FR-REP-6 | S | Chart.js visual dashboards **[ASSUMPTION on chart set]** — **delivered Phase 11** (executive + eight operational pages) |
+| FR-REP-7 | M | **Report history**: every generated report with its filters, owner and status, scoped to the owner unless `reports.manage` |
+| FR-REP-8 | M | **Scheduled reports** with per-period duplicate protection and a per-recipient delivery ledger |
+| FR-REP-9 | M | **Financial gating**: financial figures, columns and reports require `analytics.finance`; financial report access is audited |
+| FR-REP-10 | M | **Per-currency money**: no figure is summed across currencies without a configured exchange-rate source |
+| FR-REP-11 | S | **Data-quality checks** surfacing records that would skew analytics |
+| FR-REP-12 | M | **No fabricated metrics**: dashboards and reports compute from authoritative records only; empty states stay empty |
+
+> **Phase 11 delivery note.** Reporting lives in `apps.analytics` (see
+> `docs/PHASE_11_COMPLETION_REPORT.md`). Reports are a **code-defined allow-list**
+> (no arbitrary SQL/model path/field list); customer identity is absent from every
+> dashboard and report (aggregate by default); stored files are private and served
+> only through a permission-checked view; **net receipts are labelled cash, not
+> accounting profit** and no profit figure is computed because no authoritative
+> cost/expense ledger exists. The KPI registry (`apps/analytics/metrics.py`)
+> documents every figure; `docs/ANALYTICS_METRICS.md` mirrors it.
 
 ### 5.14 Security, audit and notifications (`SEC` / `NOTIF`)
 
@@ -321,6 +378,28 @@ IDs follow `FR-<DOMAIN>-<n>`. Priority uses MoSCoW (M/S/C/W).
 | FR-NOTIF-1 | M | Transactional email for registration, order and request events |
 | FR-NOTIF-2 | S | In-app notifications **[ASSUMPTION]** |
 | FR-NOTIF-3 | S | SMS/WhatsApp notifications **[ASSUMPTION / cost decision]** |
+
+> **Phase 10 delivered (`NOTIF`).** `FR-NOTIF-1` continues through the existing
+> per-domain email senders (unchanged). `FR-NOTIF-2` is delivered by the unified
+> `apps.notifications` centre: an idempotent in-app feed with per-customer
+> preferences and a delivery ledger; notification rows are written synchronously
+> inside the business transaction and only channel delivery is deferred
+> (`transaction.on_commit`). Events a domain already emails merely mirror into the
+> feed — no duplicate email is sent. `FR-NOTIF-3` ships as **optional adapters**
+> (`SMS`/`WhatsApp`) that stay **inert** until an approved provider is configured
+> *and* the customer opts in; unconfigured channels are recorded as skipped and no
+> credentials are hardcoded.
+
+### 5.14a Customer support centre (`SUPPORT`) — Phase 10, delivered
+
+| ID | Priority | Requirement |
+|---|---|---|
+| FR-SUPPORT-1 | M | A customer can open a support ticket from their own account |
+| FR-SUPPORT-2 | M | A ticket can link one of the customer's own orders/payments/enquiries/requests/enrolments (ownership resolved server-side) |
+| FR-SUPPORT-3 | M | Ticket conversation with attachments; internal staff notes are never shown to the customer |
+| FR-SUPPORT-4 | M | Staff status workflow with an explicit state machine and a bounded reopen window |
+| FR-SUPPORT-5 | M | A capability-gated staff queue (assignment, status, priority) |
+| FR-SUPPORT-6 | S | New public-reply events notify the customer in-app (and may email) |
 
 ### 5.15 Corporate website, homepage & content management (`CMS`) — Phase 3, delivered
 
@@ -427,37 +506,84 @@ Out-of-scope for Phase 1: any live payment call.
 
 ## 11. Payments and refunds
 
-- Provider: **Paystack — implemented in a later phase** (explicitly not now).
+- Provider: **Paystack**, delivered in Phase 6 (`PAYSTACK_ENABLED` defaults off;
+  sandbox-first, keys via environment variables only).
 - The model separates `Order` from `Payment` so providers can change.
-- Webhook handling: verify signature, be idempotent, store raw payload.
-- Refunds reference a payment, carry a reason and approver, and go through an
-  approval step (staff permission required).
-- **[ASSUMPTION-05]** Refund approval authority and time windows require owner
-  policy.
+- Checkout: the server creates a `Payment` with the authoritative order total and
+  redirects to Paystack's hosted page. The browser is never trusted: the callback
+  re-verifies server-side and webhooks are HMAC-SHA512 signed over the raw body,
+  deduplicated (`PaymentWebhookEvent`) and idempotent. A payment is `paid` only
+  when currency and amount match the stored order total.
+- A late payment (order expired/cancelled) is recorded and flagged
+  `requires_review`; the order is not completed automatically.
+- Refunds reference a payment, carry a reason and approver, cannot exceed
+  captured funds, and go through `request → approve → complete` with finance
+  permission (`FINANCE_MANAGE`).
+- Invoices and receipts are immutable once issued; receipts exist only for
+  verified payments. Bank-transfer claims require finance approval with
+  settlement confirmed, and one transfer cannot settle two orders.
+- **[ASSUMPTION-04]** VAT/tax rules and **[ASSUMPTION-05]** refund windows remain
+  owner policy; the platform uses the configured `ORDER_TAX_RATE` and never
+  invents tax details.
 
 ---
 
 ## 12. Consultancy and service bookings
 
-Covered by FR-CON-*. Each request: requester, division, details, preferred
-schedule, status, assigned staff, history. Requests are visible to the customer
-in the portal and to the relevant division queue in the dashboard.
+Covered by FR-CON-*. A consultancy booking is a `ConsultationAppointment`
+wrapping the shared `ServiceRequest`: requester, service, mode, scheduled
+window, assigned consultant, status and history. Consultant availability
+(`ConsultantAvailability`) is data-driven and confirmed appointments for the
+same consultant may not overlap. Requests are visible to the customer in
+`/account/services/` and to the consultancy queue in `/dashboard/services/`
+(capability-gated). Completion records a `ConsultationReport`.
 
 ---
 
 ## 13. Storage, farming and marketing requests
 
-Covered by FR-SRV-*. Storage additionally tracks facility, intake, storage
-duration and release. Farming tracks service type, farm location (state/LGA),
-acreage and schedule. Marketing tracks produce, volume and target market.
+Covered by FR-SRV-*. All three share the `ServiceRequest` engine (reference,
+status pipeline, history, activity log, assignment, comments, attachments) and
+the quotation/verified-payment flow:
+
+- **Farming** — `FarmServiceRequest` (requested service, location, area/unit,
+  crop, season, budget) → `FarmProject`; a project must be approved with an
+  agreement reference before activation, and tracks milestones and progress
+  reports.
+- **Marketing** — `MarketingEnquiry` → narrative `MarketingProposal` (accept/
+  reject by the customer) → `MarketingCampaign` (which requires an accepted
+  proposal) with a dated activity log.
+- **Storage** — data-driven `StorageFacility`/`StorageUnit` capacity with
+  `ProduceType` acceptance, `StorageBooking` + `StorageCapacityAllocation`
+  (over-allocation rejected under locks), and check-in/out + inspection records.
+- A `ServiceQuotation` prices any of the above; a booking/project/request is
+  activated only after a **verified** payment settles the quotation.
 
 ---
 
-## 14. Export enquiries
+## 14. Export management & international trade
 
-Covered by FR-EXP-*. Enquiries capture product, volume, **destination country**,
-incoterms and timeline. Export officers produce quotations and advance a
-pipeline. Destinations are external markets; no notion of company branches.
+_Phase 8 — delivered in `apps.export`._
+
+A customer raises an **export enquiry** for one or more catalogue products
+against an approved-and-active destination country, with a delivery destination,
+preferred shipping mode and timeline. An export officer prices it as a
+**quotation** naming an explicit Incoterms 2020 rule and named place, a currency,
+a deposit percentage and a validity window; approval/issue requires the
+`export.approve` capability (Administrators/Owners only) and an accepted
+quotation is frozen (later changes become superseded revisions). Acceptance
+creates an **export order** whose commercial terms are copied from the quotation.
+
+A **compliance checklist** is generated from the destination's document
+requirements; movement to `ready_for_shipment` is blocked until it is cleared.
+**Documents** use private storage and a configurable type registry (official
+types enforce an expiry date), with staff review and a per-document
+customer-visibility flag. **Shipments** reference freight-forwarding providers
+and carry staff-entered milestones only. Settlement reuses the Phase 6 verified
+payment pipeline through `orders.Payment.export_order`; a payment becomes `paid`
+only on server-side verification and only verified payments count as revenue.
+Customers see only their own records; destinations are external markets with no
+notion of company branches.
 
 ---
 
@@ -484,9 +610,27 @@ the areas each role owns. All sensitive mutations are audited (FR-SEC-5).
 
 ## 18. Reporting and analytics
 
-Covered by FR-REP-*. Reports are read-only, filterable by date range, and (from
-the relevant phase) render with Chart.js. Figures are computed from real data;
-no placeholder numbers are shipped as if real.
+Covered by FR-REP-*; **delivered in Phase 11** (`apps.analytics`, see
+`docs/PHASE_11_COMPLETION_REPORT.md`). Reports are read-only and filterable by a
+validated date range / preset, and render with Chart.js from server-computed JSON
+(`json_script`, never string-interpolated).
+
+- **Allow-listed.** A request can only name a key from the code-defined report
+  registry; there is no arbitrary SQL, model path or field list.
+- **Aggregate by default.** Customer identity is absent from every dashboard and
+  report.
+- **Per-currency money.** No figure is summed across currencies without a
+  configured exchange-rate source; the platform never invents a rate.
+- **Cash is not profit.** Net verified receipts are cash received, explicitly
+  labelled; no profit figure exists because there is no authoritative cost/expense
+  ledger.
+- **Sales-value definitions are never mixed** (placed / paid / recognised).
+- **Real data only.** Every figure is derived from the authoritative records;
+  empty states stay empty and no placeholder number is shipped as if real.
+- **Safe exports.** CSV/XLSX/PDF are produced without new dependencies, with a
+  spreadsheet formula-injection guard, private storage and a permission-checked
+  download.
+- **Audited.** Sensitive financial report access writes an `AuditLog` entry.
 
 ---
 
@@ -535,7 +679,7 @@ always hold:
 - Direct selling, not marketplace (OOS-2); standalone from AgriTrade ERP (OOS-3).
 - Django MVT + Django Templates; no SPA (OOS-4).
 - Stack: Django 5.2 LTS, PostgreSQL, Tailwind, HTMX, Alpine.js, Celery/Redis,
-  Chart.js, Paystack (later), Pytest/pytest-django, Ruff; DRF only if needed.
+  Chart.js, Paystack, Pytest/pytest-django, Ruff; DRF only if needed.
 - Email-first custom user model created before the first migration.
 - Origin-specific listings with independent price and stock; nested categories.
 - Verified Nigeria location import (36 states + FCT, 774 LGAs/area councils).
@@ -547,14 +691,14 @@ always hold:
 | ASSUMPTION-01 | Staff permission matrix / approval authority | Phase 5–10 |
 | ASSUMPTION-02 | Final category list and nesting | Phase 4 (delivered — categories DB-driven; taxonomy sign-off pending) |
 | ASSUMPTION-03 | Multi-origin listings per product allowed | Phase 4 (delivered — multiple listings per product supported) |
-| ASSUMPTION-04 | VAT/tax and delivery-fee rules | Phase 6 |
-| ASSUMPTION-05 | Refund policy, windows and approvers | Phase 6 |
-| ASSUMPTION-06 | Email verification required before checkout | Phase 5 |
-| ASSUMPTION-07 | Guest checkout not permitted | Phase 5 |
-| ASSUMPTION-08 | Export currencies beyond NGN, incoterms set | Phase 8 |
-| ASSUMPTION-09 | Course fees/payment and certificates | Phase 8 |
-| ASSUMPTION-10 | Notifications channels (email only vs SMS/WhatsApp) | Phase 9 |
-| ASSUMPTION-11 | Data-retention and account-deletion policy | Phase 10 |
+| ASSUMPTION-04 | VAT/tax and delivery-fee rules | Phase 6 (implemented via configured `ORDER_TAX_RATE`; company tax details are never invented) |
+| ASSUMPTION-05 | Refund policy, windows and approvers | Phase 6 (delivered — finance `FINANCE_MANAGE` approves; refund windows remain owner policy) |
+| ASSUMPTION-06 | Email verification required before checkout | Phase 5 (checkout requires authentication; the verified-email gate is **not enforced** — owner to confirm) |
+| ASSUMPTION-07 | Guest checkout not permitted | Phase 5 (delivered — checkout is authenticated-only; guest carts still merge on login) |
+| ASSUMPTION-08 | Export currencies beyond NGN, incoterms set | Phase 8 — resolved as data: quotations name an explicit **Incoterms 2020** rule + named place; destinations are `locations.Country` rows activated only after approval |
+| ASSUMPTION-09 | Course fees/payment and certificates | Phase 9 (delivered — free/paid cohorts; a paid seat confirms only on a server-verified payment; certificates require `TRAINING_APPROVE` + completion) |
+| ASSUMPTION-10 | Notifications channels (email only vs SMS/WhatsApp) | Phase 10 (delivered — email + in-app are live; SMS/WhatsApp ship as inert adapters until an approved provider is configured and the customer opts in) |
+| ASSUMPTION-11 | Data-retention and account-deletion policy | Phase 11 (partly resolved — generated report files are retained for `ANALYTICS_REPORT_RETENTION_DAYS` and then cleaned up; a full data-retention/account-deletion policy remains deferred) |
 | ASSUMPTION-12 | Authoritative Nigeria location dataset source | Phase 4 (importer ready; owner must supply/approve the dataset) |
 
 ### 21.3 Staff permission matrix (implemented, ASSUMPTION-01)
@@ -580,6 +724,21 @@ Customer role holds none. Treat the capability names as stable identifiers.
 | `requests.storage` | – | ✓ | – | – | – | – | – | ✓ | ✓ |
 | `requests.export` | – | – | – | – | ✓ | – | – | ✓ | ✓ |
 | `requests.training` | – | – | – | ✓ | – | – | – | ✓ | ✓ |
+| `services.manage` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ |
+| `quotations.manage` | ✓ | – | – | – | – | ✓ | – | ✓ | ✓ |
+| `export.manage` | – | – | – | – | ✓ | – | – | ✓ | ✓ |
+| `export.approve` | – | – | – | – | – | – | – | ✓ | ✓ |
+| `training.manage` | – | – | – | ✓ | – | – | – | ✓ | ✓ |
+| `training.instruct` | – | – | – | ✓ | – | – | – | ✓ | ✓ |
+| `training.approve` | – | – | – | – | – | – | – | ✓ | ✓ |
+| `support.manage` | ✓ | – | – | – | – | – | – | ✓ | ✓ |
+| `support.approve` | – | – | – | – | – | – | – | ✓ | ✓ |
+| `customers.view` | ✓ | – | – | – | – | ✓ | – | ✓ | ✓ |
+| `analytics.view` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | – | ✓ | ✓ |
+| `analytics.finance` | – | – | – | – | – | ✓ | – | ✓ | ✓ |
+| `reports.build` | ✓ | ✓ | – | ✓ | ✓ | ✓ | – | ✓ | ✓ |
+| `reports.schedule` | – | – | – | – | – | ✓ | – | ✓ | ✓ |
+| `reports.manage` | – | – | – | – | – | ✓ | – | ✓ | ✓ |
 
 > **Assignment guard.** Owners/superusers may grant any role. Administrators may
 > grant every staff role **except** `administrator`/`owner`. No one may edit
@@ -597,7 +756,10 @@ Customer role holds none. Treat the capability names as stable identifiers.
 3. Company contact details, legal name, registration numbers and verifiable
    achievements for public pages (none are invented here).
 4. Tax/VAT registration and delivery-fee policy (ASSUMPTION-04).
-5. Export currency/incoterm policy and countries served (ASSUMPTION-08).
+5. Export currency/incoterm policy and countries served — **implemented as data**
+   (explicit Incoterms 2020 + named place; countries are `locations.Country`
+   records that an approver activates). The owner still decides *which* countries
+   and currencies to enable operationally.
 6. Refund, cancellation and returns policy (ASSUMPTION-05).
 7. Notification channels and budget (ASSUMPTION-10).
 8. Data-retention and account-deletion expectations (ASSUMPTION-11).

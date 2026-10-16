@@ -7,6 +7,8 @@ selectors do the querying. Nothing here hardcodes categories, units or prices.
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms import inlineformset_factory
@@ -286,7 +288,7 @@ class WarehouseForm(CatalogForm):
 class StockReceiveForm(TailwindFormMixin, forms.Form):
     """Receive stock into a warehouse for a specific listing/variant."""
 
-    quantity = forms.DecimalField(max_digits=14, decimal_places=3, min_value="0.001")
+    quantity = forms.DecimalField(max_digits=14, decimal_places=3, min_value=Decimal("0.001"))
     warehouse = forms.ModelChoiceField(queryset=Warehouse.objects.none(), required=False)
     reference = forms.CharField(max_length=100, required=False)
     note = forms.CharField(required=False, widget=forms.Textarea(attrs={"rows": 2}))
@@ -301,7 +303,7 @@ class StockReceiveForm(TailwindFormMixin, forms.Form):
 class StockTransferForm(TailwindFormMixin, forms.Form):
     """Move unreserved stock between two warehouses."""
 
-    quantity = forms.DecimalField(max_digits=14, decimal_places=3, min_value="0.001")
+    quantity = forms.DecimalField(max_digits=14, decimal_places=3, min_value=Decimal("0.001"))
     from_warehouse = forms.ModelChoiceField(queryset=Warehouse.objects.none())
     to_warehouse = forms.ModelChoiceField(queryset=Warehouse.objects.none())
     reference = forms.CharField(max_length=100, required=False)

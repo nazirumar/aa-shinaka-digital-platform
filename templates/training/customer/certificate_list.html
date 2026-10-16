@@ -1,0 +1,39 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+{% include "training/customer/_nav.html" %}
+
+<h2 class="text-lg font-semibold text-stone-900">{% trans "My certificates" %}</h2>
+<p class="mt-1 text-sm text-stone-500">{% trans "Each certificate has a public verification code that anyone can check." %}</p>
+
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Certificate" %}</th>
+        <th class="px-5 py-3">{% trans "Course" %}</th>
+        <th class="px-5 py-3">{% trans "Issued" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for certificate in certificates %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_account:certificate_view' certificate.pk %}" class="font-medium text-forest hover:underline">{{ certificate.certificate_number }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ certificate.course.title }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ certificate.issue_date|date:"d M Y" }}</td>
+          <td class="px-5 py-3">{{ certificate.get_status_display }}</td>
+          <td class="px-5 py-3 text-right">
+            {% if certificate.status == 'issued' %}
+              <a href="{% url 'training_account:certificate_download' certificate.pk %}" class="text-sm font-medium text-forest hover:underline">{% trans "Download PDF" %}</a>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-sm text-stone-500">{% trans "No certificates issued yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

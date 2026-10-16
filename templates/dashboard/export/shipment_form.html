@@ -1,0 +1,13 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "New shipment" %}</h1>
+{% if order %}<p class="mt-1 text-sm text-stone-500">{{ order.reference }} · {{ order.customer.email }} · {{ order.destination.country.name }}</p>{% endif %}
+<form method="post" class="mt-4 max-w-2xl space-y-4 rounded-xl border border-stone-200 bg-white p-5">
+  {% csrf_token %}
+  {% if order %}<input type="hidden" name="order" value="{{ order.reference }}">{% endif %}
+  {{ form.as_p }}
+  <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Create shipment" %}</button>
+</form>
+{% endblock %}

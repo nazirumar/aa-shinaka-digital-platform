@@ -1,0 +1,27 @@
+{% extends "accounts/account_base.html" %}
+{% block account_content %}
+<form method="get" class="mb-4 flex items-end gap-3">
+  <label class="text-sm">
+    <span class="block text-stone-600">Status</span>
+    <select name="status" class="mt-1 rounded-md border border-stone-300 px-3 py-2">
+      <option value="">All</option>
+      {% for value, label in statuses %}
+        <option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100">Filter</button>
+</form>
+<div class="rounded-xl border border-stone-200 bg-white">
+  <ul class="divide-y divide-stone-100">
+    {% for q in quotations %}
+      <li class="flex items-center justify-between px-5 py-3 text-sm">
+        <a href="{% url 'services:quotation_detail' q.pk %}" class="font-medium text-stone-900 hover:text-forest">{{ q.reference }}</a>
+        <span class="text-stone-500">{{ q.currency }} {{ q.total }} · {{ q.get_status_display }}</span>
+      </li>
+    {% empty %}
+      <li class="px-5 py-6 text-sm text-stone-500">No quotations found.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

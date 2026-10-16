@@ -1,0 +1,47 @@
+{% extends "dashboard/base.html" %}
+
+{% block dashboard_content %}
+<div class="space-y-6">
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {% include "components/metric_card.html" with label="Open tickets" value=metrics.open_total tone="brand" %}
+    {% include "components/metric_card.html" with label="Unassigned" value=metrics.unassigned_total tone="amber" %}
+    {% include "components/metric_card.html" with label="Total tickets" value=metrics.total tone="stone" %}
+    {% include "components/metric_card.html" with label="Resolved / closed" value=metrics.resolved_total|add:metrics.closed_total tone="gold" %}
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">By status</h3>
+      <ul class="mt-3 space-y-1 text-sm">
+        {% for row in metrics.by_status %}
+          <li class="flex items-center justify-between"><span class="text-stone-600">{{ row.label }}</span><span class="font-medium text-stone-900">{{ row.count }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">By priority</h3>
+      <ul class="mt-3 space-y-1 text-sm">
+        {% for row in metrics.by_priority %}
+          <li class="flex items-center justify-between"><span class="text-stone-600">{{ row.label }}</span><span class="font-medium text-stone-900">{{ row.count }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">By category</h3>
+      <ul class="mt-3 space-y-1 text-sm">
+        {% for row in metrics.by_category %}
+          <li class="flex items-center justify-between"><span class="text-stone-600">{{ row.label }}</span><span class="font-medium text-stone-900">{{ row.count }}</span></li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+      <h3 class="font-medium text-stone-900">Recently updated</h3>
+      <a href="{% url 'support_dashboard:ticket_list' %}" class="text-sm font-medium text-brand-700 hover:underline">Open queue</a>
+    </div>
+    {% include "support/dashboard/_ticket_table.html" with tickets=recent %}
+  </div>
+</div>
+{% endblock %}

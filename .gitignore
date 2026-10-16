@@ -25,6 +25,7 @@ node_modules/
 .env
 .env.*
 !.env.example
+!deploy/.env.production.example
 
 # Tooling caches
 .pytest_cache/

@@ -1,0 +1,36 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Export documents" %}</h1>
+<form method="get" class="mt-4 flex flex-wrap gap-2">
+  <input type="text" name="q" value="{{ q }}" placeholder="{% trans 'Reference, order or issuer' %}" class="w-64 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <select name="status" class="rounded-md border border-stone-300 px-3 py-2 text-sm">
+    <option value="">{% trans "All statuses" %}</option>
+    <option value="pending" {% if status == "pending" %}selected{% endif %}>{% trans "Pending" %}</option>
+    <option value="approved" {% if status == "approved" %}selected{% endif %}>{% trans "Approved" %}</option>
+    <option value="rejected" {% if status == "rejected" %}selected{% endif %}>{% trans "Rejected" %}</option>
+  </select>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Filter" %}</button>
+</form>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr><th class="px-5 py-3">{% trans "Reference" %}</th><th class="px-5 py-3">{% trans "Order" %}</th><th class="px-5 py-3">{% trans "Type" %}</th><th class="px-5 py-3">{% trans "Issuer" %}</th><th class="px-5 py-3">{% trans "Status" %}</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for d in documents %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'export_dashboard:document_detail' d.pk %}" class="font-medium text-forest hover:underline">{{ d.reference }}</a></td>
+          <td class="px-5 py-3">{{ d.order.reference }}</td>
+          <td class="px-5 py-3">{{ d.document_type.name }}</td>
+          <td class="px-5 py-3">{{ d.issuing_organization|default:"—" }}</td>
+          <td class="px-5 py-3">{{ d.get_verification_status_display }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-center text-stone-500">{% trans "No documents found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

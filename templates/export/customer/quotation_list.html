@@ -1,0 +1,26 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "My export quotations" %}</h1>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr><th class="px-5 py-3">{% trans "Reference" %}</th><th class="px-5 py-3">{% trans "Destination" %}</th><th class="px-5 py-3">{% trans "Incoterm" %}</th><th class="px-5 py-3">{% trans "Total" %}</th><th class="px-5 py-3">{% trans "Valid until" %}</th><th class="px-5 py-3">{% trans "Status" %}</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for q in quotations %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'export:quotation_detail' q.pk %}" class="font-medium text-forest hover:underline">{{ q.reference }}</a></td>
+          <td class="px-5 py-3">{{ q.destination.country.name }}</td>
+          <td class="px-5 py-3">{{ q.incoterm }} {{ q.named_place }}</td>
+          <td class="px-5 py-3">{{ q.currency }} {{ q.total }}</td>
+          <td class="px-5 py-3 text-stone-500">{{ q.valid_until|date:"Y-m-d" }}</td>
+          <td class="px-5 py-3">{{ q.get_status_display }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-5 py-6 text-center text-stone-500">{% trans "No quotations yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

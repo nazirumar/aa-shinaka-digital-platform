@@ -1,0 +1,56 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+<div class="mb-4 flex items-center justify-between">
+  <p class="text-sm text-stone-600">{% trans "These accounts are shown to customers paying by bank transfer." %}</p>
+  <a href="{% url 'finance_dashboard:bank_account_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">{% trans "Add account" %}</a>
+</div>
+
+{% if accounts %}
+  <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">{% trans "Bank" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Account name" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Number" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Currency" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+          <th scope="col" class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for account in accounts %}
+          <tr>
+            <td class="px-4 py-3 font-medium text-stone-900">{{ account.bank_name }}</td>
+            <td class="px-4 py-3 text-stone-700">{{ account.account_name }}</td>
+            <td class="px-4 py-3 font-mono text-xs text-stone-700">{{ account.account_number }}</td>
+            <td class="px-4 py-3 text-stone-700">{{ account.currency }}</td>
+            <td class="px-4 py-3">
+              {% if account.is_active %}
+                <span class="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">{% trans "Active" %}</span>
+              {% else %}
+                <span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-600">{% trans "Inactive" %}</span>
+              {% endif %}
+            </td>
+            <td class="px-4 py-3 text-right">
+              <div class="flex justify-end gap-3">
+                <a href="{% url 'finance_dashboard:bank_account_edit' account.pk %}" class="font-medium text-forest hover:underline">{% trans "Edit" %}</a>
+                <form method="post" action="{% url 'finance_dashboard:bank_account_toggle' account.pk %}">
+                  {% csrf_token %}
+                  <button type="submit" class="font-medium text-stone-600 hover:underline">{% if account.is_active %}{% trans "Disable" %}{% else %}{% trans "Enable" %}{% endif %}</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+{% else %}
+  {% trans "No bank accounts yet" as empty_title %}
+  {% trans "Add a company account so customers can pay by bank transfer." as empty_message %}
+  {% url 'finance_dashboard:bank_account_create' as create_url %}
+  {% include "components/empty_state.html" with title=empty_title message=empty_message action_url=create_url action_label="Add bank account" %}
+{% endif %}
+{% endblock %}

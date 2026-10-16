@@ -1,0 +1,69 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+<div class="mx-auto max-w-3xl space-y-6">
+  <div class="flex flex-wrap items-start justify-between gap-3">
+    <div>
+      <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Tax invoice" %}</p>
+      <p class="text-lg font-semibold text-stone-900">{{ invoice.number }}</p>
+    </div>
+    <div class="text-right text-sm">
+      <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-700">{{ invoice.get_status_display }}</span>
+      {% if invoice.issued_at %}<p class="mt-2 text-stone-500">{% trans "Issued" %} {{ invoice.issued_at|date:"j M Y" }}</p>{% endif %}
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <div class="grid gap-4 sm:grid-cols-2 text-sm">
+      <div>
+        <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Billed to" %}</p>
+        <p class="mt-1 font-medium text-stone-900">{{ invoice.customer_name }}</p>
+        {% if invoice.customer_email %}<p class="text-stone-600">{{ invoice.customer_email }}</p>{% endif %}
+        {% if invoice.customer_phone %}<p class="text-stone-600">{{ invoice.customer_phone }}</p>{% endif %}
+        {% if invoice.billing_address %}<p class="mt-1 whitespace-pre-line text-stone-600">{{ invoice.billing_address }}</p>{% endif %}
+      </div>
+      <div class="sm:text-right">
+        <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Order" %}</p>
+        <p class="mt-1 font-medium text-stone-900">{{ invoice.order.number }}</p>
+        <p class="text-stone-600">{{ invoice.currency }}</p>
+      </div>
+    </div>
+
+    <table class="mt-6 min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="py-2">{% trans "Item" %}</th>
+          <th scope="col" class="py-2 text-right">{% trans "Qty" %}</th>
+          <th scope="col" class="py-2 text-right">{% trans "Unit" %}</th>
+          <th scope="col" class="py-2 text-right">{% trans "Total" %}</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for item in items %}
+          <tr>
+            <td class="py-3"><span class="font-medium text-stone-900">{{ item.product_name }}</span>{% if item.variant_name %}<span class="block text-xs text-stone-500">{{ item.variant_name }}</span>{% endif %}</td>
+            <td class="py-3 text-right text-stone-700">{{ item.quantity|decimal_str }}</td>
+            <td class="py-3 text-right text-stone-700">{{ item.unit_price|money:invoice.currency }}</td>
+            <td class="py-3 text-right font-medium text-stone-900">{{ item.line_total|money:invoice.currency }}</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    <dl class="mt-4 space-y-1 border-t border-stone-100 pt-4 text-sm">
+      <div class="flex justify-between"><dt class="text-stone-600">{% trans "Subtotal" %}</dt><dd class="text-stone-900">{{ invoice.subtotal|money:invoice.currency }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-600">{% trans "Shipping" %}</dt><dd class="text-stone-900">{{ invoice.shipping_amount|money:invoice.currency }}</dd></div>
+      {% if invoice.discount_amount %}<div class="flex justify-between"><dt class="text-stone-600">{% trans "Discount" %}</dt><dd class="text-stone-900">-{{ invoice.discount_amount|money:invoice.currency }}</dd></div>{% endif %}
+      {% if invoice.tax_amount %}<div class="flex justify-between"><dt class="text-stone-600">{% trans "Tax" %}</dt><dd class="text-stone-900">{{ invoice.tax_amount|money:invoice.currency }}</dd></div>{% endif %}
+      <div class="flex justify-between border-t border-stone-100 pt-2 font-semibold"><dt>{% trans "Total" %}</dt><dd>{{ invoice.total|money:invoice.currency }}</dd></div>
+    </dl>
+
+    {% if invoice.notes %}<p class="mt-4 text-sm text-stone-600">{{ invoice.notes }}</p>{% endif %}
+  </div>
+
+  <div class="flex flex-wrap gap-3 text-sm">
+    <a href="{% url 'orders:invoice_pdf' invoice.number %}" class="rounded-md border border-stone-300 px-3 py-1.5 hover:bg-stone-100">{% trans "Download PDF" %}</a>
+    <a href="{% url 'orders:invoice_list' %}" class="rounded-md border border-stone-300 px-3 py-1.5 hover:bg-stone-100">{% trans "All invoices" %}</a>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "dashboard/base.html" %}
+{% block dashboard_content %}
+<div class="mb-4 flex justify-end">
+  <a href="{% url 'services_dashboard:facility_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">New facility</a>
+</div>
+<div class="overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="w-full text-sm">
+    <thead class="border-b border-stone-200 bg-stone-50 text-left text-stone-500">
+      <tr><th class="px-4 py-2">Name</th><th class="px-4 py-2">Code</th><th class="px-4 py-2">Capacity</th><th class="px-4 py-2">Active</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for f in facilities %}
+        <tr>
+          <td class="px-4 py-2"><a href="{% url 'services_dashboard:facility_detail' f.pk %}" class="font-medium text-forest hover:underline">{{ f.name }}</a></td>
+          <td class="px-4 py-2">{{ f.code }}</td>
+          <td class="px-4 py-2">{{ f.capacity }} {{ f.get_capacity_unit_display }}</td>
+          <td class="px-4 py-2">{{ f.is_active|yesno:"Yes,No" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-4 py-6 text-center text-stone-500">No facilities yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

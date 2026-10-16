@@ -1,0 +1,75 @@
+{% extends "accounts/account_base.html" %}
+{% block account_content %}
+<div class="rounded-xl border border-stone-200 bg-white p-5">
+  <div class="flex flex-wrap items-center justify-between gap-2">
+    <h2 class="text-lg font-semibold text-stone-900">{{ request_obj.title }}</h2>
+    <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600">{{ request_obj.get_status_display }}</span>
+  </div>
+  <dl class="mt-4 grid gap-2 text-sm sm:grid-cols-2">
+    <div><dt class="text-stone-500">Reference</dt><dd class="font-medium">{{ request_obj.reference }}</dd></div>
+    <div><dt class="text-stone-500">Division</dt><dd class="font-medium">{{ request_obj.get_service_type_display }}</dd></div>
+    <div><dt class="text-stone-500">Created</dt><dd>{{ request_obj.created_at|date:"j M Y, H:i" }}</dd></div>
+    <div><dt class="text-stone-500">Assigned to</dt><dd>{{ request_obj.assigned_to.email|default:"Unassigned" }}</dd></div>
+  </dl>
+  {% if request_obj.description %}<p class="mt-4 text-sm text-stone-700">{{ request_obj.description }}</p>{% endif %}
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">Progress</h2>
+    <ul class="mt-3 space-y-3 text-sm">
+      {% for entry in timeline %}
+        <li class="border-l-2 border-forest pl-3">
+          <p class="font-medium text-stone-800">{{ entry.get_to_status_display|default:entry.to_status }}</p>
+          {% if entry.note %}<p class="text-stone-600">{{ entry.note }}</p>{% endif %}
+          <p class="text-xs text-stone-400">{{ entry.created_at }}</p>
+        </li>
+      {% empty %}
+        <li class="text-stone-500">No history yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">Quotations</h2>
+    <ul class="mt-2 divide-y divide-stone-100">
+      {% for q in request_obj.quotations.all %}
+        <li class="flex items-center justify-between py-2 text-sm">
+          <a href="{% url 'services:quotation_detail' q.pk %}" class="font-medium text-forest hover:underline">{{ q.reference }}</a>
+          <span class="text-stone-500">{{ q.currency }} {{ q.total }} · {{ q.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="py-2 text-sm text-stone-500">No quotations yet.</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="mt-6 rounded-xl border border-stone-200 bg-white p-5">
+  <h2 class="font-semibold text-stone-900">Messages &amp; attachments</h2>
+  <ul class="mt-3 space-y-2 text-sm">
+    {% for c in request_obj.comments.all %}
+      {% if c.visibility == 'customer' %}
+        <li class="rounded-md bg-stone-50 px-3 py-2"><span class="font-medium">{{ c.author.email }}</span> · {{ c.body }}</li>
+      {% endif %}
+    {% empty %}
+      <li class="text-stone-500">No messages yet.</li>
+    {% endfor %}
+  </ul>
+  <form method="post" class="mt-4 space-y-2">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="comment">
+    <textarea name="body" rows="3" required class="w-full rounded-md border border-stone-300 px-3 py-2" placeholder="Add a comment"></textarea>
+    <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white">Post comment</button>
+  </form>
+  <form method="post" enctype="multipart/form-data" class="mt-4 flex items-end gap-3">
+    {% csrf_token %}
+    <input type="hidden" name="action" value="attachment">
+    <label class="text-sm">
+      <span class="block text-stone-600">Attachment</span>
+      <input type="file" name="file" required class="mt-1">
+    </label>
+    <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100">Upload</button>
+  </form>
+</div>
+{% endblock %}

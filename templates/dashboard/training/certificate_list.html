@@ -1,0 +1,79 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Certificates" %}</h1>
+<p class="mt-1 text-sm text-stone-500">{% trans "Certificates are only issued when completion is verified. Public verification uses a non-guessable code." %}</p>
+
+<form method="get" class="mt-4 flex flex-wrap gap-2">
+  <input type="search" name="q" value="{{ search }}" placeholder="{% trans 'Search number, email or course' %}" class="w-72 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <select name="status" class="rounded-md border border-stone-300 px-3 py-2 text-sm">
+    <option value="">{% trans "All statuses" %}</option>
+    <option value="issued" {% if current_status == 'issued' %}selected{% endif %}>{% trans "Issued" %}</option>
+    <option value="revoked" {% if current_status == 'revoked' %}selected{% endif %}>{% trans "Revoked" %}</option>
+  </select>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Filter" %}</button>
+</form>
+
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Number" %}</th>
+        <th class="px-5 py-3">{% trans "Student" %}</th>
+        <th class="px-5 py-3">{% trans "Course" %}</th>
+        <th class="px-5 py-3">{% trans "Issued" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for certificate in certificates %}
+        <tr>
+          <td class="px-5 py-3 font-medium text-stone-900">{{ certificate.certificate_number }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ certificate.student.email }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ certificate.course.title }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ certificate.issue_date|date:"d M Y" }}</td>
+          <td class="px-5 py-3">{{ certificate.get_status_display }}</td>
+          <td class="px-5 py-3 text-right">
+            {% if can_approve and certificate.status == 'issued' %}
+              <form method="post" action="{% url 'training_dashboard:certificate_revoke' certificate.pk %}" class="flex items-center gap-2">
+                {% csrf_token %}
+                <input type="text" name="reason" required maxlength="300" placeholder="{% trans 'Reason' %}" class="w-40 rounded-md border border-stone-300 px-2 py-1 text-xs">
+                <button type="submit" class="text-xs text-red-700 hover:underline">{% trans "Revoke" %}</button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-5 py-6 text-sm text-stone-500">{% trans "No certificates found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=page_obj %}
+
+{% if can_approve %}
+  <div class="mt-8 rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Issue a certificate" %}</h2>
+    <p class="mt-1 text-sm text-stone-500">{% trans "Only completed enrolments are listed. Issuance is re-checked server-side." %}</p>
+    <ul class="mt-3 space-y-2 text-sm">
+      {% for enrollment in completed_enrollments %}
+        <li class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+          <span class="text-stone-700">{{ enrollment.reference }} · {{ enrollment.student.email }} · {{ enrollment.session.course.title }}</span>
+          <form method="post" action="{% url 'training_dashboard:certificate_issue' enrollment.reference %}" class="flex items-center gap-2">
+            {% csrf_token %}
+            <select name="template" class="rounded-md border border-stone-300 px-2 py-1 text-xs">
+              <option value="">{% trans "No template" %}</option>
+              {% for template in templates %}<option value="{{ template.pk }}">{{ template.name }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="rounded-md bg-forest px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-dark">{% trans "Issue" %}</button>
+          </form>
+        </li>
+      {% empty %}
+        <li class="text-sm text-stone-500">{% trans "No completed enrolments awaiting a certificate." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+{% endif %}
+{% endblock %}

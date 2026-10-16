@@ -1,0 +1,126 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">{{ order.reference }}</h1>
+    <p class="text-sm text-stone-500">{{ order.customer.email }} · {{ order.destination.country.name }} · {{ order.get_status_display }}</p>
+  </div>
+  <div class="flex gap-2">
+    <form method="post" action="{% url 'export_dashboard:shipment_create' %}">
+      {% csrf_token %}
+      <input type="hidden" name="order" value="{{ order.reference }}">
+      <button class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "New shipment" %}</button>
+    </form>
+  </div>
+</div>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Total" %}</p><p class="mt-1 text-xl font-semibold">{{ order.currency }} {{ order.total }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Paid" %}</p><p class="mt-1 text-xl font-semibold">{{ order.amount_paid }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Compliance" %}</p><p class="mt-1 text-xl font-semibold">{{ order.get_compliance_status_display }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Fulfillment" %}</p><p class="mt-1 text-xl font-semibold">{{ order.get_fulfillment_status_display }}</p></div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-3">
+  <div class="space-y-6 lg:col-span-2">
+    <div class="rounded-xl border border-stone-200 bg-white">
+      <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Items" %}</h2>
+      <table class="min-w-full divide-y divide-stone-100 text-sm">
+        <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr><th class="px-5 py-2">{% trans "Description" %}</th><th class="px-5 py-2">{% trans "Qty" %}</th><th class="px-5 py-2">{% trans "Unit price" %}</th><th class="px-5 py-2">{% trans "Line total" %}</th></tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for item in items %}
+            <tr><td class="px-5 py-2">{{ item.description }}</td><td class="px-5 py-2">{{ item.quantity }} {{ item.unit }}</td><td class="px-5 py-2">{{ item.unit_price }}</td><td class="px-5 py-2">{{ item.line_total }}</td></tr>
+          {% empty %}
+            <tr><td colspan="4" class="px-5 py-6 text-center text-stone-500">{% trans "No items." %}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white">
+      <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Documents" %}</h2>
+      <ul class="divide-y divide-stone-100 text-sm">
+        {% for d in documents %}
+          <li class="flex items-center justify-between px-5 py-3">
+            <a href="{% url 'export_dashboard:document_detail' d.pk %}" class="font-medium text-forest hover:underline">{{ d.document_type.name }}</a>
+            <span class="text-stone-500">{{ d.get_verification_status_display }}</span>
+          </li>
+        {% empty %}
+          <li class="px-5 py-6 text-stone-500">{% trans "No documents yet." %}</li>
+        {% endfor %}
+      </ul>
+      <form method="post" action="{% url 'export_dashboard:document_create' order.reference %}" enctype="multipart/form-data" class="space-y-3 border-t border-stone-100 p-5">
+        {% csrf_token %}
+        {{ document_form.as_p }}
+        <button class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Upload document" %}</button>
+      </form>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white">
+      <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Shipments" %}</h2>
+      <ul class="divide-y divide-stone-100 text-sm">
+        {% for s in shipments %}
+          <li class="flex items-center justify-between px-5 py-3">
+            <a href="{% url 'export_dashboard:shipment_detail' s.reference %}" class="font-medium text-forest hover:underline">{{ s.reference }}</a>
+            <span class="text-stone-500">{{ s.get_transport_mode_display }} · {{ s.get_status_display }}</span>
+          </li>
+        {% empty %}
+          <li class="px-5 py-6 text-stone-500">{% trans "No shipments yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white">
+      <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Payments" %}</h2>
+      <ul class="divide-y divide-stone-100 text-sm">
+        {% for p in payments %}
+          <li class="flex items-center justify-between px-5 py-3">
+            <span>{{ p.reference }} · {{ p.provider }}</span>
+            <span class="text-stone-500">{{ p.currency }} {{ p.amount }} · {{ p.get_status_display }}</span>
+          </li>
+        {% empty %}
+          <li class="px-5 py-6 text-stone-500">{% trans "No payments yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="space-y-6">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">{% trans "Advance status" %}</h2>
+      <p class="mt-1 text-xs text-stone-500">{% trans "Moving to ready-for-shipment requires an approved compliance checklist." %}</p>
+      <form method="post" action="{% url 'export_dashboard:order_transition' order.reference %}" class="mt-3 space-y-2">
+        {% csrf_token %}
+        <select name="status" class="w-full rounded-md border border-stone-300 px-3 py-2 text-sm">
+          {% for value, label in status_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+        </select>
+        <textarea name="note" rows="2" class="w-full rounded-md border border-stone-300 px-3 py-2 text-sm" placeholder="{% trans 'Note (optional)' %}"></textarea>
+        <button class="rounded-md bg-forest px-4 py-2 text-sm text-white hover:bg-forest-dark">{% trans "Update status" %}</button>
+      </form>
+    </div>
+
+    {% if checklist %}
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h2 class="font-semibold text-stone-900">{% trans "Compliance checklist" %}</h2>
+        <p class="mt-1 text-sm text-stone-500">{{ checklist.get_status_display }} · {{ checklist.outstanding_items }} {% trans "outstanding" %}</p>
+        <a href="{% url 'export_dashboard:compliance_detail' checklist.pk %}" class="mt-2 inline-block text-sm text-forest hover:underline">{% trans "Open checklist" %}</a>
+      </div>
+    {% endif %}
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">{% trans "Status history" %}</h2>
+      <ol class="mt-3 space-y-3 text-sm">
+        {% for h in history %}
+          <li><p class="font-medium text-stone-800">{{ h.get_to_status_display }}</p><p class="text-xs text-stone-500">{{ h.created_at|date:"Y-m-d H:i" }}{% if h.actor %} · {{ h.actor.email }}{% endif %}</p>{% if h.note %}<p class="text-stone-600">{{ h.note }}</p>{% endif %}</li>
+        {% empty %}
+          <li class="text-stone-500">{% trans "No history yet." %}</li>
+        {% endfor %}
+      </ol>
+    </div>
+  </div>
+</div>
+{% endblock %}

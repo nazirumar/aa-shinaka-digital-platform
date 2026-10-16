@@ -140,7 +140,7 @@ for these divisions arrive with the service pipelines (Phase 7); until then the
 CTA routes to the stored contact form.
 
 `/consultancy/`, `/farming-services/`, `/marketing/`, `/storage/`, `/export/`,
-`/training/` (Phase 7/8 paths) — each: hero, offering summary, process/how-it-works, FAQ,
+`/training/` (Phase 7/8/9 paths) — each: hero, offering summary, process/how-it-works, FAQ,
 request/enquiry CTA form.
 
 ### 5.4 Request & enquiry forms
@@ -151,18 +151,45 @@ request/enquiry CTA form.
 | Farming service | service type, farm location, acreage, schedule, notes |
 | Marketing | produce, volume + unit, target market, notes |
 | Storage | produce, quantity + unit, duration, facility preference, notes |
-| Export enquiry | product, volume + unit, destination country, incoterms, target date, notes |
+| Export enquiry | product(s), volume + unit, destination country, shipping mode, target date, notes |
 | Training enrollment | cohort selection, trainee details, notes |
 
 All forms: inline validation, required-field indicators, helpful errors,
 loading/disabled submit state, confirmation screen with reference number.
 
+**Phase 7 (delivered):** the request/enquiry forms are implemented in the
+**customer service portal** at `/account/services/` rather than on the public
+division pages (which keep the CMS-driven content and a CTA). Each submission
+creates a `ServiceRequest` with a human reference (`AS-SR-…`) and lands in the
+relevant staff queue.
+
+**Phase 8 (delivered):** the **export enquiry** form lives in the customer export
+portal at `/account/export/enquiries/new/` (multi-line product/quantity formset).
+Only **approved and active** destinations are selectable, and only
+export-eligible products appear. Each enquiry gets an `AS-EXQ-…` reference.
+
+### 5.4a Training academy (Phase 9, delivered)
+
+Public `/training/`: home (featured courses from real published records),
+`/training/courses/` (filterable list) and `/training/courses/<slug>/` (course
+detail with modules/lessons — preview lessons are readable signed-out),
+`/training/categories/<slug>/`, `/training/sessions/` and
+`/training/sessions/<uuid>/` (cohort detail + **Enrol** CTA), and
+`/training/verify/` (public certificate verification by code, showing only the
+minimum approved information). Free cohorts confirm immediately; paid cohorts
+move to *payment pending* and confirm **only** after a server-verified payment.
+Empty states never invent courses, cohorts, instructors or dates.
+
 ### 5.5 Cart & checkout
 
 - Cart: line items with origin/package, quantity stepper, availability warnings,
   subtotal, proceed CTA.
-- Checkout: address selection/entry, contact, notes, order summary, payment step
-  (placeholder until Paystack phase).
+- Checkout: address selection/entry, contact, notes, order summary, payment step.
+- Payment (Phase 6): orders are created `pending_payment`; the customer can pay
+  via hosted **Paystack** (`/orders/<n>/pay/` → provider, then callback re-verifies
+  server-side) or claim a **bank transfer** (`/orders/<n>/bank-transfer/`) which
+  finance must approve. Result pages show the verified status; the browser
+  redirect is never the source of truth.
 - Confirmation: order number, summary, next steps.
 
 ### 5.6 Static & legal
@@ -186,23 +213,47 @@ verification. Simple centred card, accessible inputs.
 ## 6. Customer portal
 
 > **Phase 2 delivered:** the portal home, profile, addresses and security pages
-> live under `/account/`. Orders, requests and training pages arrive with their
-> domain phases (4, 6 and 7).
+> live under `/account/`. Orders (Phase 5), payments (Phase 6), the service
+> portal (Phase 7), the export portal (Phase 8) and the training portal
+> (Phase 9, `/account/training/`) each add their own sections.
 
 | Page | Path | Purpose |
 |---|---|---|
 | Portal home | `/account/` | summary cards: recent orders, open requests, notifications |
 | Orders | `/account/orders/` | order list with status filters |
 | Order detail | `/account/orders/<number>/` | items, timeline, payment status, actions |
-| Requests | `/account/requests/` | all service requests by division and status |
-| Request detail | `/account/requests/<ref>/` | details + status history |
-| Enrollments | `/account/training/` | enrolled courses/cohorts |
+| Payments | `/payments/` | payment history + status; pay/re-submit |
+| Payment detail | `/payments/<uuid>/` | one payment, attempts, review notes |
+| Invoices | `/invoices/` | issued invoices; download PDF |
+| Invoice detail | `/invoices/<number>/` | immutable invoice; PDF |
+| Receipts | `/receipts/<number>/` | receipts for verified payments; PDF |
+| Services home | `/account/services/` | service portal: requests, quotations, appointments |
+| Request queue | `/account/services/requests/` | all service requests by division and status |
+| Request detail | `/account/services/requests/<ref>/` | details + status history |
+| New request | `/account/services/<division>/new/` | consultancy/farming/marketing/storage forms |
+| Quotations | `/account/services/quotations/` | issued quotations; accept/reject/pay |
+| Quotation detail | `/account/services/quotations/<uuid>/` | items, totals, terms + `/pay/` |
+| Proposals | (within marketing request) | accept/reject a marketing proposal |
+| Export home | `/account/export/` | export portal: enquiries, quotations, orders, shipments |
+| Export enquiries | `/account/export/enquiries/` (+ `/new/`) | raise/track an enquiry; `/<ref>/` shows status history |
+| Export quotations | `/account/export/quotations/<uuid>/` | Incoterms + named place, totals, terms; `/accept/` |
+| Export orders | `/account/export/orders/<ref>/` | frozen terms, deposit/balance, `/pay/`, documents |
+| Export shipments | `/account/export/shipments/` (+ `/<ref>/`) | status + staff-entered milestones |
+| Enrolments | `/account/training/` | training home, my courses, upcoming sessions, enrolments + detail, payments |
+| Learning | `/account/training/enrolments/<ref>/` | lessons, progress, assessments, resources, certificate |
+| Certificates | `/account/training/certificates/` | approved certificates; view/download PDF |
+| Activity timeline | `/account/activity/` | aggregated orders/payments/service/export/training/support events |
+| Document centre | `/account/documents/` | every downloadable document; one central ownership-checked download |
+| Notifications | `/notifications/` | in-app notification centre (read/unread, mark all, open+redirect) |
+| Notification settings | `/notifications/preferences/` | per-channel + per-category opt-outs |
+| Support | `/support/` | my tickets, open a ticket, conversation, attachments, close/reopen |
 | Profile | `/account/profile/` | name, phone, state/LGA, marketing consent |
 | Addresses | `/account/addresses/` | CRUD, set default |
 | Security | `/account/security/` | change password, sessions |
 
 Navigation: portal sidebar/tabs, responsive; active-state indicator; empty
-states with CTAs.
+states with CTAs. Phase 6 adds a **Payments** and an **Invoices** entry to the
+portal navigation, scoped to the signed-in customer.
 
 ---
 
@@ -222,13 +273,51 @@ states with CTAs.
 | Listings | `/dashboard/catalog/listings/` | origin, package, price, stock |
 | Inventory | `/dashboard/inventory/` | Inventory Officer — movements, adjustments, low stock |
 | Orders | `/dashboard/orders/` | Sales/Inventory/Finance — fulfilment queue, status transitions |
-| Payments | `/dashboard/payments/` | Finance Officer — payments + refunds |
-| Requests | `/dashboard/requests/<division>/` | per-division queues |
-| Storage | `/dashboard/storage/` | Inventory Officer — facilities, intake/release records |
-| Export | `/dashboard/export/` | Export Officer — enquiry pipeline + quotations |
-| Training | `/dashboard/training/` | Training Manager — courses, cohorts, enrollments |
+| Payments | `/dashboard/finance/` | Finance Officer — verified-only overview + revenue chart (`FINANCE_MANAGE`) |
+| Payments queue | `/dashboard/finance/payments/` | payment list/detail + manual reconcile |
+| Bank transfers | `/dashboard/finance/transfers/` | review customer transfer claims (approve requires confirmed settlement) |
+| Refunds | `/dashboard/finance/refunds/` | request → approve → complete |
+| Invoices | `/dashboard/finance/invoices/` | issued invoices |
+| Bank accounts | `/dashboard/finance/bank-accounts/` | settlement accounts shown to customers |
+| Requests | `/dashboard/services/requests/` | per-division request queues (`SERVICES_MANAGE`) |
+| Service overview | `/dashboard/services/` | all divisions — KPIs + Chart.js (real records only) |
+| Consultancy | `/dashboard/services/appointments/<uuid>/confirm|complete/` | Consultant — appointments, reports |
+| Farming | `/dashboard/services/farm/…` | projects, agreement-gated activation, milestones, visits, progress |
+| Marketing | `/dashboard/services/marketing/…` | enquiries, proposals, campaigns, activity |
+| Storage | `/dashboard/services/storage/…` | Inventory Officer — facilities, units, bookings, check-in/out, inspections |
+| Quotations | `/dashboard/services/quotations/…` | approve/issue (`QUOTATIONS_MANAGE`) |
+| Export overview | `/dashboard/export/` | Export Officer — KPIs + Chart.js, compliance & shipment queues (`EXPORT_MANAGE`) |
+| Export destinations | `/dashboard/export/destinations/…` | approve (`EXPORT_APPROVE`)/activate; requirements, restrictions, document rules |
+| Export products | `/dashboard/export/products/…` | `ExportProductProfile` config: eligibility, allow-list, minimums |
+| Export enquiries | `/dashboard/export/enquiries/…` | review/quote; `/quotation/new/` |
+| Export quotations | `/dashboard/export/quotations/…` | approve/issue (`EXPORT_APPROVE`), revise/supersede |
+| Export orders | `/dashboard/export/orders/<ref>/` | transitions, documents, checklist |
+| Export compliance | `/dashboard/export/compliance/…` | checklist review/approve; blocks dispatch until cleared |
+| Export shipments | `/dashboard/export/shipments/…` | create/transition; **staff-entered** milestones only |
+| Export providers | `/dashboard/export/providers/…` | freight-forwarding provider records |
+| Export reports | `/dashboard/export/reports/` | Chart.js reports derived strictly from real records |
+| Training overview | `/dashboard/training/` | Training Manager — KPIs + Chart.js from real records (`TRAINING_MANAGE`) |
+| Training catalogue | `/dashboard/training/courses/…`, `categories/…` | courses, modules, lessons, private resources; publish (`TRAINING_APPROVE`) |
+| Instructors & venues | `/dashboard/training/instructors/…`, `venues/…` | profiles, assignments, venues |
+| Cohorts | `/dashboard/training/sessions/…` | sessions + schedules, capacity, transitions |
+| Enrolments | `/dashboard/training/enrollments/…` | enrolment management, payment/status actions |
+| Attendance | `/dashboard/training/attendance/…` | registers + per-student marking |
+| Assessments | `/dashboard/training/assessments/…` | questions/options, publish, manual grading |
+| Certificates | `/dashboard/training/certificates/…`, `templates/…` | issue/revoke certificates (`TRAINING_APPROVE`), templates |
+| Training reports | `/dashboard/training/reports/` | Chart.js reports derived strictly from real records |
+| Training reports | `/dashboard/training/reports/` | Chart.js reports derived strictly from real records |
+| Support queue | `/dashboard/support/` | Sales/Admin/Owner — queue + metrics (`SUPPORT_MANAGE`) |
+| Support ticket | `/dashboard/support/tickets/<ref>/` | conversation, reply, assign, status; internal notes |
+| Ticket priority | `/dashboard/support/tickets/<ref>/priority/` | priority change (`SUPPORT_APPROVE`) |
+| Customer overview | `/dashboard/customers/…` | read-only cross-domain profile (`CUSTOMERS_VIEW`; finance rows need `FINANCE_MANAGE`) |
+| Executive overview | `/dashboard/executive/` | cross-division KPIs + charts (`analytics.view`; financial figures need `analytics.finance`) |
+| Analytics pages | `/dashboard/analytics/<page>/` | sales, finance, inventory, services, export, training, customers, support; KPIs + Chart.js + tables |
+| Report builder | `/dashboard/reports/builder/` | allow-listed report, typed filters, live preview (`reports.build`) |
+| Report history | `/dashboard/reports/history/` | generated reports + format/status; all rows need `reports.manage` |
+| Report download | `/dashboard/reports/<uuid>/download/` | permission-checked private file (ownership or `reports.manage`; finance needs `analytics.finance`) |
+| Scheduled reports | `/dashboard/reports/scheduled/…` | recurring configs, enable/disable, run-now, delivery ledger (`reports.schedule`) |
+| Data quality | `/dashboard/reports/data-quality/` | read-only integrity checks (`analytics.view`) |
 | Staff | `/dashboard/staff/` | Administrator/Owner — staff creation, roles, activation |
-| Reports | `/dashboard/reports/` | Chart.js dashboards + filters |
 | Audit | `/dashboard/audit/` | searchable audit log (Administrator/Owner; view for Finance) |
 
 Dashboard chrome: fixed sidebar (collapsible on mobile), topbar with user menu,

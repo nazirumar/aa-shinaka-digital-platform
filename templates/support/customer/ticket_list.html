@@ -1,0 +1,52 @@
+{% extends "accounts/account_base.html" %}
+
+{% block account_content %}
+<div class="rounded-xl border border-stone-200 bg-white">
+  <div class="flex flex-wrap items-center justify-between gap-3 border-b border-stone-100 px-4 py-3">
+    <h2 class="font-semibold text-stone-900">My tickets</h2>
+    <form method="get" class="flex items-center gap-2 text-sm">
+      <label class="sr-only" for="status-filter">Status</label>
+      <select id="status-filter" name="status" class="rounded-md border border-stone-300 px-3 py-1.5">
+        <option value="">All statuses</option>
+        {% for value, label in statuses %}
+          <option value="{{ value }}" {% if value == selected_status %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+      <button type="submit" class="rounded-md border border-stone-300 px-3 py-1.5 hover:bg-stone-100">Filter</button>
+    </form>
+  </div>
+
+  {% if tickets %}
+    <table class="w-full text-left text-sm">
+      <thead class="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th class="px-4 py-2">Subject</th>
+          <th class="px-4 py-2">Category</th>
+          <th class="px-4 py-2">Priority</th>
+          <th class="px-4 py-2">Status</th>
+          <th class="px-4 py-2">Updated</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for ticket in tickets %}
+          <tr>
+            <td class="px-4 py-3">
+              <a href="{% url 'support:ticket_detail' ticket.reference %}" class="font-medium text-stone-900 hover:text-brand-700">{{ ticket.subject }}</a>
+              <span class="block text-xs text-stone-500">{{ ticket.reference }}</span>
+            </td>
+            <td class="px-4 py-3 text-stone-600">{{ ticket.get_category_display }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ ticket.get_priority_display }}</td>
+            <td class="px-4 py-3">{% include "support/_status_badge.html" with status=ticket.status label=ticket.get_status_display %}</td>
+            <td class="px-4 py-3 text-stone-500">{{ ticket.last_activity_at|timesince }} ago</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% include "components/pagination.html" %}
+  {% else %}
+    <div class="p-4">
+      {% include "components/empty_state.html" with title="No tickets" message="You have no tickets matching this filter." %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

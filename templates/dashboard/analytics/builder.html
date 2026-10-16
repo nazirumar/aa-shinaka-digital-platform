@@ -1,0 +1,118 @@
+{% extends "dashboard/base.html" %}
+{% load catalog_tags %}
+{% block title %}Report builder{% endblock %}
+{% block dashboard_content %}
+<div class="flex flex-wrap items-center justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">Report builder</h1>
+    <p class="text-sm text-stone-600">Choose an approved report — reports are code-defined and cannot be edited into raw queries.</p>
+  </div>
+  <a href="{% url 'analytics:report_history' %}" class="rounded-md border border-stone-300 px-3 py-2 text-sm hover:bg-stone-100">Report history</a>
+</div>
+
+<form method="post" class="mt-4 rounded-xl border border-stone-200 bg-white p-4" novalidate>
+  {% csrf_token %}
+  {% if form.non_field_errors %}
+    <div class="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-800">
+      {% for error in form.non_field_errors %}<p>{{ error }}</p>{% endfor %}
+    </div>
+  {% endif %}
+
+  <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div>
+      <label for="{{ form.report.id_for_label }}" class="block text-xs font-medium text-stone-600">Report</label>
+      {{ form.report }}
+      {% for error in form.report.errors %}<p class="mt-1 text-xs text-red-700">{{ error }}</p>{% endfor %}
+    </div>
+    <div>
+      <label for="{{ form.format.id_for_label }}" class="block text-xs font-medium text-stone-600">Format</label>
+      {{ form.format }}
+      {% for error in form.format.errors %}<p class="mt-1 text-xs text-red-700">{{ error }}</p>{% endfor %}
+    </div>
+    <div>
+      <label for="{{ form.preset.id_for_label }}" class="block text-xs font-medium text-stone-600">Period</label>
+      {{ form.preset }}
+    </div>
+    <div>
+      <label for="{{ form.date_from.id_for_label }}" class="block text-xs font-medium text-stone-600">From</label>
+      {{ form.date_from }}
+    </div>
+    <div>
+      <label for="{{ form.date_to.id_for_label }}" class="block text-xs font-medium text-stone-600">To</label>
+      {{ form.date_to }}
+    </div>
+    <div>
+      <label for="{{ form.status.id_for_label }}" class="block text-xs font-medium text-stone-600">Status (optional)</label>
+      {{ form.status }}
+    </div>
+    <div>
+      <label for="{{ form.division.id_for_label }}" class="block text-xs font-medium text-stone-600">Division (optional)</label>
+      {{ form.division }}
+    </div>
+    <div>
+      <label for="{{ form.product_id.id_for_label }}" class="block text-xs font-medium text-stone-600">Product</label>
+      {{ form.product_id }}
+    </div>
+    <div>
+      <label for="{{ form.warehouse_id.id_for_label }}" class="block text-xs font-medium text-stone-600">Warehouse</label>
+      {{ form.warehouse_id }}
+    </div>
+    <div>
+      <label for="{{ form.state_id.id_for_label }}" class="block text-xs font-medium text-stone-600">State</label>
+      {{ form.state_id }}
+    </div>
+    <div>
+      <label for="{{ form.destination_id.id_for_label }}" class="block text-xs font-medium text-stone-600">Export destination</label>
+      {{ form.destination_id }}
+    </div>
+    <div>
+      <label for="{{ form.currency.id_for_label }}" class="block text-xs font-medium text-stone-600">Currency (optional)</label>
+      {{ form.currency }}
+    </div>
+  </div>
+
+  <div class="mt-4 flex flex-wrap gap-2">
+    <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100">Preview</button>
+    <button type="submit" formaction="{% url 'analytics:report_generate' %}"
+            class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">
+      Generate &amp; download
+    </button>
+  </div>
+  <p class="mt-2 text-xs text-stone-500">
+    Exports are private to you and expire after the configured retention window. Customer
+    identity is never included.
+  </p>
+</form>
+
+{% if preview %}
+  <section class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-4 py-3">
+      <h2 class="text-sm font-semibold text-stone-800">Preview — {{ preview.definition.label }}</h2>
+      <span class="text-xs text-stone-500">First {{ preview.rows|length }} row(s)</span>
+    </div>
+    {% if preview.display_rows %}
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-stone-200 text-sm">
+          <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+            <tr>{% for label in preview.display_columns %}<th scope="col" class="px-4 py-3">{{ label }}</th>{% endfor %}</tr>
+          </thead>
+          <tbody class="divide-y divide-stone-100">
+            {% for row in preview.display_rows %}
+              <tr class="hover:bg-cream-50">
+                {% for cell in row %}<td class="whitespace-nowrap px-4 py-3 text-stone-700">{{ cell }}</td>{% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+          {% if preview.display_totals %}
+            <tfoot class="bg-cream-50 font-medium text-stone-800">
+              <tr>{% for cell in preview.display_totals %}<td class="px-4 py-3">{{ cell }}</td>{% endfor %}</tr>
+            </tfoot>
+          {% endif %}
+        </table>
+      </div>
+    {% else %}
+      <div class="p-4">{% include "components/empty_state.html" with title="No rows" message="No data matched the selected filters." %}</div>
+    {% endif %}
+  </section>
+{% endif %}
+{% endblock %}

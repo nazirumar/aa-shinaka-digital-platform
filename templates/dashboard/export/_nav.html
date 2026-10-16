@@ -1,0 +1,14 @@
+{% load i18n %}
+<nav class="mb-6 flex flex-wrap gap-2 border-b border-stone-200 pb-3 text-sm">
+  <a href="{% url 'export_dashboard:home' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Overview" %}</a>
+  <a href="{% url 'export_dashboard:destination_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Destinations" %}</a>
+  <a href="{% url 'export_dashboard:product_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Products" %}</a>
+  <a href="{% url 'export_dashboard:enquiry_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Enquiries" %}</a>
+  <a href="{% url 'export_dashboard:quotation_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Quotations" %}</a>
+  <a href="{% url 'export_dashboard:order_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Orders" %}</a>
+  <a href="{% url 'export_dashboard:compliance_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Compliance" %}</a>
+  <a href="{% url 'export_dashboard:document_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Documents" %}</a>
+  <a href="{% url 'export_dashboard:shipment_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Shipments" %}</a>
+  <a href="{% url 'export_dashboard:provider_list' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Logistics" %}</a>
+  <a href="{% url 'export_dashboard:reports' %}" class="rounded-md px-3 py-1.5 text-stone-600 hover:bg-stone-100">{% trans "Reports" %}</a>
+</nav>

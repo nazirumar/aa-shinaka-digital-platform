@@ -1,0 +1,32 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Attendance registers" %}</h1>
+<p class="mt-1 text-sm text-stone-500">{% trans "Registers are created from a session's detail page." %}</p>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Date" %}</th>
+        <th class="px-5 py-3">{% trans "Session" %}</th>
+        <th class="px-5 py-3">{% trans "Topic" %}</th>
+        <th class="px-5 py-3">{% trans "Marked by" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for register in registers %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_dashboard:attendance_detail' register.pk %}" class="font-medium text-forest hover:underline">{{ register.date|date:"d M Y" }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ register.session.reference }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ register.topic|default:"—" }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ register.marked_by.email|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-5 py-6 text-sm text-stone-500">{% trans "No attendance registers yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=registers %}
+{% endblock %}

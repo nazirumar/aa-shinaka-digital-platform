@@ -5,14 +5,15 @@
 Standalone Django 5.2 LTS **MVT monolith** (Django Templates — no SPA) for the
 AA Shinaka agricultural business platform. Postgres + Tailwind + HTMX + Alpine +
 Celery/Redis + Chart.js. See `docs/` for the spec; `docs/IMPLEMENTATION_ROADMAP.md`
-is the phase plan. Phases 1 (foundation), 2 (auth, accounts, staff permissions & core
-infrastructure), 3 (corporate website, premium homepage & CMS) and 4 (catalog:
-categories, products, Nigeria locations, pricing & inventory) are done. Orders
-(cart/checkout/orders) is **Phase 5** — do not start it without approval.
-Phase 4 work lives in `apps/catalog` (public `/shop/`, staff
-`/dashboard/catalog/` and `/dashboard/inventory/`) + `apps/locations`, and
-reports in `docs/PHASE_4_COMPLETION_REPORT.md`; Phase 3 reports in
-`docs/PHASE_3_COMPLETION_REPORT.md`.
+is the phase plan. Phases 1–11 (foundation; auth/accounts/staff permissions;
+corporate website + CMS; catalog; orders/payments; service divisions; export;
+training; unified customer portal + notifications + support; analytics &
+reporting) are done. Phase 12 (production security, QA, deployment & launch
+readiness) is delivered and awaiting owner approval — see
+`docs/PRODUCTION_READINESS_AUDIT.md`, `docs/PRODUCTION_RUNBOOK.md` and
+`docs/FINAL_PRODUCTION_READINESS_REPORT.md`. Phase 12 did **not** deploy, change
+DNS or enable live Paystack credentials. Later phases must not start without
+approval.
 
 Hard exclusions — never add: oil & gas features, multi-vendor marketplace
 features, or any AgriTrade ERP integration. Never hardcode product categories,

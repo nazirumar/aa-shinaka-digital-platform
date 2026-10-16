@@ -1,0 +1,94 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Export reports" %}</h1>
+<p class="mt-1 text-sm text-stone-500">{% trans "Verified revenue counts only payments confirmed server-side — never the browser callback." %}</p>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Active destinations" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.active_destinations }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Verified revenue" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.verified_revenue }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Dispatched shipments" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.dispatched_shipments }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Delivered shipments" %}</p><p class="mt-1 text-2xl font-semibold">{{ metrics.delivered_shipments }}</p></div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Enquiries by destination" %}</h2>
+    <div class="mt-4 h-64"><canvas id="chart-enquiries" role="img" aria-label="{% trans 'Enquiries by destination' %}"></canvas></div>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Orders by status" %}</h2>
+    <div class="mt-4 h-64"><canvas id="chart-orders" role="img" aria-label="{% trans 'Orders by status' %}"></canvas></div>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Quotations by status" %}</h2>
+    <div class="mt-4 h-64"><canvas id="chart-quotations" role="img" aria-label="{% trans 'Quotations by status' %}"></canvas></div>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Shipments by status" %}</h2>
+    <div class="mt-4 h-64"><canvas id="chart-shipments" role="img" aria-label="{% trans 'Shipments by status' %}"></canvas></div>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Product quantities (pipeline)" %}</h2>
+    <table class="min-w-full divide-y divide-stone-100 text-sm">
+      <tbody class="divide-y divide-stone-100">
+        {% for row in product_quantities %}
+          <tr><td class="px-5 py-2">{{ row.description }}</td><td class="px-5 py-2 text-right">{{ row.quantity }}</td></tr>
+        {% empty %}
+          <tr><td class="px-5 py-6 text-stone-500">{% trans "No data." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <h2 class="border-b border-stone-100 px-5 py-3 font-semibold text-stone-900">{% trans "Compliance delays" %}</h2>
+    <table class="min-w-full divide-y divide-stone-100 text-sm">
+      <tbody class="divide-y divide-stone-100">
+        {% for row in compliance_delays %}
+          <tr><td class="px-5 py-2">{{ row.checklist__order__reference }}</td><td class="px-5 py-2 text-right">{{ row.outstanding }} {% trans "outstanding" %}</td></tr>
+        {% empty %}
+          <tr><td class="px-5 py-6 text-stone-500">{% trans "No delays." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{{ enquiries_by_destination|json_script:"data-enquiries" }}
+{{ orders_by_status|json_script:"data-orders" }}
+{{ quotations_by_status|json_script:"data-quotations" }}
+{{ shipment_status_breakdown|json_script:"data-shipments" }}
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    function read(id) {
+      var el = document.getElementById(id);
+      if (!el) return [];
+      try { return JSON.parse(el.textContent); } catch (e) { return []; }
+    }
+    function draw(canvasId, rows, labelKey) {
+      var el = document.getElementById(canvasId);
+      if (!el || typeof Chart === 'undefined') return;
+      new Chart(el, {
+        type: 'bar',
+        data: {
+          labels: rows.map(function (r) { return r[labelKey] || '—'; }),
+          datasets: [{ data: rows.map(function (r) { return Number(r.total); }), backgroundColor: '#16a34a' }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
+      });
+    }
+    draw('chart-enquiries', read('data-enquiries'), 'destination__country__name');
+    draw('chart-orders', read('data-orders'), 'status');
+    draw('chart-quotations', read('data-quotations'), 'status');
+    draw('chart-shipments', read('data-shipments'), 'status');
+  })();
+</script>
+{% endblock %}

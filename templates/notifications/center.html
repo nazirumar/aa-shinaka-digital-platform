@@ -1,0 +1,11 @@
+{% extends "accounts/account_base.html" %}
+
+{% block account_content %}
+  <div class="mb-4 flex flex-wrap items-center justify-between gap-3">
+    <p class="text-sm text-stone-600">
+      You have <span class="font-semibold text-stone-900">{{ unread_count }}</span> unread notification{{ unread_count|pluralize }}.
+    </p>
+    <a href="{% url 'notifications:preferences' %}" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-100">Notification settings</a>
+  </div>
+  {% include "notifications/_list.html" %}
+{% endblock %}

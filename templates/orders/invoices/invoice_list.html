@@ -1,0 +1,43 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n catalog_tags %}
+{% block content %}
+<div class="space-y-6">
+  <div class="flex flex-wrap items-center justify-between gap-3">
+    <h2 class="text-lg font-semibold text-stone-900">{% trans "Your invoices" %}</h2>
+    <a href="{% url 'orders:payment_list' %}" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm hover:bg-stone-100">{% trans "Payments" %}</a>
+  </div>
+
+  {% if invoices %}
+    <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+      <table class="min-w-full divide-y divide-stone-200 text-sm">
+        <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            <th scope="col" class="px-4 py-3">{% trans "Invoice" %}</th>
+            <th scope="col" class="px-4 py-3">{% trans "Order" %}</th>
+            <th scope="col" class="px-4 py-3">{% trans "Issued" %}</th>
+            <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+            <th scope="col" class="px-4 py-3 text-right">{% trans "Total" %}</th>
+            <th scope="col" class="px-4 py-3"></th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for invoice in invoices %}
+            <tr>
+              <td class="px-4 py-3 font-mono text-xs text-stone-700">{{ invoice.number }}</td>
+              <td class="px-4 py-3 text-stone-700">{{ invoice.order.number }}</td>
+              <td class="px-4 py-3 text-stone-600">{{ invoice.issued_at|date:"j M Y" }}</td>
+              <td class="px-4 py-3"><span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">{{ invoice.get_status_display }}</span></td>
+              <td class="px-4 py-3 text-right font-semibold text-stone-900">{{ invoice.total|money:invoice.currency }}</td>
+              <td class="px-4 py-3 text-right"><a href="{% url 'orders:invoice_detail' invoice.number %}" class="text-sm font-medium text-forest hover:underline">{% trans "View" %}</a></td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    {% trans "No invoices yet" as empty_title %}
+    {% trans "Invoices are issued with your orders." as empty_message %}
+    {% include "components/empty_state.html" with title=empty_title message=empty_message %}
+  {% endif %}
+</div>
+{% endblock %}

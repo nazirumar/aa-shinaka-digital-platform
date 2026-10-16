@@ -97,8 +97,9 @@ class Command(BaseCommand):
             ng, _ = Country.objects.get_or_create(code="NG", defaults={"name": "Nigeria"})
             for row in rows:
                 state, _ = State.objects.update_or_create(
-                    code=row["state_code"].upper(),
+                    code__iexact=row["state_code"].strip(),
                     defaults={
+                        "code": row["state_code"].upper(),
                         "name": row["state_name"].strip(),
                         "zone": row["zone"].upper(),
                         "slug": slugify(row["state_name"]),

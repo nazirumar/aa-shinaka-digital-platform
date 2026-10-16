@@ -1,0 +1,14 @@
+{{ company.site_name|default:"AA Shinaka" }}
+
+{{ heading }}
+
+{{ intro }}
+
+{% if order %}Order: {{ order.number }}
+Total: {{ order.currency }} {{ order.grand_total }}{% endif %}
+{% if invoice %}Invoice: {{ invoice.number }}{% endif %}
+{% if receipt %}Receipt: {{ receipt.number }}{% endif %}
+
+You can view this in your account at the AA Shinaka website.
+
+This is an automated message. Please do not reply to this email.

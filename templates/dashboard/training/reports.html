@@ -1,0 +1,65 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Training reports" %}</h1>
+<p class="mt-1 text-sm text-stone-500">{% trans "Verified revenue counts only payments confirmed server-side — never the browser callback. Requests are never counted as confirmed students." %}</p>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Enrolments" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.total_enrollments }}</p><p class="text-xs text-stone-500">{{ report.pending_enrollments }} {% trans "pending" %}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Confirmed students" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.confirmed_students }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Completion rate" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.completion_rate }}%</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Attendance rate" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.attendance_rate }}%</p></div>
+</div>
+<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Verified revenue" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.verified_revenue }}</p><p class="text-xs text-stone-500">{% trans "from verified payments only" %}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Outstanding fees" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.outstanding_payments }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Certificates issued" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.certificates_issued }}</p></div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5"><p class="text-sm text-stone-500">{% trans "Upcoming sessions" %}</p><p class="mt-1 text-2xl font-semibold">{{ report.upcoming_sessions }}</p></div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Course popularity" %}</h2>
+    <div class="mt-4 h-64"><canvas id="chart-popularity" role="img" aria-label="{% trans 'Course popularity' %}"></canvas></div>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Enrolments by course" %}</h2>
+    <div class="mt-4 h-64"><canvas id="chart-trend" role="img" aria-label="{% trans 'Enrolments by course' %}"></canvas></div>
+  </div>
+</div>
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    if (typeof Chart === "undefined") return;
+    var popEl = document.getElementById("chart-popularity");
+    if (popEl) {
+      new Chart(popEl, {
+        type: "bar",
+        data: {
+          labels: [{% for item in report.course_popularity %}"{{ item.title|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+          datasets: [{ label: "{{ 'Confirmed students'|escapejs }}", data: [{% for item in report.course_popularity %}{{ item.confirmed }}{% if not forloop.last %},{% endif %}{% endfor %}], backgroundColor: "#166534" }]
+        },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+    }
+    var trendEl = document.getElementById("chart-trend");
+    if (trendEl) {
+      new Chart(trendEl, {
+        type: "bar",
+        data: {
+          labels: [{% for item in report.trend %}"{{ item.session__course__title|escapejs }}"{% if not forloop.last %},{% endif %}{% endfor %}],
+          datasets: [
+            { label: "{{ 'Requests'|escapejs }}", data: [{% for item in report.trend %}{{ item.total }}{% if not forloop.last %},{% endif %}{% endfor %}], backgroundColor: "#a3a3a3" },
+            { label: "{{ 'Confirmed'|escapejs }}", data: [{% for item in report.trend %}{{ item.confirmed }}{% if not forloop.last %},{% endif %}{% endfor %}], backgroundColor: "#166534" }
+          ]
+        },
+        options: { responsive: true, maintainAspectRatio: false, scales: { y: { beginAtZero: true, ticks: { precision: 0 } } } }
+      });
+    }
+  })();
+</script>
+{% endblock %}

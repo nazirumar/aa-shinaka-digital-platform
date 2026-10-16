@@ -1,0 +1,182 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+{% include "training/customer/_nav.html" %}
+
+<div class="flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <p class="text-xs font-semibold uppercase tracking-wide text-harvest-dark">{% trans "Enrolment" %}</p>
+    <h2 class="mt-1 text-lg font-semibold text-stone-900">{{ course.title }}</h2>
+    <p class="text-sm text-stone-500">{{ enrollment.reference }} · {{ enrollment.session.start_date|date:"d M Y" }}{% if enrollment.session.venue %} · {{ enrollment.session.venue.name }}{% endif %}</p>
+  </div>
+  <span class="rounded-full bg-stone-100 px-3 py-1 text-sm text-stone-700">{{ enrollment.get_status_display }}</span>
+</div>
+
+{% if enrollment.status == 'pending' or enrollment.status == 'payment_pending' or enrollment.status == 'confirmed' or enrollment.status == 'waitlisted' %}
+  <div class="mt-4 flex flex-wrap gap-2">
+    {% if enrollment.balance_due > 0 and enrollment.status != 'waitlisted' %}
+      <form method="post" action="{% url 'training_account:enrollment_pay' enrollment.reference %}">
+        {% csrf_token %}
+        <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Pay now" %} ({{ enrollment.session.currency }} {{ enrollment.balance_due }})</button>
+      </form>
+    {% endif %}
+    <form method="post" action="{% url 'training_account:enrollment_cancel' enrollment.reference %}">
+      {% csrf_token %}
+      <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "Cancel enrolment" %}</button>
+    </form>
+  </div>
+{% endif %}
+
+<div class="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Fee" %}</p><p class="mt-1 font-medium">{{ enrollment.session.currency }} {{ enrollment.session.fee }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Paid" %}</p><p class="mt-1 font-medium">{{ enrollment.amount_paid }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Balance" %}</p><p class="mt-1 font-medium">{{ enrollment.balance_due }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Payment status" %}</p><p class="mt-1 font-medium">{{ enrollment.get_payment_status_display }}</p></div>
+</div>
+
+{% if progress %}
+  <div class="mt-6 rounded-xl border border-stone-200 bg-white p-5">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <h2 class="font-semibold text-stone-900">{% trans "Course progress" %}</h2>
+      <span class="text-sm text-stone-600">{{ progress.percentage }}%{% if progress.is_completed %} · <span class="text-green-700">{% trans "Completed" %}</span>{% endif %}</span>
+    </div>
+    <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-stone-100" role="img" aria-label="{% trans 'Course progress' %}">
+      <div class="h-full rounded-full bg-forest" style="width: {{ progress.percentage }}%"></div>
+    </div>
+    <dl class="mt-3 grid gap-x-6 gap-y-1 text-sm text-stone-600 sm:grid-cols-3">
+      <div><dt class="inline">{% trans "Lessons" %}:</dt> <dd class="inline">{{ progress.completed_lessons }} / {{ progress.total_lessons }}</dd></div>
+      <div><dt class="inline">{% trans "Assessments" %}:</dt> <dd class="inline">{{ progress.assessments_passed }} / {{ progress.required_assessments }}</dd></div>
+      <div><dt class="inline">{% trans "Attendance" %}:</dt> <dd class="inline">{{ progress.attendance_percentage }}%</dd></div>
+    </dl>
+  </div>
+{% endif %}
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Lessons" %}</h2>
+    {% if module_rows %}
+      <ol class="mt-3 space-y-4">
+        {% for row in module_rows %}
+          <li>
+            <p class="font-medium text-stone-800">{{ row.module.sort_order }}. {{ row.module.title }}</p>
+            <ul class="mt-2 space-y-2">
+              {% for item in row.lessons %}
+                <li class="flex items-start justify-between gap-3 rounded-lg border border-stone-100 p-3 text-sm">
+                  <div>
+                    <p class="text-stone-800">{{ item.lesson.title }}</p>
+                    <p class="text-xs text-stone-500">{{ item.lesson.get_lesson_type_display }}{% if item.lesson.estimated_minutes %} · {{ item.lesson.estimated_minutes }} {% trans "min" %}{% endif %}</p>
+                  </div>
+                  {% if enrollment.status == 'confirmed' or enrollment.status == 'completed' %}
+                    <form method="post" action="{% url 'training_account:lesson_complete' enrollment.reference item.lesson.id %}">
+                      {% csrf_token %}
+                      {% if item.progress and item.progress.is_completed %}
+                        <input type="hidden" name="completed" value="false">
+                        <button type="submit" class="whitespace-nowrap rounded-md border border-green-300 bg-green-50 px-3 py-1.5 text-xs font-medium text-green-800">{% trans "Completed ✓" %}</button>
+                      {% else %}
+                        <input type="hidden" name="completed" value="true">
+                        <button type="submit" class="whitespace-nowrap rounded-md border border-stone-300 px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100">{% trans "Mark complete" %}</button>
+                      {% endif %}
+                    </form>
+                  {% elif item.progress and item.progress.is_completed %}
+                    <span class="text-xs text-green-700">{% trans "Completed" %}</span>
+                  {% endif %}
+                </li>
+              {% empty %}
+                <li class="text-xs text-stone-500">{% trans "No lessons yet." %}</li>
+              {% endfor %}
+            </ul>
+          </li>
+        {% endfor %}
+      </ol>
+    {% else %}
+      <p class="mt-3 text-sm text-stone-500">{% trans "Learning content becomes available once your enrolment is confirmed." %}</p>
+    {% endif %}
+  </div>
+
+  <div class="space-y-6">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">{% trans "Assessments" %}</h2>
+      <ul class="mt-3 space-y-2 text-sm">
+        {% for assessment in assessments %}
+          <li class="flex flex-wrap items-center justify-between gap-2 border-b border-stone-100 pb-2">
+            <span class="text-stone-700">{{ assessment.title }} <span class="text-xs text-stone-500">· {{ assessment.get_assessment_type_display }} · {% trans "pass" %} {{ assessment.passing_score }}%</span></span>
+            {% if enrollment.status == 'confirmed' or enrollment.status == 'completed' %}
+              <a href="{% url 'training_account:assessment_take' enrollment.reference assessment.id %}" class="text-xs font-medium text-forest hover:underline">{% trans "Take assessment" %}</a>
+            {% endif %}
+          </li>
+        {% empty %}
+          <li class="text-stone-500">{% trans "No published assessments." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">{% trans "My attempts" %}</h2>
+      <ul class="mt-3 space-y-1 text-sm text-stone-600">
+        {% for submission in submissions %}
+          <li>{{ submission.assessment.title }} · {% trans "attempt" %} {{ submission.attempt_number }} · {{ submission.get_status_display }}{% if submission.score is not None %} · {{ submission.score }}{% endif %}</li>
+        {% empty %}
+          <li class="text-stone-500">{% trans "No attempts yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Learning resources" %}</h2>
+    <ul class="mt-3 space-y-1 text-sm text-stone-600">
+      {% for resource in resources %}
+        <li class="flex items-center justify-between gap-2">
+          <span>{{ resource.title }} <span class="text-xs text-stone-400">({{ resource.get_resource_type_display }})</span></span>
+          {% if enrollment.status == 'confirmed' or enrollment.status == 'completed' %}
+            <a href="{% url 'training_account:resource_download' resource.id %}" class="text-xs font-medium text-forest hover:underline">{% trans "Download" %}</a>
+          {% endif %}
+        </li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No resources published yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Attendance" %}</h2>
+    <p class="mt-1 text-sm text-stone-600">{{ attendance.percentage }}% {% trans "attended" %} ({{ attendance.attended }} / {{ attendance.total }})</p>
+    <ul class="mt-3 space-y-1 text-sm text-stone-600">
+      {% for record in attendance_records %}
+        <li>{{ record.attendance_session.date|date:"d M Y" }} · {{ record.get_status_display }}{% if record.note %} · {{ record.note }}{% endif %}</li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No attendance records yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Certificates" %}</h2>
+    <ul class="mt-3 space-y-1 text-sm">
+      {% for certificate in certificates %}
+        <li class="flex items-center justify-between gap-2">
+          <span class="text-stone-700">{{ certificate.certificate_number }} · {{ certificate.get_status_display }}</span>
+          <a href="{% url 'training_account:certificate_view' certificate.pk %}" class="text-xs font-medium text-forest hover:underline">{% trans "View" %}</a>
+        </li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No certificates for this enrolment yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Status history" %}</h2>
+    <ol class="mt-3 space-y-1 text-sm text-stone-600">
+      {% for entry in history %}
+        <li>{{ entry.created_at|date:"d M Y H:i" }} · {{ entry.from_status|default:"—" }} → {{ entry.get_to_status_display }}{% if entry.note %} · {{ entry.note }}{% endif %}</li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No status changes yet." %}</li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+{% endblock %}

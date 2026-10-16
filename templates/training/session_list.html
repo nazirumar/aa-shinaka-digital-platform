@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-10 sm:py-12">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <h1 class="mt-3 text-3xl font-bold tracking-tight text-stone-900">{% trans "Upcoming training sessions" %}</h1>
+    <p class="mt-3 max-w-2xl text-stone-600">{% trans "Scheduled deliveries of our published courses. Open a session to enrol; capacity is confirmed server-side." %}</p>
+  </div>
+</div>
+
+<div class="mx-auto max-w-7xl px-4 py-10">
+  <div class="overflow-hidden rounded-xl border border-stone-200 bg-white">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th class="px-5 py-3">{% trans "Course" %}</th>
+          <th class="px-5 py-3">{% trans "Dates" %}</th>
+          <th class="px-5 py-3">{% trans "Mode" %}</th>
+          <th class="px-5 py-3">{% trans "Venue" %}</th>
+          <th class="px-5 py-3">{% trans "Fee" %}</th>
+          <th class="px-5 py-3">{% trans "Status" %}</th>
+          <th class="px-5 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for session in sessions %}
+          <tr>
+            <td class="px-5 py-3">
+              <a href="{% url 'training:session_detail' session.pk %}" class="font-medium text-forest hover:underline">{{ session.title|default:session.course.title }}</a>
+              <span class="block text-xs text-stone-500">{{ session.course.title }}</span>
+            </td>
+            <td class="px-5 py-3 text-stone-600">{{ session.start_date|date:"d M Y" }}{% if session.end_date != session.start_date %} – {{ session.end_date|date:"d M Y" }}{% endif %}</td>
+            <td class="px-5 py-3 text-stone-600">{{ session.get_delivery_mode_display }}</td>
+            <td class="px-5 py-3 text-stone-600">{{ session.venue.name|default:"—" }}</td>
+            <td class="px-5 py-3 text-stone-600">{% if session.is_paid %}{{ session.currency }} {{ session.fee }}{% else %}{% trans "Free" %}{% endif %}</td>
+            <td class="px-5 py-3">{% if session.is_full %}<span class="text-amber-700">{% trans "Waitlist" %}</span>{% else %}<span class="text-stone-700">{{ session.get_status_display }}</span>{% endif %}</td>
+            <td class="px-5 py-3 text-right"><a href="{% url 'training:session_detail' session.pk %}" class="text-sm font-medium text-forest hover:underline">{% trans "Details" %}</a></td>
+          </tr>
+        {% empty %}
+          <tr><td colspan="7" class="px-5 py-6 text-sm text-stone-500">{% trans "No published sessions are scheduled at the moment. Please check back soon." %}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

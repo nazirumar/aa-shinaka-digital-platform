@@ -1,0 +1,25 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% comment %}
+Generic staff form page. ``form_title`` names the screen; ``cancel_url`` is the
+route to return to and may carry a single ``cancel_kwargs`` dict (pk).
+{% endcomment %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<div class="max-w-2xl">
+  <h1 class="text-lg font-semibold text-stone-900">{{ form_title|default:page_title }}</h1>
+  <form method="post" enctype="multipart/form-data" class="mt-4 space-y-4 rounded-xl border border-stone-200 bg-white p-5">
+    {% csrf_token %}
+    {{ form.as_p }}
+    <div class="flex flex-wrap gap-2 pt-2">
+      <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Save" %}</button>
+      {% if cancel_kwargs %}
+        {% url cancel_url pk=cancel_kwargs.pk as cancel_href %}
+      {% else %}
+        {% url cancel_url as cancel_href %}
+      {% endif %}
+      <a href="{{ cancel_href }}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "Cancel" %}</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

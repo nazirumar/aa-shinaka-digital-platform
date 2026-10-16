@@ -1,0 +1,12 @@
+# /etc/systemd/system/aa-shinaka-backup.timer
+# Nightly at 02:15 local time, with a small random delay to avoid thundering herd.
+[Unit]
+Description=AA Shinaka — nightly PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00
+RandomizedDelaySec=600
+Persistent=true
+
+[Install]
+WantedBy=timers.target

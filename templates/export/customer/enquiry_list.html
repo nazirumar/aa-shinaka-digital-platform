@@ -1,0 +1,27 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+<div class="flex items-center justify-between">
+  <h1 class="text-lg font-semibold text-stone-900">{% trans "My export enquiries" %}</h1>
+  <a href="{% url 'export:enquiry_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "New enquiry" %}</a>
+</div>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr><th class="px-5 py-3">{% trans "Reference" %}</th><th class="px-5 py-3">{% trans "Destination" %}</th><th class="px-5 py-3">{% trans "Status" %}</th><th class="px-5 py-3">{% trans "Created" %}</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for e in enquiries %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'export:enquiry_detail' e.reference %}" class="font-medium text-forest hover:underline">{{ e.reference }}</a></td>
+          <td class="px-5 py-3">{{ e.destination.country.name }}</td>
+          <td class="px-5 py-3">{{ e.get_status_display }}</td>
+          <td class="px-5 py-3 text-stone-500">{{ e.created_at|date:"Y-m-d" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="4" class="px-5 py-6 text-center text-stone-500">{% trans "No enquiries yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

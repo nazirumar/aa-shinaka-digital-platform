@@ -1,0 +1,36 @@
+{% comment %}Staff ticket table (self-contained HTMX target). Props: tickets, page_obj.{% endcomment %}
+<div id="support-ticket-table">
+  {% if tickets %}
+    <table class="w-full text-left text-sm">
+      <thead class="bg-stone-50 text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th class="px-4 py-2">Reference</th>
+          <th class="px-4 py-2">Subject</th>
+          <th class="px-4 py-2">Customer</th>
+          <th class="px-4 py-2">Priority</th>
+          <th class="px-4 py-2">Status</th>
+          <th class="px-4 py-2">Assigned</th>
+          <th class="px-4 py-2">Updated</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for ticket in tickets %}
+          <tr>
+            <td class="px-4 py-3"><a href="{% url 'support_dashboard:ticket_detail' ticket.reference %}" class="font-medium text-brand-700 hover:underline">{{ ticket.reference }}</a></td>
+            <td class="px-4 py-3 text-stone-700">{{ ticket.subject }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ ticket.customer.email }}</td>
+            <td class="px-4 py-3 text-stone-600">{{ ticket.get_priority_display }}</td>
+            <td class="px-4 py-3">{% include "support/_status_badge.html" with status=ticket.status label=ticket.get_status_display %}</td>
+            <td class="px-4 py-3 text-stone-600">{{ ticket.assigned_to.email|default:"—" }}</td>
+            <td class="px-4 py-3 text-stone-500">{{ ticket.last_activity_at|timesince }} ago</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% include "components/pagination.html" %}
+  {% else %}
+    <div class="p-4">
+      {% include "components/empty_state.html" with title="No tickets" message="No tickets match the current filters." %}
+    </div>
+  {% endif %}
+</div>

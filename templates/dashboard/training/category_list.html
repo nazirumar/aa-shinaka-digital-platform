@@ -1,0 +1,41 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<div class="flex flex-wrap items-center justify-between gap-2">
+  <h1 class="text-lg font-semibold text-stone-900">{% trans "Training categories" %}</h1>
+  <a href="{% url 'training_dashboard:category_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "New category" %}</a>
+</div>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Name" %}</th>
+        <th class="px-5 py-3">{% trans "Parent" %}</th>
+        <th class="px-5 py-3">{% trans "Order" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+        <th class="px-5 py-3"></th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for category in categories %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_dashboard:category_edit' category.pk %}" class="font-medium text-forest hover:underline">{{ category.name }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ category.parent|default:"—" }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ category.sort_order }}</td>
+          <td class="px-5 py-3">{% if category.is_active %}<span class="text-green-700">{% trans "Active" %}</span>{% else %}<span class="text-stone-500">{% trans "Inactive" %}</span>{% endif %}</td>
+          <td class="px-5 py-3 text-right">
+            <form method="post" action="{% url 'training_dashboard:category_toggle' category.pk %}" class="inline">
+              {% csrf_token %}
+              <button type="submit" class="text-sm text-forest hover:underline">{% if category.is_active %}{% trans "Deactivate" %}{% else %}{% trans "Activate" %}{% endif %}</button>
+            </form>
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-sm text-stone-500">{% trans "No categories yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=page_obj %}
+{% endblock %}

@@ -1,0 +1,32 @@
+{% extends "accounts/account_base.html" %}
+{% block account_content %}
+<form method="get" class="mb-4 flex flex-wrap items-end gap-3">
+  <label class="text-sm">
+    <span class="block text-stone-600">Division</span>
+    <select name="type" class="mt-1 rounded-md border border-stone-300 px-3 py-2">
+      <option value="">All</option>
+      {% for value, label in service_types %}
+        <option value="{{ value }}" {% if value == service_type %}selected{% endif %}>{{ label }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <label class="text-sm">
+    <span class="block text-stone-600">Status</span>
+    <input type="text" name="status" value="{{ status }}" class="mt-1 rounded-md border border-stone-300 px-3 py-2" placeholder="e.g. submitted">
+  </label>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100">Filter</button>
+</form>
+
+<div class="rounded-xl border border-stone-200 bg-white">
+  <ul class="divide-y divide-stone-100">
+    {% for r in requests %}
+      <li class="flex items-center justify-between px-5 py-3 text-sm">
+        <a href="{% url 'services:request_detail' r.reference %}" class="font-medium text-stone-900 hover:text-forest">{{ r.title }}</a>
+        <span class="text-stone-500">{{ r.reference }} · {{ r.get_status_display }}</span>
+      </li>
+    {% empty %}
+      <li class="px-5 py-6 text-sm text-stone-500">No requests found.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

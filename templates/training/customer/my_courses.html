@@ -1,0 +1,27 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+{% include "training/customer/_nav.html" %}
+
+<h2 class="text-lg font-semibold text-stone-900">{% trans "My courses" %}</h2>
+<p class="mt-1 text-sm text-stone-500">{% trans "Courses you are enrolled in or waiting on." %}</p>
+
+<div class="mt-4 grid gap-5 sm:grid-cols-2">
+  {% for enrollment in enrollments %}
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <div class="flex items-start justify-between gap-2">
+        <div>
+          <p class="text-xs font-semibold uppercase tracking-wide text-harvest-dark">{{ enrollment.session.course.category.name|default:"" }}</p>
+          <h3 class="mt-1 font-semibold text-stone-900">{{ enrollment.session.course.title }}</h3>
+        </div>
+        <span class="whitespace-nowrap rounded-full bg-stone-100 px-2.5 py-1 text-xs text-stone-600">{{ enrollment.get_status_display }}</span>
+      </div>
+      <p class="mt-2 text-sm text-stone-600">{{ enrollment.session.start_date|date:"d M Y" }}{% if enrollment.session.venue %} · {{ enrollment.session.venue.name }}{% endif %}</p>
+      <p class="mt-1 text-xs text-stone-500">{{ enrollment.reference }}</p>
+      <a href="{% url 'training_account:enrollment_detail' enrollment.reference %}" class="mt-3 inline-block rounded-md bg-forest px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-dark">{% trans "Open" %}</a>
+    </div>
+  {% empty %}
+    {% include "components/empty_state.html" with title="No courses yet" message="Browse the training catalogue and enrol in a scheduled session to get started." %}
+  {% endfor %}
+</div>
+{% endblock %}

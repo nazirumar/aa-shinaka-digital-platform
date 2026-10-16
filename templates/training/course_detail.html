@@ -1,0 +1,138 @@
+{% extends "base.html" %}
+{% load i18n %}
+{% block content %}
+<div class="border-b border-stone-200 bg-cream-dark">
+  <div class="mx-auto max-w-7xl px-4 py-12 sm:py-16">
+    {% include "components/breadcrumbs.html" with items=breadcrumbs %}
+    <div class="mt-4 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
+      <div>
+        {% if course.category %}<p class="text-sm font-semibold uppercase tracking-wider text-harvest-dark">{{ course.category.name }}</p>{% endif %}
+        <h1 class="mt-2 text-3xl font-bold tracking-tight text-stone-900 sm:text-4xl">{{ course.title }}</h1>
+        {% if course.short_description %}<p class="mt-4 max-w-2xl text-stone-600">{{ course.short_description }}</p>{% endif %}
+        <dl class="mt-6 flex flex-wrap gap-x-6 gap-y-2 text-sm text-stone-600">
+          <div><dt class="inline font-medium text-stone-800">{% trans "Delivery:" %}</dt> <dd class="inline">{{ course.get_delivery_mode_display }}</dd></div>
+          <div><dt class="inline font-medium text-stone-800">{% trans "Duration:" %}</dt> <dd class="inline">{{ course.duration_hours }} {% trans "hours" %}</dd></div>
+          {% if course.certificate_eligible %}<div class="text-forest"><dd class="inline">{% trans "Certificate eligible" %}</dd></div>{% endif %}
+        </dl>
+      </div>
+      <div class="lg:pt-8">
+        {% if course.featured_image %}<img src="{{ course.featured_image.url }}" alt="{{ course.title }}" class="w-full rounded-xl object-cover">{% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="mx-auto max-w-7xl px-4 py-12">
+  <div class="grid gap-10 lg:grid-cols-[1.6fr_1fr]">
+    <div class="space-y-10">
+      {% if course.description %}
+        <section>
+          <h2 class="text-xl font-semibold text-stone-900">{% trans "Course overview" %}</h2>
+          <div class="prose prose-stone mt-3 max-w-none text-stone-700">{{ course.description|linebreaks }}</div>
+        </section>
+      {% endif %}
+
+      {% if course.objectives_list %}
+        <section>
+          <h2 class="text-xl font-semibold text-stone-900">{% trans "What you will learn" %}</h2>
+          <ul class="mt-3 list-disc space-y-1 pl-5 text-stone-700">
+            {% for objective in course.objectives_list %}<li>{{ objective }}</li>{% endfor %}
+          </ul>
+        </section>
+      {% endif %}
+
+      {% if course.prerequisites %}
+        <section>
+          <h2 class="text-xl font-semibold text-stone-900">{% trans "Prerequisites" %}</h2>
+          <div class="mt-3 text-stone-700">{{ course.prerequisites|linebreaks }}</div>
+        </section>
+      {% endif %}
+
+      <section>
+        <h2 class="text-xl font-semibold text-stone-900">{% trans "Course content" %}</h2>
+        {% if modules %}
+          <ol class="mt-4 space-y-4">
+            {% for module in modules %}
+              <li class="rounded-xl border border-stone-200 bg-white p-5">
+                <h3 class="font-semibold text-stone-900">{{ module.sort_order }}. {{ module.title }}</h3>
+                {% if module.description %}<p class="mt-1 text-sm text-stone-600">{{ module.description }}</p>{% endif %}
+                <ul class="mt-3 space-y-2 text-sm">
+                  {% for lesson in module.lessons.all %}
+                    <li class="rounded-lg border border-stone-100 bg-stone-50 p-3">
+                      <p class="font-medium text-stone-800">{{ lesson.title }} <span class="text-xs font-normal text-stone-500">· {{ lesson.get_lesson_type_display }}{% if lesson.estimated_minutes %} · {{ lesson.estimated_minutes }} {% trans "min" %}{% endif %}</span></p>
+                      {% if lesson.is_preview %}
+                        {% if lesson.content_text %}<div class="mt-2 text-stone-700">{{ lesson.content_text|linebreaks }}</div>{% endif %}
+                        {% if lesson.video_url %}<a href="{{ lesson.video_url }}" class="mt-2 inline-block text-forest hover:underline" target="_blank" rel="noopener">{% trans "Watch preview" %}</a>{% endif %}
+                      {% else %}
+                        <p class="mt-1 text-xs text-stone-500">{% trans "Enrol in a scheduled session to access this lesson." %}</p>
+                      {% endif %}
+                    </li>
+                  {% empty %}
+                    <li class="text-stone-500">{% trans "No lessons published yet." %}</li>
+                  {% endfor %}
+                </ul>
+              </li>
+            {% endfor %}
+          </ol>
+        {% else %}
+          {% include "components/empty_state.html" with title="Course content coming soon" message="The modules for this course have not been published yet." %}
+        {% endif %}
+      </section>
+
+      {% if course.enrollment_requirements.all %}
+        <section>
+          <h2 class="text-xl font-semibold text-stone-900">{% trans "Enrolment requirements" %}</h2>
+          <ul class="mt-3 list-disc space-y-1 pl-5 text-stone-700">
+            {% for requirement in course.enrollment_requirements.all %}
+              <li>{{ requirement.label }}{% if not requirement.is_required %} <span class="text-xs text-stone-500">({% trans "optional" %})</span>{% endif %}</li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endif %}
+    </div>
+
+    <aside class="space-y-6">
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h2 class="font-semibold text-stone-900">{% trans "Upcoming sessions" %}</h2>
+        <ul class="mt-3 space-y-3 text-sm">
+          {% for session in sessions %}
+            <li class="rounded-lg border border-stone-100 p-3">
+              <p class="font-medium text-stone-800">{{ session.start_date|date:"d M Y" }}{% if session.end_date != session.start_date %} – {{ session.end_date|date:"d M Y" }}{% endif %}</p>
+              <p class="text-stone-500">{{ session.get_delivery_mode_display }}{% if session.venue %} · {{ session.venue.name }}{% endif %}</p>
+              <p class="text-stone-600">{% if session.is_paid %}{{ session.currency }} {{ session.fee }}{% else %}{% trans "Free" %}{% endif %}</p>
+              <a href="{% url 'training:session_detail' session.pk %}" class="mt-2 inline-block rounded-md bg-forest px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-dark">{% trans "View session" %}</a>
+            </li>
+          {% empty %}
+            <li class="text-stone-500">{% trans "No scheduled sessions yet." %}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      {% if instructors %}
+        <div class="rounded-xl border border-stone-200 bg-white p-5">
+          <h2 class="font-semibold text-stone-900">{% trans "Instructors" %}</h2>
+          <ul class="mt-3 space-y-3 text-sm">
+            {% for instructor in instructors %}
+              <li>
+                <p class="font-medium text-stone-800">{{ instructor.user.full_name|default:instructor.user.email }}</p>
+                {% if instructor.professional_title %}<p class="text-stone-500">{{ instructor.professional_title }}</p>{% endif %}
+              </li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+
+      {% if assessments %}
+        <div class="rounded-xl border border-stone-200 bg-white p-5">
+          <h2 class="font-semibold text-stone-900">{% trans "Assessments" %}</h2>
+          <ul class="mt-3 space-y-1 text-sm text-stone-600">
+            {% for assessment in assessments %}
+              <li>{{ assessment.title }} · {{ assessment.get_assessment_type_display }}</li>
+            {% endfor %}
+          </ul>
+        </div>
+      {% endif %}
+    </aside>
+  </div>
+</div>
+{% endblock %}

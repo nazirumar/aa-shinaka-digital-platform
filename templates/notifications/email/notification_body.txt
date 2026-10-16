@@ -1,0 +1,9 @@
+{% autoescape off %}{{ heading }}
+
+{{ intro }}
+
+{% if site_url and notification.url %}View it here: {{ site_url }}{{ notification.url }}{% endif %}
+
+{{ company.site_name|default:"AA Shinaka" }}
+{{ company.tagline|default:"Digital Business Platform" }}
+{% endautoescape %}

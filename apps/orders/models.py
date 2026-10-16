@@ -127,12 +127,18 @@ ORDER_TRANSITIONS: dict[str, frozenset[str]] = {
             OrderStatus.EXPIRED,
         }
     ),
-    OrderStatus.CONFIRMED: frozenset({OrderStatus.PROCESSING, OrderStatus.CANCELLED}),
-    OrderStatus.PROCESSING: frozenset({OrderStatus.READY_FOR_DISPATCH, OrderStatus.CANCELLED}),
-    OrderStatus.READY_FOR_DISPATCH: frozenset({OrderStatus.DISPATCHED, OrderStatus.CANCELLED}),
-    OrderStatus.DISPATCHED: frozenset({OrderStatus.DELIVERED}),
-    OrderStatus.DELIVERED: frozenset({OrderStatus.COMPLETED}),
-    OrderStatus.COMPLETED: frozenset(),
+    OrderStatus.CONFIRMED: frozenset(
+        {OrderStatus.PROCESSING, OrderStatus.CANCELLED, OrderStatus.REFUNDED}
+    ),
+    OrderStatus.PROCESSING: frozenset(
+        {OrderStatus.READY_FOR_DISPATCH, OrderStatus.CANCELLED, OrderStatus.REFUNDED}
+    ),
+    OrderStatus.READY_FOR_DISPATCH: frozenset(
+        {OrderStatus.DISPATCHED, OrderStatus.CANCELLED, OrderStatus.REFUNDED}
+    ),
+    OrderStatus.DISPATCHED: frozenset({OrderStatus.DELIVERED, OrderStatus.REFUNDED}),
+    OrderStatus.DELIVERED: frozenset({OrderStatus.COMPLETED, OrderStatus.REFUNDED}),
+    OrderStatus.COMPLETED: frozenset({OrderStatus.REFUNDED}),
     OrderStatus.CANCELLED: frozenset(),
     OrderStatus.EXPIRED: frozenset(),
     OrderStatus.REFUNDED: frozenset(),
@@ -723,20 +729,58 @@ class QuotationRequest(UUIDTimeStampedModel):
         return f"Quote request · {self.listing} × {self.quantity}"
 
 
+# Phase 6 payment/refund/invoice models. Imported last so the module-level
+# ``Order`` dependency inside ``payment_models`` is already defined.
+from .payment_models import (  # noqa: E402
+    BankTransferStatus,
+    BankTransferSubmission,
+    CompanyBankAccount,
+    Invoice,
+    InvoiceState,
+    Payment,
+    PaymentAttempt,
+    PaymentAttemptStatus,
+    PaymentMethod,
+    PaymentProvider,
+    PaymentState,
+    PaymentWebhookEvent,
+    Receipt,
+    Refund,
+    RefundProviderState,
+    RefundState,
+    WebhookEventStatus,
+)
+
 __all__ = [
+    "BankTransferStatus",
+    "BankTransferSubmission",
     "Cart",
     "CartItem",
     "CartStatus",
+    "CompanyBankAccount",
     "FulfilmentStatus",
+    "Invoice",
+    "InvoiceState",
     "ORDER_TRANSITIONS",
     "Order",
     "OrderItem",
     "OrderStatus",
     "OrderStatusHistory",
     "PAID_FULFILMENT_STATUSES",
+    "Payment",
+    "PaymentAttempt",
+    "PaymentAttemptStatus",
+    "PaymentMethod",
+    "PaymentProvider",
+    "PaymentState",
     "PaymentStatus",
+    "PaymentWebhookEvent",
     "QuotationRequest",
     "QuotationStatus",
+    "Receipt",
+    "Refund",
+    "RefundProviderState",
+    "RefundState",
     "ReservationStatus",
     "Shipment",
     "ShipmentStatus",
@@ -745,4 +789,5 @@ __all__ = [
     "ShippingZone",
     "StockReservation",
     "UUIDTimeStampedModel",
+    "WebhookEventStatus",
 ]

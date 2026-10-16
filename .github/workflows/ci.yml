@@ -1,0 +1,128 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DJANGO_SETTINGS_MODULE: config.settings.test
+  DJANGO_SECRET_KEY: ci-only-not-a-real-secret-key-0123456789-abcdefghijklmnopqrstuvwxyz
+  DATABASE_URL: postgres://aa_shinaka:aa_shinaka@localhost:5432/aa_shinaka
+  CACHE_URL: locmem://
+
+jobs:
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Ruff lint
+        run: uv run ruff check .
+      - name: Ruff format check
+        run: uv run ruff format --check .
+
+  checks:
+    name: Django system & migration checks
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: aa_shinaka
+          POSTGRES_USER: aa_shinaka
+          POSTGRES_PASSWORD: aa_shinaka
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aa_shinaka"
+          --health-interval 10s --health-timeout 5s --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Django check
+        run: uv run python manage.py check --fail-level ERROR
+      - name: Missing-migration guard
+        run: uv run python manage.py makemigrations --check --dry-run
+
+  assets:
+    name: Static asset build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:css
+      - name: Verify the Tailwind bundle was produced
+        run: test -s static/css/app.css
+
+  test:
+    name: Tests (PostgreSQL)
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aa_shinaka
+          POSTGRES_PASSWORD: aa_shinaka
+          POSTGRES_DB: aa_shinaka
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Run tests with coverage
+        run: uv run pytest --cov=apps --cov=config --cov-report=xml --cov-report=term-missing -q
+      - name: Upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-xml
+          path: coverage.xml
+          if-no-files-found: warn
+
+  security:
+    name: Security checks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv sync --frozen
+      - name: Dependency vulnerability scan (pip-audit)
+        run: uvx pip-audit --strict --progress-spinner off
+        continue-on-error: true
+      - name: Django deployment check (production settings)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.prod
+          DJANGO_SECRET_KEY: a-very-long-ci-only-secret-key-0123456789-abcdefghijklmnopqrstuvwxyz
+          DJANGO_ALLOWED_HOSTS: example.com
+          CSRF_TRUSTED_ORIGINS: https://example.com
+          CACHE_URL: redis://localhost:6379/2
+          DATABASE_URL: postgres://aa_shinaka:aa_shinaka@localhost:5432/aa_shinaka
+          EMAIL_BACKEND: django.core.mail.backends.smtp.EmailBackend
+          EMAIL_HOST: smtp.example.com
+        run: uv run python manage.py check --deploy --fail-level ERROR

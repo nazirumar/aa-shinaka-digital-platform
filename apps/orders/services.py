@@ -400,6 +400,17 @@ def place_order(
             after={"number": order.number, "total": str(order.grand_total)},
             request=request,
         )
+
+    # Phase 6: issue the (unpaid) invoice for the new order. Imported lazily to
+    # avoid an import cycle (payments imports this module).
+    from . import payments as payment_services
+
+    payment_services.generate_invoice(order, request=request)
+
+    # Phase 10: mirror the event into the customer's in-app notification feed.
+    from apps.notifications import events as notification_events
+
+    notification_events.order_created(order)
     return order
 
 
@@ -505,6 +516,11 @@ def _apply_transition(
         after={"number": order.number, "from_status": previous, "status": to_status},
         request=request,
     )
+    if to_status == OrderStatus.DISPATCHED:
+        # Phase 10: dispatch is a genuine customer-facing milestone.
+        from apps.notifications import events as notification_events
+
+        notification_events.order_dispatched(order)
     return order
 
 
@@ -526,7 +542,12 @@ def transition_order(
                 "Payment must be verified (or manually approved) before this step."
             )
         if to_status in {OrderStatus.CANCELLED, OrderStatus.EXPIRED}:
-            _release_active_reservations(order, status=ReservationStatus.RELEASED, actor=actor)
+            # A paid order already had its reservations committed, so returning
+            # the stock (not just releasing active holds) keeps the ledger true.
+            if order.stock_committed_at:
+                _restock_committed(order, actor=actor)
+            else:
+                _release_active_reservations(order, status=ReservationStatus.RELEASED, actor=actor)
         return _apply_transition(
             order, to_status=to_status, actor=actor, reason=reason, request=request
         )
@@ -549,18 +570,16 @@ def submit_payment_review(order: Order, *, actor=None, note: str = "", request=N
     )
 
 
-def confirm_payment(
-    order: Order, *, actor, reference: str = "", note: str = "", request=None
+def settle_order(
+    order: Order, *, actor=None, reference: str = "", note: str = "", request=None
 ) -> Order:
-    """Authorised manual-payment approval → commit stock and confirm the order.
+    """Commit reservations and mark a paid order confirmed (idempotent core).
 
-    This is the ONLY path that marks an order paid in Phase 5. It is idempotent
-    and refuses to run for callers without the finance capability. Phase 6 will
-    call it from the verified Paystack webhook.
+    Shared by manual finance approval and the verified Paystack / bank-transfer
+    paths (Phase 6). Provider-specific checks happen in ``apps.orders.payments``;
+    this only enforces the order-level invariants, inside one transaction, and is
+    safe to call twice.
     """
-    if not has_capability(actor, Capability.FINANCE_MANAGE):
-        raise PermissionDenied("You are not authorised to confirm payments.")
-
     with transaction.atomic():
         order = Order.objects.select_for_update().get(pk=order.pk)
         if order.payment_status == PaymentStatus.PAID:
@@ -572,7 +591,7 @@ def confirm_payment(
         order.payment_status = PaymentStatus.PAID
         order.stock_committed_at = timezone.now()
         order.save(update_fields=["payment_status", "stock_committed_at", "updated_at"])
-        note_parts = ["Payment approved manually."]
+        note_parts = ["Payment settled."]
         if committed:
             note_parts.append(f"{committed} reservation(s) committed to stock.")
         if reference:
@@ -586,13 +605,36 @@ def confirm_payment(
             reason=" ".join(note_parts),
             request=request,
         )
-        record_audit(
-            actor=actor,
-            action="orders.order.payment_confirmed",
-            target=order,
-            after={"number": order.number, "reference": reference},
-            request=request,
-        )
+    return order
+
+
+def confirm_payment(
+    order: Order, *, actor, reference: str = "", note: str = "", request=None
+) -> Order:
+    """Authorised manual-payment approval → commit stock and confirm the order.
+
+    Idempotent and refuses to run for callers without the finance capability.
+    Phase 6's verified provider paths reuse :func:`settle_order` directly.
+    """
+    if not has_capability(actor, Capability.FINANCE_MANAGE):
+        raise PermissionDenied("You are not authorised to confirm payments.")
+    if order.payment_status == PaymentStatus.PAID:
+        return order
+
+    settle_order(
+        order,
+        actor=actor,
+        reference=reference,
+        note=note or "Payment approved manually.",
+        request=request,
+    )
+    record_audit(
+        actor=actor,
+        action="orders.order.payment_confirmed",
+        target=order,
+        after={"number": order.number, "reference": reference},
+        request=request,
+    )
     return order
 
 

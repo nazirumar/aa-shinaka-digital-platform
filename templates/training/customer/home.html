@@ -1,0 +1,63 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+{% include "training/customer/_nav.html" %}
+
+<div class="flex flex-wrap gap-2">
+  <a href="{% url 'training:course_list' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Browse courses" %}</a>
+  <a href="{% url 'training:session_list' %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "Upcoming sessions" %}</a>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "My enrolments" %}</h2>
+      <a href="{% url 'training_account:enrollment_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for enrollment in enrollments %}
+        <li class="flex items-center justify-between gap-2 px-5 py-3 text-sm">
+          <a href="{% url 'training_account:enrollment_detail' enrollment.reference %}" class="font-medium text-forest hover:underline">{{ enrollment.reference }}</a>
+          <span class="text-stone-500">{{ enrollment.session.course.title }} · {{ enrollment.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "You have no enrolments yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Upcoming sessions" %}</h2>
+      <a href="{% url 'training_account:upcoming_sessions' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for enrollment in upcoming %}
+        <li class="flex items-center justify-between gap-2 px-5 py-3 text-sm">
+          <span class="text-stone-700">{{ enrollment.session.course.title }}</span>
+          <span class="text-stone-500">{{ enrollment.session.start_date|date:"d M Y" }}{% if enrollment.session.venue %} · {{ enrollment.session.venue.name }}{% endif %}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No upcoming sessions." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white lg:col-span-2">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "My certificates" %}</h2>
+      <a href="{% url 'training_account:certificate_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for certificate in certificates %}
+        <li class="flex items-center justify-between gap-2 px-5 py-3 text-sm">
+          <a href="{% url 'training_account:certificate_view' certificate.pk %}" class="font-medium text-forest hover:underline">{{ certificate.certificate_number }}</a>
+          <span class="text-stone-500">{{ certificate.course.title }} · {{ certificate.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No certificates issued yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

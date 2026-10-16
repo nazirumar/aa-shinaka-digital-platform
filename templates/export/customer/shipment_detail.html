@@ -1,0 +1,41 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+<div class="flex items-center justify-between">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">{{ shipment.reference }}</h1>
+    <p class="text-sm text-stone-500">{{ shipment.order.reference }} · {{ shipment.get_status_display }}</p>
+  </div>
+  <a href="{% url 'export:shipment_list' %}" class="text-sm text-forest hover:underline">{% trans "Back to shipments" %}</a>
+</div>
+
+<div class="mt-4 grid gap-6 lg:grid-cols-3">
+  <div class="rounded-xl border border-stone-200 bg-white p-5 lg:col-span-1">
+    <h2 class="font-semibold text-stone-900">{% trans "Details" %}</h2>
+    <dl class="mt-3 space-y-2 text-sm">
+      <div class="flex justify-between"><dt class="text-stone-500">{% trans "Mode" %}</dt><dd>{{ shipment.get_transport_mode_display }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">{% trans "Origin" %}</dt><dd>{{ shipment.origin }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">{% trans "Destination" %}</dt><dd>{{ shipment.destination }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">{% trans "Departed" %}</dt><dd>{{ shipment.departure_date|date:"Y-m-d"|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">{% trans "ETA" %}</dt><dd>{{ shipment.estimated_arrival|date:"Y-m-d"|default:"—" }}</dd></div>
+      <div class="flex justify-between"><dt class="text-stone-500">{% trans "Tracking" %}</dt><dd>{{ shipment.tracking_reference|default:"—" }}</dd></div>
+    </dl>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5 lg:col-span-2">
+    <h2 class="font-semibold text-stone-900">{% trans "Milestones" %}</h2>
+    <p class="mt-1 text-xs text-stone-500">{% trans "These are staff-recorded shipment events, entered as they happen." %}</p>
+    <ol class="mt-4 space-y-3 border-l border-stone-200 pl-4 text-sm">
+      {% for m in milestones %}
+        <li>
+          <p class="font-medium text-stone-800">{{ m.get_status_display }}{% if m.location %} — {{ m.location }}{% endif %}</p>
+          <p class="text-xs text-stone-500">{{ m.occurred_at|date:"Y-m-d H:i" }}</p>
+          {% if m.notes %}<p class="text-stone-600">{{ m.notes }}</p>{% endif %}
+        </li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No milestones recorded yet." %}</li>
+      {% endfor %}
+    </ol>
+  </div>
+</div>
+{% endblock %}

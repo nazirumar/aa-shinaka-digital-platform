@@ -1,0 +1,35 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/export/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Export quotations" %}</h1>
+<form method="get" class="mt-4 flex flex-wrap gap-2">
+  <input type="text" name="q" value="{{ q }}" placeholder="{% trans 'Reference or customer' %}" class="w-56 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <select name="status" class="rounded-md border border-stone-300 px-3 py-2 text-sm">
+    <option value="">{% trans "All statuses" %}</option>
+    {% for value, label in statuses %}<option value="{{ value }}" {% if value == status %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Filter" %}</button>
+</form>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr><th class="px-5 py-3">{% trans "Reference" %}</th><th class="px-5 py-3">{% trans "Customer" %}</th><th class="px-5 py-3">{% trans "Incoterm" %}</th><th class="px-5 py-3">{% trans "Total" %}</th><th class="px-5 py-3">{% trans "Rev" %}</th><th class="px-5 py-3">{% trans "Status" %}</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for q in quotations %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'export_dashboard:quotation_detail' q.pk %}" class="font-medium text-forest hover:underline">{{ q.reference }}</a></td>
+          <td class="px-5 py-3">{{ q.customer.email }}</td>
+          <td class="px-5 py-3">{{ q.incoterm }} {{ q.named_place }}</td>
+          <td class="px-5 py-3">{{ q.currency }} {{ q.total }}</td>
+          <td class="px-5 py-3">{{ q.revision }}</td>
+          <td class="px-5 py-3">{{ q.get_status_display }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="6" class="px-5 py-6 text-center text-stone-500">{% trans "No quotations found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

@@ -1,0 +1,37 @@
+{% comment %}Table block. ``table`` is {title, columns, rows, totals, note, empty}.{% endcomment %}
+<section class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <div class="border-b border-stone-100 px-4 py-3">
+    <h2 class="text-sm font-semibold text-stone-800">{{ table.title }}</h2>
+  </div>
+  {% if table.rows %}
+    <div class="overflow-x-auto">
+      <table class="min-w-full divide-y divide-stone-200 text-sm">
+        <caption class="sr-only">{{ table.title }}</caption>
+        <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+          <tr>
+            {% for col in table.columns %}<th scope="col" class="px-4 py-3">{{ col.label }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-stone-100">
+          {% for row in table.rows %}
+            <tr class="hover:bg-cream-50">
+              {% for cell in row %}<td class="whitespace-nowrap px-4 py-3 text-stone-700">{{ cell }}</td>{% endfor %}
+            </tr>
+          {% endfor %}
+        </tbody>
+        {% if table.totals %}
+          <tfoot class="bg-cream-50 font-medium text-stone-800">
+            <tr>
+              {% for cell in table.totals %}<td class="px-4 py-3">{{ cell }}</td>{% endfor %}
+            </tr>
+          </tfoot>
+        {% endif %}
+      </table>
+    </div>
+    {% if table.note %}<p class="border-t border-stone-100 px-4 py-2 text-xs text-stone-500">{{ table.note }}</p>{% endif %}
+  {% else %}
+    <div class="p-4">
+      {% include "components/empty_state.html" with title=table.title message=table.empty %}
+    </div>
+  {% endif %}
+</section>

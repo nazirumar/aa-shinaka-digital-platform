@@ -1,0 +1,20 @@
+# /etc/systemd/system/aa-shinaka-beat.service
+# Only ONE beat instance may run at a time (it is the scheduler).
+[Unit]
+Description=AA Shinaka — Celery beat scheduler
+After=network.target redis-server.service
+Wants=redis-server.service
+
+[Service]
+Type=simple
+User=aashinaka
+Group=aashinaka
+WorkingDirectory=/srv/aa-shinaka
+EnvironmentFile=/etc/aa-shinaka/aa-shinaka.env
+Environment=DJANGO_SETTINGS_MODULE=config.settings.prod
+ExecStart=/srv/aa-shinaka/.venv/bin/celery -A config beat -l info --schedule=/var/lib/aa-shinaka/celerybeat-schedule
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

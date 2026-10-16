@@ -1,0 +1,153 @@
+{% extends "dashboard/base.html" %}
+{% load i18n catalog_tags %}
+{% block dashboard_content %}
+<div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Gross revenue" %}</p>
+    <p class="mt-1 text-2xl font-semibold text-stone-900">{{ overview.gross_revenue|money:"NGN" }}</p>
+    <p class="mt-1 text-xs text-stone-500">{% trans "Verified payments only" %}</p>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Refunded" %}</p>
+    <p class="mt-1 text-2xl font-semibold text-red-700">{{ overview.refunded_total|money:"NGN" }}</p>
+    <p class="mt-1 text-xs text-stone-500">{{ overview.refunds_pending|money:"NGN" }} {% trans "in flight" %}</p>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Net revenue" %}</p>
+    <p class="mt-1 text-2xl font-semibold text-forest">{{ overview.net_revenue|money:"NGN" }}</p>
+    <p class="mt-1 text-xs text-stone-500">{{ overview.settled_count }} {% trans "settled payments" %}</p>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Needs attention" %}</p>
+    <ul class="mt-1 space-y-0.5 text-sm text-stone-700">
+      <li>{{ overview.payments_requiring_review }} {% trans "payment(s) in review" %}</li>
+      <li>{{ overview.bank_transfers_pending }} {% trans "transfer(s) to verify" %}</li>
+      <li>{{ overview.refunds_awaiting_approval }} {% trans "refund(s) to approve" %}</li>
+    </dl>
+  </div>
+</div>
+
+<div class="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Pending payments" %}</p>
+    <p class="mt-1 text-xl font-semibold text-stone-900">{{ overview.payments_pending }}</p>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Failed payments" %}</p>
+    <p class="mt-1 text-xl font-semibold text-stone-900">{{ overview.payments_failed }}</p>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Awaiting review" %}</p>
+    <p class="mt-1 text-xl font-semibold text-amber-700">{{ overview.payments_requiring_review }}</p>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <p class="text-xs uppercase tracking-wide text-stone-500">{% trans "Unpaid invoices" %}</p>
+    <p class="mt-1 text-xl font-semibold text-stone-900">{{ overview.invoices_unpaid }}</p>
+  </div>
+</div>
+
+<div class="mt-8 grid gap-6 lg:grid-cols-3">
+  <div class="rounded-xl border border-stone-200 bg-white p-5 lg:col-span-2">
+    <h2 class="font-semibold text-stone-900">{% trans "Verified revenue — last 30 days" %}</h2>
+    <p class="text-xs text-stone-500">{% trans "Amounts in NGN, by verification date." %}</p>
+    <div class="mt-4 h-64"><canvas id="revenue-chart" aria-label="Revenue chart" role="img"></canvas></div>
+  </div>
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "By method" %}</h2>
+    <ul class="mt-3 divide-y divide-stone-100 text-sm">
+      {% for row in overview.by_method %}
+        <li class="flex items-center justify-between py-2">
+          <span class="text-stone-700">{{ row.method|default:"—" }}</span>
+          <span class="font-medium text-stone-900">{{ row.total|money:"NGN" }}</span>
+        </li>
+      {% empty %}
+        <li class="py-3 text-stone-500">{% trans "No settled payments yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+<div class="mt-8 grid gap-6 lg:grid-cols-3">
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="text-sm font-semibold text-stone-900">{% trans "Recent payments" %}</h2>
+      <a href="{% url 'finance_dashboard:payment_list' %}" class="text-sm text-forest hover:underline">{% trans "All" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100 text-sm">
+      {% for payment in recent_payments %}
+        <li class="flex items-center justify-between px-5 py-3">
+          <a href="{% url 'finance_dashboard:payment_detail' payment.pk %}" class="font-mono text-xs text-forest hover:underline">{{ payment.reference }}</a>
+          <span class="text-stone-700">{{ payment.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No payments yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-stone-900">{% trans "Transfers to review" %}</h2>
+      <a href="{% url 'finance_dashboard:bank_transfer_list' %}" class="text-sm text-forest hover:underline">{% trans "All" %}</a>
+    </div>
+    <ul class="mt-3 divide-y divide-stone-100 text-sm">
+      {% for transfer in pending_transfers %}
+        <li class="flex items-center justify-between py-2">
+          <a href="{% url 'finance_dashboard:bank_transfer_detail' transfer.pk %}" class="font-mono text-xs text-forest hover:underline">{{ transfer.transfer_reference }}</a>
+          <span class="text-stone-700">{{ transfer.claimed_amount|money:transfer.payment.currency }}</span>
+        </li>
+      {% empty %}
+        <li class="py-3 text-stone-500">{% trans "Nothing awaiting review." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <div class="flex items-center justify-between">
+      <h2 class="font-semibold text-stone-900">{% trans "Refunds awaiting approval" %}</h2>
+      <a href="{% url 'finance_dashboard:refund_list' %}" class="text-sm text-forest hover:underline">{% trans "All" %}</a>
+    </div>
+    <ul class="mt-3 divide-y divide-stone-100 text-sm">
+      {% for refund in refunds_pending %}
+        <li class="flex items-center justify-between py-2">
+          <a href="{% url 'finance_dashboard:refund_detail' refund.pk %}" class="font-mono text-xs text-forest hover:underline">{{ refund.reference }}</a>
+          <span class="text-stone-700">{{ refund.amount|money:refund.payment.currency }}</span>
+        </li>
+      {% empty %}
+        <li class="py-3 text-stone-500">{% trans "No refunds pending." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+
+{{ revenue_by_day|json_script:"revenue-data" }}
+{% endblock %}
+
+{% block body_extra %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+  (function () {
+    var el = document.getElementById('revenue-chart');
+    var raw = document.getElementById('revenue-data');
+    if (!el || !raw || typeof Chart === 'undefined') return;
+    var rows = JSON.parse(raw.textContent);
+    new Chart(el, {
+      type: 'bar',
+      data: {
+        labels: rows.map(function (r) { return r.day; }),
+        datasets: [{
+          label: 'Verified revenue',
+          data: rows.map(function (r) { return Number(r.total); }),
+          backgroundColor: '#16a34a'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true } }
+      }
+    });
+  })();
+</script>
+{% endblock %}

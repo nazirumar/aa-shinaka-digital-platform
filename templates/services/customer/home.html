@@ -1,0 +1,43 @@
+{% extends "accounts/account_base.html" %}
+{% block account_content %}
+<div class="flex flex-wrap gap-2">
+  <a href="{% url 'services:consultation_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">Book a consultation</a>
+  <a href="{% url 'services:farming_create' %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">Request farming services</a>
+  <a href="{% url 'services:marketing_create' %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">Marketing enquiry</a>
+  <a href="{% url 'services:storage_create' %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">Storage request</a>
+</div>
+
+<div class="mt-6 rounded-xl border border-stone-200 bg-white">
+  <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+    <h2 class="font-semibold text-stone-900">Recent service requests</h2>
+    <a href="{% url 'services:request_list' %}" class="text-sm text-forest hover:underline">View all</a>
+  </div>
+  <ul class="divide-y divide-stone-100">
+    {% for r in requests %}
+      <li class="flex items-center justify-between px-5 py-3 text-sm">
+        <a href="{% url 'services:request_detail' r.reference %}" class="font-medium text-stone-900 hover:text-forest">{{ r.title }}</a>
+        <span class="text-stone-500">{{ r.get_service_type_display }} · {{ r.get_status_display }}</span>
+      </li>
+    {% empty %}
+      <li class="px-5 py-6 text-sm text-stone-500">No service requests yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<div class="mt-6 rounded-xl border border-stone-200 bg-white">
+  <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+    <h2 class="font-semibold text-stone-900">Service quotations</h2>
+    <a href="{% url 'services:quotation_list' %}" class="text-sm text-forest hover:underline">View all</a>
+  </div>
+  <ul class="divide-y divide-stone-100">
+    {% for q in quotations %}
+      <li class="flex items-center justify-between px-5 py-3 text-sm">
+        <a href="{% url 'services:quotation_detail' q.pk %}" class="font-medium text-stone-900 hover:text-forest">{{ r.reference }}</a>
+        <span class="text-stone-500">{{ quotation.currency }} {{ quotation.total }} · {{ quotation.get_status_display }}</span>
+      </li>
+    {% empty %}
+      <li class="px-5 py-6 text-sm text-stone-500">No quotations yet.</li>
+    {% endfor %}
+  </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,25 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "My export shipments" %}</h1>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr><th class="px-5 py-3">{% trans "Reference" %}</th><th class="px-5 py-3">{% trans "Order" %}</th><th class="px-5 py-3">{% trans "Mode" %}</th><th class="px-5 py-3">{% trans "Status" %}</th><th class="px-5 py-3">{% trans "ETA" %}</th></tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for s in shipments %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'export:shipment_detail' s.reference %}" class="font-medium text-forest hover:underline">{{ s.reference }}</a></td>
+          <td class="px-5 py-3">{{ s.order.reference }}</td>
+          <td class="px-5 py-3">{{ s.get_transport_mode_display }}</td>
+          <td class="px-5 py-3">{{ s.get_status_display }}</td>
+          <td class="px-5 py-3 text-stone-500">{{ s.estimated_arrival|date:"Y-m-d"|default:"—" }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-center text-stone-500">{% trans "No shipments yet." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% endblock %}

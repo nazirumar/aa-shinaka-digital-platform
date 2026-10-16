@@ -1,0 +1,62 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<div class="flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">{{ enrollment.reference }}</h1>
+    <p class="text-sm text-stone-600">{{ enrollment.student.full_name|default:enrollment.student.email }} · {{ enrollment.session.reference }}</p>
+    <p class="text-sm text-stone-500">{{ enrollment.session.course.title }}</p>
+  </div>
+  <div class="rounded-lg border border-stone-200 bg-white px-4 py-3 text-sm">
+    <p class="text-xs text-stone-500">{% trans "Status" %}</p>
+    <p class="font-semibold">{{ enrollment.get_status_display }}</p>
+  </div>
+</div>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Fee" %}</p><p class="mt-1 font-medium">{{ enrollment.session.currency }} {{ enrollment.session.fee }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Amount paid" %}</p><p class="mt-1 font-medium">{{ enrollment.amount_paid }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Balance" %}</p><p class="mt-1 font-medium">{{ enrollment.balance_due }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Payment status" %}</p><p class="mt-1 font-medium">{{ enrollment.get_payment_status_display }}</p></div>
+</div>
+
+{% if allowed_statuses %}
+  <form method="post" action="{% url 'training_dashboard:enrollment_action' enrollment.reference %}" class="mt-6 flex flex-wrap items-end gap-2 rounded-lg border border-stone-200 bg-white p-4">
+    {% csrf_token %}
+    <label class="text-sm text-stone-600">{% trans "Change status to" %}
+      <select name="status" class="mt-1 block rounded-md border border-stone-300 px-3 py-2 text-sm">
+        {% for value, label in allowed_statuses %}<option value="{{ value }}">{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    <label class="flex-1 text-sm text-stone-600">{% trans "Note" %}
+      <input type="text" name="note" maxlength="300" class="mt-1 block w-full rounded-md border border-stone-300 px-3 py-2 text-sm">
+    </label>
+    <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Update" %}</button>
+  </form>
+{% endif %}
+
+<div class="mt-8 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Status history" %}</h2>
+    <ol class="mt-3 space-y-2 text-sm text-stone-600">
+      {% for entry in history %}
+        <li>{{ entry.created_at|date:"d M Y H:i" }} · {{ entry.from_status|default:"—" }} → {{ entry.get_to_status_display }}{% if entry.actor %} · {{ entry.actor.email }}{% endif %}{% if entry.note %} · {{ entry.note }}{% endif %}</li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No status changes yet." %}</li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Payments" %}</h2>
+    <ul class="mt-3 space-y-1 text-sm text-stone-600">
+      {% for payment in payments %}
+        <li>{{ payment.reference }} · {{ payment.currency }} {{ payment.expected_amount }} · {{ payment.get_status_display }}{% if payment.requires_review %} · <span class="text-amber-700">{% trans "needs review" %}</span>{% endif %}</li>
+      {% empty %}
+        <li class="text-stone-500">{% trans "No payments recorded." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

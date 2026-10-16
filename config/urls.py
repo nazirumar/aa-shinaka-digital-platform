@@ -26,6 +26,8 @@ urlpatterns = [
     path("accounts/", include("apps.accounts.urls")),
     path("account/", include("apps.accounts.account_urls")),
     path("dashboard/", include("apps.dashboard.urls")),
+    # Analytics, business intelligence and controlled reporting (Phase 11).
+    path("dashboard/", include("apps.analytics.urls")),
     # CMS management screens, inside the staff dashboard.
     path("dashboard/cms/", include("apps.cms.dashboard_urls")),
     # Order & shipping management screens, inside the staff dashboard.
@@ -36,6 +38,30 @@ urlpatterns = [
     path("dashboard/catalog/", include("apps.catalog.dashboard_urls")),
     # Inventory management screens (warehouses, balances, movements, reservations).
     path("dashboard/inventory/", include("apps.catalog.inventory_urls")),
+    # Finance dashboard (payments, bank transfers, refunds, invoices, accounts).
+    path("dashboard/finance/", include("apps.orders.finance_urls")),
+    # Unified customer notification centre (Phase 10).
+    path("account/notifications/", include("apps.notifications.urls")),
+    # Customer support centre (tickets, replies, attachments) (Phase 10).
+    path("account/support/", include("apps.support.urls")),
+    # Staff support dashboard (queue, assignment, status machine) (Phase 10).
+    path("dashboard/support/", include("apps.support.dashboard_urls")),
+    # Staff customer overview (read-only, capability-gated) (Phase 10).
+    path("dashboard/customers/", include("apps.accounts.customer_dashboard_urls")),
+    # Customer service portal (service requests, quotations, service payments).
+    path("account/services/", include("apps.services.urls")),
+    # Staff service dashboard (consultancy, farming, marketing, storage).
+    path("dashboard/services/", include("apps.services.dashboard_urls")),
+    # Customer export portal (enquiries, quotations, export orders, shipments).
+    path("account/export/", include("apps.export.urls")),
+    # Staff export dashboard (destinations, compliance, documents, shipments).
+    path("dashboard/export/", include("apps.export.dashboard_urls")),
+    # Public training academy (courses, sessions, certificate verification).
+    path("training/", include("apps.training.urls")),
+    # Student training portal (enrolments, progress, assessments, certificates).
+    path("account/training/", include("apps.training.account_urls")),
+    # Staff training dashboard (courses, sessions, attendance, certificates).
+    path("dashboard/training/", include("apps.training.dashboard_urls")),
     # Legacy catalogue aliases kept stable for shared links (UI_UX_SPEC §5.2).
     path("states/", catalog_views.state_list, name="state_list"),
     path("states/<slug:slug>/", catalog_views.state_detail, name="state_detail"),

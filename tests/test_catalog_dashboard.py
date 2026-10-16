@@ -104,11 +104,11 @@ def test_inventory_officer_can_reach_inventory_views(client, inventory_officer):
 
 def test_inventory_low_stock_alias_is_gated(client, staff_user, inventory_officer):
     _login(client, staff_user)
-    assert client.get(reverse("inventory_low_stock")).status_code == 403
+    assert client.get(reverse("inventory_dashboard:low_stock")).status_code == 403
 
     client.logout()
     _login(client, inventory_officer)
-    assert client.get(reverse("inventory_low_stock")).status_code == 200
+    assert client.get(reverse("inventory_dashboard:low_stock")).status_code == 200
 
 
 def test_owner_can_reach_catalog_dashboard(client, owner):

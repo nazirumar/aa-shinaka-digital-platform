@@ -1,0 +1,42 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Attendance" %} · {{ register.date|date:"d M Y" }}</h1>
+<p class="text-sm text-stone-600">{{ register.session.reference }} · {{ register.session.course.title }}{% if register.topic %} · {{ register.topic }}{% endif %}</p>
+
+<form method="post" action="{% url 'training_dashboard:attendance_mark' register.pk %}" class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  {% csrf_token %}
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Student" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+        <th class="px-5 py-3">{% trans "Note" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for row in rows %}
+        <tr>
+          <td class="px-5 py-3 text-stone-700">{{ row.0.student.full_name|default:row.0.student.email }}</td>
+          <td class="px-5 py-3">
+            <select name="status_{{ row.0.pk }}" class="rounded-md border border-stone-300 px-3 py-1.5 text-sm">
+              {% for value, label in statuses %}
+                <option value="{{ value }}" {% if row.1.status == value %}selected{% endif %}>{{ label }}</option>
+              {% endfor %}
+            </select>
+          </td>
+          <td class="px-5 py-3">
+            <input type="text" name="note_{{ row.0.pk }}" maxlength="200" value="{{ row.1.note|default:'' }}" class="w-full rounded-md border border-stone-300 px-3 py-1.5 text-sm">
+          </td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="3" class="px-5 py-6 text-sm text-stone-500">{% trans "No confirmed students to mark." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <div class="border-t border-stone-100 px-5 py-3">
+    <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Save attendance" %}</button>
+  </div>
+</form>
+{% endblock %}

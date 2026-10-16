@@ -1,0 +1,37 @@
+{% extends "dashboard/base.html" %}
+{% block dashboard_content %}
+<div class="grid gap-6 lg:grid-cols-3">
+  <div class="lg:col-span-2 space-y-6">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h2 class="text-lg font-semibold text-stone-900">{{ facility.name }}</h2>
+        <span class="rounded-full bg-stone-100 px-3 py-1 text-xs font-medium text-stone-600">{{ facility.code }}</span>
+      </div>
+      <p class="mt-2 text-sm text-stone-600">{{ facility.location }}</p>
+      <p class="mt-2 text-sm text-stone-600">Capacity: {{ facility.capacity }} {{ facility.get_capacity_unit_display }} · allocated {{ utilization.allocated }} ({{ utilization.percent }}%)</p>
+      <div class="mt-3 h-2 w-full overflow-hidden rounded-full bg-stone-100"><div class="h-full bg-forest" style="width: {{ utilization.percent }}%"></div></div>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">Units</h2>
+      <ul class="mt-3 divide-y divide-stone-100">
+        {% for u in facility.units.all %}
+          <li class="flex items-center justify-between py-2 text-sm"><span>{{ u.name }}</span><span class="text-stone-500">{{ u.capacity }} {{ u.get_capacity_unit_display }}</span></li>
+        {% empty %}
+          <li class="py-2 text-sm text-stone-500">No units yet.</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">Add unit</h2>
+    <form method="post" class="mt-3 space-y-2">
+      {% csrf_token %}
+      <input type="hidden" name="action" value="unit">
+      {{ unit_form.as_p }}
+      <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm hover:bg-stone-100">Add unit</button>
+    </form>
+  </div>
+</div>
+{% endblock %}

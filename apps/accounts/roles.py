@@ -45,6 +45,22 @@ class Capability:
     REQUESTS_STORAGE = "requests.storage"
     REQUESTS_EXPORT = "requests.export"
     REQUESTS_TRAINING = "requests.training"
+    SERVICES_MANAGE = "services.manage"
+    QUOTATIONS_MANAGE = "quotations.manage"
+    EXPORT_MANAGE = "export.manage"
+    EXPORT_APPROVE = "export.approve"
+    TRAINING_MANAGE = "training.manage"
+    TRAINING_APPROVE = "training.approve"
+    TRAINING_INSTRUCT = "training.instruct"
+    SUPPORT_MANAGE = "support.manage"
+    SUPPORT_APPROVE = "support.approve"
+    CUSTOMERS_VIEW = "customers.view"
+    # Phase 11 — analytics, business intelligence and reporting.
+    ANALYTICS_VIEW = "analytics.view"
+    ANALYTICS_FINANCE = "analytics.finance"
+    REPORTS_BUILD = "reports.build"
+    REPORTS_SCHEDULE = "reports.schedule"
+    REPORTS_MANAGE = "reports.manage"
 
 
 ALL_CAPABILITIES: frozenset[str] = frozenset(
@@ -61,6 +77,12 @@ ROLE_CAPABILITIES: dict[str, frozenset[str]] = {
             Capability.ORDERS_MANAGE,
             Capability.REQUESTS_MARKETING,
             Capability.CONTACT_MANAGE,
+            Capability.SERVICES_MANAGE,
+            Capability.QUOTATIONS_MANAGE,
+            Capability.SUPPORT_MANAGE,
+            Capability.CUSTOMERS_VIEW,
+            Capability.ANALYTICS_VIEW,
+            Capability.REPORTS_BUILD,
         }
     ),
     UserRole.INVENTORY_OFFICER: frozenset(
@@ -70,13 +92,48 @@ ROLE_CAPABILITIES: dict[str, frozenset[str]] = {
             Capability.ORDERS_MANAGE,
             Capability.REQUESTS_FARMING,
             Capability.REQUESTS_STORAGE,
+            Capability.SERVICES_MANAGE,
+            Capability.ANALYTICS_VIEW,
+            Capability.REPORTS_BUILD,
         }
     ),
-    UserRole.CONSULTANT: frozenset({Capability.REQUESTS_CONSULTANCY}),
-    UserRole.TRAINING_MANAGER: frozenset({Capability.REQUESTS_TRAINING, Capability.CONTENT_MANAGE}),
-    UserRole.EXPORT_OFFICER: frozenset({Capability.REQUESTS_EXPORT}),
+    UserRole.CONSULTANT: frozenset(
+        {Capability.REQUESTS_CONSULTANCY, Capability.SERVICES_MANAGE, Capability.ANALYTICS_VIEW}
+    ),
+    UserRole.TRAINING_MANAGER: frozenset(
+        {
+            Capability.REQUESTS_TRAINING,
+            Capability.CONTENT_MANAGE,
+            Capability.SERVICES_MANAGE,
+            Capability.TRAINING_MANAGE,
+            Capability.TRAINING_INSTRUCT,
+            Capability.ANALYTICS_VIEW,
+            Capability.REPORTS_BUILD,
+        }
+    ),
+    UserRole.EXPORT_OFFICER: frozenset(
+        {
+            Capability.REQUESTS_EXPORT,
+            Capability.SERVICES_MANAGE,
+            Capability.EXPORT_MANAGE,
+            Capability.ANALYTICS_VIEW,
+            Capability.REPORTS_BUILD,
+        }
+    ),
     UserRole.FINANCE_OFFICER: frozenset(
-        {Capability.FINANCE_MANAGE, Capability.ORDERS_MANAGE, Capability.AUDIT_VIEW}
+        {
+            Capability.FINANCE_MANAGE,
+            Capability.ORDERS_MANAGE,
+            Capability.AUDIT_VIEW,
+            Capability.SERVICES_MANAGE,
+            Capability.QUOTATIONS_MANAGE,
+            Capability.CUSTOMERS_VIEW,
+            Capability.ANALYTICS_VIEW,
+            Capability.ANALYTICS_FINANCE,
+            Capability.REPORTS_BUILD,
+            Capability.REPORTS_SCHEDULE,
+            Capability.REPORTS_MANAGE,
+        }
     ),
     UserRole.CONTENT_EDITOR: frozenset(
         {

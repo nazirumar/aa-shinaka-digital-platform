@@ -1,0 +1,79 @@
+{% extends "accounts/account_base.html" %}
+{% load i18n %}
+{% block account_content %}
+<div class="flex flex-wrap gap-2">
+  <a href="{% url 'export:enquiry_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "New export enquiry" %}</a>
+  <a href="{% url 'export:order_list' %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "My export orders" %}</a>
+  <a href="{% url 'export:shipment_list' %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "My shipments" %}</a>
+</div>
+
+<div class="mt-6 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent enquiries" %}</h2>
+      <a href="{% url 'export:enquiry_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for e in enquiries %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export:enquiry_detail' e.reference %}" class="font-medium text-stone-900 hover:text-forest">{{ e.reference }}</a>
+          <span class="text-stone-500">{{ e.destination.country.name }} · {{ e.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No enquiries yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent quotations" %}</h2>
+      <a href="{% url 'export:quotation_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for q in quotations %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export:quotation_detail' q.pk %}" class="font-medium text-stone-900 hover:text-forest">{{ q.reference }}</a>
+          <span class="text-stone-500">{{ q.currency }} {{ q.total }} · {{ q.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No quotations yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent export orders" %}</h2>
+      <a href="{% url 'export:order_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for o in orders %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export:order_detail' o.reference %}" class="font-medium text-stone-900 hover:text-forest">{{ o.reference }}</a>
+          <span class="text-stone-500">{{ o.currency }} {{ o.total }} · {{ o.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No export orders yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="rounded-xl border border-stone-200 bg-white">
+    <div class="flex items-center justify-between border-b border-stone-100 px-5 py-3">
+      <h2 class="font-semibold text-stone-900">{% trans "Recent shipments" %}</h2>
+      <a href="{% url 'export:shipment_list' %}" class="text-sm text-forest hover:underline">{% trans "View all" %}</a>
+    </div>
+    <ul class="divide-y divide-stone-100">
+      {% for s in shipments %}
+        <li class="flex items-center justify-between px-5 py-3 text-sm">
+          <a href="{% url 'export:shipment_detail' s.reference %}" class="font-medium text-stone-900 hover:text-forest">{{ s.reference }}</a>
+          <span class="text-stone-500">{{ s.get_status_display }}</span>
+        </li>
+      {% empty %}
+        <li class="px-5 py-6 text-sm text-stone-500">{% trans "No shipments yet." %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</div>
+{% endblock %}

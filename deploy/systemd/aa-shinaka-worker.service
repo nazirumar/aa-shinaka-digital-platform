@@ -1,0 +1,22 @@
+# /etc/systemd/system/aa-shinaka-worker.service
+[Unit]
+Description=AA Shinaka — Celery worker
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=simple
+User=aashinaka
+Group=aashinaka
+WorkingDirectory=/srv/aa-shinaka
+EnvironmentFile=/etc/aa-shinaka/aa-shinaka.env
+Environment=DJANGO_SETTINGS_MODULE=config.settings.prod
+ExecStart=/srv/aa-shinaka/.venv/bin/celery -A config worker -l info --concurrency=4
+Restart=always
+RestartSec=5
+# Graceful shutdown: finish in-flight tasks before the worker exits.
+KillSignal=SIGTERM
+TimeoutStopSec=120
+
+[Install]
+WantedBy=multi-user.target

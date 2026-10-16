@@ -1,0 +1,46 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<div class="flex flex-wrap items-center justify-between gap-2">
+  <h1 class="text-lg font-semibold text-stone-900">{% trans "Courses" %}</h1>
+  <a href="{% url 'training_dashboard:course_create' %}" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "New course" %}</a>
+</div>
+<form method="get" class="mt-4 flex flex-wrap gap-2">
+  <input type="search" name="q" value="{{ search }}" placeholder="{% trans 'Search title' %}" class="w-64 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <select name="status" class="rounded-md border border-stone-300 px-3 py-2 text-sm">
+    <option value="">{% trans "All statuses" %}</option>
+    {% for value, label in status_choices %}
+      <option value="{{ value }}" {% if current_status == value %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Filter" %}</button>
+</div>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Title" %}</th>
+        <th class="px-5 py-3">{% trans "Category" %}</th>
+        <th class="px-5 py-3">{% trans "Mode" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+        <th class="px-5 py-3">{% trans "Certificate" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for course in courses %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_dashboard:course_detail' course.pk %}" class="font-medium text-forest hover:underline">{{ course.title }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ course.category|default:"—" }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ course.get_delivery_mode_display }}</td>
+          <td class="px-5 py-3">{{ course.get_status_display }}</td>
+          <td class="px-5 py-3">{% if course.certificate_eligible %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-sm text-stone-500">{% trans "No courses found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=page_obj %}
+{% endblock %}

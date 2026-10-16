@@ -1,0 +1,32 @@
+# /etc/systemd/system/aa-shinaka-web.service
+# Bare-metal alternative to Docker: Gunicorn behind nginx.
+[Unit]
+Description=AA Shinaka — Gunicorn web
+After=network.target postgresql.service redis-server.service
+Wants=postgresql.service redis-server.service
+
+[Service]
+Type=notify
+User=aashinaka
+Group=aashinaka
+WorkingDirectory=/srv/aa-shinaka
+EnvironmentFile=/etc/aa-shinaka/aa-shinaka.env
+Environment=DJANGO_SETTINGS_MODULE=config.settings.prod
+ExecStartPre=/srv/aa-shinaka/.venv/bin/python manage.py migrate --noinput
+ExecStartPre=/srv/aa-shinaka/.venv/bin/python manage.py collectstatic --noinput
+ExecStart=/srv/aa-shinaka/.venv/bin/gunicorn config.wsgi:application --config /srv/aa-shinaka/deploy/gunicorn.conf.py
+ExecReload=/bin/kill -s HUP $MAINPID
+Restart=always
+RestartSec=5
+KillSignal=SIGQUIT
+TimeoutStopSec=30
+
+# Hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/srv/aa-shinaka/media /srv/aa-shinaka/staticfiles /var/log/aa-shinaka
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

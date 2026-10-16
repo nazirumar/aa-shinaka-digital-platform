@@ -1,0 +1,140 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+
+<div class="flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1 class="text-lg font-semibold text-stone-900">{{ course.title }}</h1>
+    <p class="mt-1 text-sm text-stone-500">
+      {{ course.get_status_display }} · {{ course.get_delivery_mode_display }}
+      {% if course.category %}· {{ course.category.name }}{% endif %}
+      {% if course.certificate_eligible %}· {% trans "certificate eligible" %}{% endif %}
+    </h1>
+  </div>
+  <div class="flex flex-wrap gap-2">
+    <a href="{% url 'training_dashboard:course_edit' course.pk %}" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "Edit course" %}</a>
+    {% if can_approve %}
+      <form method="post" action="{% url 'training_dashboard:course_publish' course.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-dark">{% trans "Publish" %}</button>
+      </form>
+    {% endif %}
+    <form method="post" action="{% url 'training_dashboard:course_archive' course.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100">{% trans "Archive" %}</button>
+    </form>
+  </div>
+</div>
+
+<div class="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Delivery" %}</p><p class="mt-1 font-medium">{{ course.get_delivery_mode_display }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Duration" %}</p><p class="mt-1 font-medium">{{ course.duration_hours }}h</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Status" %}</p><p class="mt-1 font-medium">{{ course.get_status_display }}</p></div>
+  <div class="rounded-lg border border-stone-200 bg-white p-4"><p class="text-xs text-stone-500">{% trans "Certificate eligible" %}</p><p class="mt-1 font-medium">{% if course.certificate_eligible %}{% trans "Yes" %}{% else %}{% trans "No" %}{% endif %}</p></div>
+</div>
+
+{% if course.short_description %}<p class="mt-4 text-sm text-stone-600">{{ course.short_description }}</p>{% endif %}
+{% if course.description %}<div class="prose prose-sm mt-4 max-w-3xl text-stone-700">{{ course.description|linebreaks }}</div>{% endif %}
+{% if course.objectives_list %}
+  <div class="mt-4 rounded-lg border border-stone-200 bg-white p-4">
+    <h2 class="text-sm font-semibold text-stone-900">{% trans "Learning objectives" %}</h2>
+    <ul class="mt-2 list-disc space-y-1 pl-5 text-sm text-stone-700">
+      {% for objective in course.objectives_list %}<li>{{ objective }}</li>{% endfor %}
+    </ul>
+  </div>
+{% endif %}
+
+<div class="mt-8 grid gap-6 lg:grid-cols-2">
+  <div class="rounded-xl border border-stone-200 bg-white p-5">
+    <h2 class="font-semibold text-stone-900">{% trans "Modules & lessons" %}</h2>
+    <ol class="mt-3 space-y-4">
+      {% for module in modules %}
+        <li class="rounded-lg border border-stone-100 p-3">
+          <p class="font-medium text-stone-800">{{ module.sort_order }}. {{ module.title }}</p>
+          {% if module.description %}<p class="text-xs text-stone-500">{{ module.description }}</p>{% endif %}
+          <ul class="mt-2 space-y-1 text-sm text-stone-600">
+            {% for lesson in module.lessons.all %}
+              <li>· {{ lesson.title }} <span class="text-xs text-stone-400">({{ lesson.get_lesson_type_display }}{% if lesson.is_preview %}, {% trans "preview" %}{% endif %})</span></li>
+            {% empty %}
+              <li class="text-xs text-stone-400">{% trans "No lessons yet." %}</li>
+            {% endfor %}
+          </ul>
+          <form method="post" action="{% url 'training_dashboard:lesson_create' module.pk %}" class="mt-3 space-y-2 rounded-md bg-stone-50 p-3">
+            {% csrf_token %}
+            {{ lesson_form.as_p }}
+            <button type="submit" class="rounded-md border border-stone-300 bg-white px-3 py-1.5 text-xs font-medium text-stone-700 hover:bg-stone-100">{% trans "Add lesson" %}</button>
+          </form>
+        </li>
+      {% empty %}
+        <li class="text-sm text-stone-500">{% trans "No modules yet." %}</li>
+      {% endfor %}
+    </ol>
+    <form method="post" action="{% url 'training_dashboard:module_create' course.pk %}" class="mt-4 space-y-2 rounded-md bg-stone-50 p-3">
+      {% csrf_token %}
+      {{ module_form.as_p }}
+      <button type="submit" class="rounded-md bg-forest px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-dark">{% trans "Add module" %}</button>
+    </form>
+  </div>
+
+  <div class="space-y-6">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h2 class="font-semibold text-stone-900">{% trans "Resources" %}</h2>
+      <ul class="mt-3 space-y-1 text-sm text-stone-600">
+        {% for resource in resources %}
+          <li>· {{ resource.title }} <span class="text-xs text-stone-400">({{ resource.get_resource_type_display }})</span></li>
+        {% empty %}
+          <li class="text-sm text-stone-500">{% trans "No resources yet." %}</li>
+        {% endfor %}
+      </ul>
+      <form method="post" enctype="multipart/form-data" action="{% url 'training_dashboard:resource_create' course.pk %}" class="mt-3 space-y-2 rounded-md bg-stone-50 p-3">
+        {% csrf_token %}
+        {{ resource_form.as_p }}
+        <button type="submit" class="rounded-md bg-forest px-3 py-1.5 text-xs font-medium text-white hover:bg-forest-dark">{% trans "Add resource" %}</button>
+      </form>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-stone-900">{% trans "Sessions" %}</h2>
+        <a href="{% url 'training_dashboard:session_list' %}" class="text-sm text-forest hover:underline">{% trans "All sessions" %}</a>
+      </div>
+      <ul class="mt-3 space-y-1 text-sm text-stone-600">
+        {% for session in sessions %}
+          <li><a href="{% url 'training_dashboard:session_detail' session.pk %}" class="text-forest hover:underline">{{ session.reference }}</a> · {{ session.start_date|date:"d M Y" }} · {{ session.get_status_display }}</li>
+        {% empty %}
+          <li class="text-sm text-stone-500">{% trans "No sessions scheduled." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-stone-900">{% trans "Instructors" %}</h2>
+        <a href="{% url 'training_dashboard:instructor_list' %}" class="text-sm text-forest hover:underline">{% trans "Manage" %}</a>
+      </div>
+      <ul class="mt-3 space-y-1 text-sm text-stone-600">
+        {% for instructor in instructors %}
+          <li>{{ instructor.user.full_name|default:instructor.user.email }}{% if instructor.professional_title %} · {{ instructor.professional_title }}{% endif %}</li>
+        {% empty %}
+          <li class="text-sm text-stone-500">{% trans "No instructors assigned." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <div class="flex items-center justify-between">
+        <h2 class="font-semibold text-stone-900">{% trans "Assessments" %}</h2>
+        <a href="{% url 'training_dashboard:assessment_create' course.pk %}" class="text-sm text-forest hover:underline">{% trans "New assessment" %}</a>
+      </div>
+      <ul class="mt-3 space-y-1 text-sm text-stone-600">
+        {% for assessment in assessments %}
+          <li><a href="{% url 'training_dashboard:assessment_detail' assessment.pk %}" class="text-forest hover:underline">{{ assessment.title }}</a> · {{ assessment.get_assessment_type_display }} · {% if assessment.is_published %}{% trans "published" %}{% else %}{% trans "draft" %}{% endif %}</li>
+        {% empty %}
+          <li class="text-sm text-stone-500">{% trans "No assessments yet." %}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+</div>
+{% endblock %}

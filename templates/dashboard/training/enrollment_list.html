@@ -1,0 +1,43 @@
+{% extends "dashboard/base.html" %}
+{% load i18n %}
+{% block dashboard_content %}
+{% include "dashboard/training/_nav.html" %}
+<h1 class="text-lg font-semibold text-stone-900">{% trans "Enrolments" %}</h1>
+<form method="get" class="mt-4 flex flex-wrap gap-2">
+  <input type="search" name="q" value="{{ search }}" placeholder="{% trans 'Search reference, email or session' %}" class="w-72 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  <select name="status" class="rounded-md border border-stone-300 px-3 py-2 text-sm">
+    <option value="">{% trans "All statuses" %}</option>
+    {% for value, label in status_choices %}
+      <option value="{{ value }}" {% if value == current_status %}selected{% endif %}>{{ label }}</option>
+    {% endfor %}
+  </select>
+  <button type="submit" class="rounded-md border border-stone-300 px-4 py-2 text-sm text-stone-700 hover:bg-stone-100">{% trans "Filter" %}</button>
+</form>
+<div class="mt-4 overflow-hidden rounded-xl border border-stone-200 bg-white">
+  <table class="min-w-full divide-y divide-stone-200 text-sm">
+    <thead class="bg-stone-50 text-left text-xs uppercase tracking-wide text-stone-500">
+      <tr>
+        <th class="px-5 py-3">{% trans "Reference" %}</th>
+        <th class="px-5 py-3">{% trans "Student" %}</th>
+        <th class="px-5 py-3">{% trans "Session" %}</th>
+        <th class="px-5 py-3">{% trans "Status" %}</th>
+        <th class="px-5 py-3">{% trans "Payment" %}</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-stone-100">
+      {% for enrollment in enrollments %}
+        <tr>
+          <td class="px-5 py-3"><a href="{% url 'training_dashboard:enrollment_detail' enrollment.reference %}" class="font-medium text-forest hover:underline">{{ enrollment.reference }}</a></td>
+          <td class="px-5 py-3 text-stone-600">{{ enrollment.student.email }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ enrollment.session.reference }}</td>
+          <td class="px-5 py-3">{{ enrollment.get_status_display }}</td>
+          <td class="px-5 py-3 text-stone-600">{{ enrollment.get_payment_status_display }}</td>
+        </tr>
+      {% empty %}
+        <tr><td colspan="5" class="px-5 py-6 text-sm text-stone-500">{% trans "No enrolments found." %}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% include "components/pagination.html" with page_obj=page_obj %}
+{% endblock %}

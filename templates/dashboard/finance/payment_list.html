@@ -1,0 +1,64 @@
+{% extends "dashboard/base.html" %}
+{% load i18n catalog_tags %}
+{% block dashboard_content %}
+<form method="get" class="mb-4 flex flex-wrap items-end gap-3">
+  <div>
+    <label for="q" class="block text-xs font-medium text-stone-600">{% trans "Search" %}</label>
+    <input id="q" name="q" value="{{ query }}" placeholder="{% trans 'Reference or order' %}" class="mt-1 rounded-md border border-stone-300 px-3 py-2 text-sm">
+  </div>
+  <div>
+    <label for="status" class="block text-xs font-medium text-stone-600">{% trans "Status" %}</label>
+    <select id="status" name="status" class="mt-1 rounded-md border border-stone-300 px-3 py-2 text-sm">
+      <option value="">{% trans "All" %}</option>
+      {% for value, label in statuses %}<option value="{{ value }}" {% if status == value %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  <div>
+    <label for="provider" class="block text-xs font-medium text-stone-600">{% trans "Provider" %}</label>
+    <select id="provider" name="provider" class="mt-1 rounded-md border border-stone-300 px-3 py-2 text-sm">
+      <option value="">{% trans "All" %}</option>
+      <option value="paystack" {% if provider == 'paystack' %}selected{% endif %}>Paystack</option>
+      <option value="bank_transfer" {% if provider == 'bank_transfer' %}selected{% endif %}>Bank transfer</option>
+      <option value="manual" {% if provider == 'manual' %}selected{% endif %}>Manual</option>
+    </select>
+  </div>
+  <label class="flex items-center gap-2 text-sm text-stone-700"><input type="checkbox" name="review" value="1" {% if review_only %}checked{% endif %}> {% trans "Needs review only" %}</label>
+  <button type="submit" class="rounded-md bg-forest px-4 py-2 text-sm font-medium text-white hover:bg-forest-light">{% trans "Filter" %}</button>
+</form>
+
+{% if payments %}
+  <div class="overflow-x-auto rounded-xl border border-stone-200 bg-white">
+    <table class="min-w-full divide-y divide-stone-200 text-sm">
+      <thead class="bg-cream-100 text-left text-xs uppercase tracking-wide text-stone-500">
+        <tr>
+          <th scope="col" class="px-4 py-3">{% trans "Reference" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Order" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Customer" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Provider" %}</th>
+          <th scope="col" class="px-4 py-3">{% trans "Status" %}</th>
+          <th scope="col" class="px-4 py-3 text-right">{% trans "Amount" %}</th>
+          <th scope="col" class="px-4 py-3"></th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-stone-100">
+        {% for payment in payments %}
+          <tr>
+            <td class="px-4 py-3 font-mono text-xs text-stone-700">{{ payment.reference }}{% if payment.requires_review %}<span class="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-800">{% trans "Review" %}</span>{% endif %}</td>
+            <td class="px-4 py-3 text-stone-700">{% if payment.order %}{{ payment.order.number }}{% elif payment.service_quotation %}{{ payment.service_quotation.reference }}{% else %}{{ payment.reference }}{% endif %}</td>
+            <td class="px-4 py-3 text-stone-600">{{ payment.customer.email }}</td>
+            <td class="px-4 py-3 text-stone-700">{{ payment.get_provider_display }}</td>
+            <td class="px-4 py-3"><span class="rounded-full bg-stone-100 px-2 py-0.5 text-xs text-stone-700">{{ payment.get_status_display }}</span></td>
+            <td class="px-4 py-3 text-right font-semibold text-stone-900">{{ payment.expected_amount|money:payment.currency }}</td>
+            <td class="px-4 py-3 text-right"><a href="{% url 'finance_dashboard:payment_detail' payment.pk %}" class="font-medium text-forest hover:underline">{% trans "View" %}</a></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% include "components/pagination.html" %}
+{% else %}
+  {% trans "No payments found" as empty_title %}
+  {% trans "Adjust the filters or wait for new payments." as empty_message %}
+  {% include "components/empty_state.html" with title=empty_title message=empty_message %}
+{% endif %}
+{% endblock %}

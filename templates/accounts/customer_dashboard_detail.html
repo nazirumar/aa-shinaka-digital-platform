@@ -1,0 +1,104 @@
+{% extends "dashboard/base.html" %}
+
+{% block dashboard_content %}
+<div class="space-y-6">
+  <div class="rounded-xl border border-stone-200 bg-white p-6">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+      <div>
+        <h2 class="text-lg font-semibold text-stone-900">{{ customer.full_name|default:customer.email }}</h2>
+        <p class="mt-1 text-sm text-stone-600">{{ customer.email }}{% if customer.phone %} · {{ customer.phone }}{% endif %}</p>
+        <p class="mt-1 text-sm text-stone-500">
+          {% if customer.state %}{{ customer.state.name }} · {% endif %}Joined {{ customer.date_joined|date:"j M Y" }}
+        </p>
+      </div>
+      <div class="flex flex-col items-end gap-2 text-sm">
+        <span class="rounded-full px-3 py-1 {% if customer.is_email_verified %}bg-brand-50 text-brand-700{% else %}bg-amber-50 text-amber-800{% endif %}">
+          {% if customer.is_email_verified %}Email verified{% else %}Email not verified{% endif %}
+        </span>
+        <span class="rounded-full px-3 py-1 {% if customer.is_active %}bg-stone-100 text-stone-700{% else %}bg-red-50 text-red-700{% endif %}">
+          {% if customer.is_active %}Active{% else %}Inactive{% endif %}
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <dl class="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {% include "components/metric_card.html" with label="Orders" value=overview.orders_total tone="brand" %}
+    {% include "components/metric_card.html" with label="Service requests" value=overview.service_requests_total tone="stone" %}
+    {% include "components/metric_card.html" with label="Export enquiries" value=overview.export_enquiries_total tone="stone" %}
+    {% include "components/metric_card.html" with label="Export orders" value=overview.export_orders_total tone="stone" %}
+    {% include "components/metric_card.html" with label="Enrolments" value=overview.enrollments_total tone="stone" %}
+    {% include "components/metric_card.html" with label="Documents" value=overview.documents_total tone="gold" %}
+    {% include "components/metric_card.html" with label="Open tickets" value=overview.tickets_open tone="amber" %}
+    {% include "components/metric_card.html" with label="Unread notifications" value=overview.notifications_unread tone="amber" %}
+  </div>
+
+  <div class="grid gap-4 lg:grid-cols-3">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">Recent orders</h3>
+      {% if overview.orders_recent %}
+        <ul class="mt-3 space-y-2 text-sm">
+          {% for order in overview.orders_recent %}
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-stone-700">{{ order.reference }}</span>
+              <span class="text-xs text-stone-500">{{ order.get_status_display }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="mt-3 text-sm text-stone-500">No orders.</p>{% endif %}
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">Recent service requests</h3>
+      {% if overview.service_requests_recent %}
+        <ul class="mt-3 space-y-2 text-sm">
+          {% for req in overview.service_requests_recent %}
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-stone-700">{{ request.title|default:service_request.title }}</span>
+              <span class="text-xs text-stone-500">{{ request.get_status_display }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="mt-3 text-sm text-stone-500">No service requests.</p>{% endif %}
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">Recent support tickets</h3>
+      {% if overview.tickets_recent %}
+        <ul class="mt-3 space-y-2 text-sm">
+          {% for ticket in overview.tickets_recent %}
+            <li class="flex items-center justify-between gap-2">
+              <span class="text-stone-700">{{ ticket.reference }}</span>
+              <span class="text-xs text-stone-500">{{ ticket.get_status_display }}</span>
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}<p class="mt-3 text-sm text-stone-500">No tickets.</p>{% endif %}
+    </div>
+  </div>
+
+  {% if can_view_finance %}
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">Payments (finance)</h3>
+      <p class="mt-1 text-sm text-stone-500">{{ overview.payments_verified_total }} verified of {{ overview.payments_total }} payment{{ overview.payments_total|pluralize }}.</p>
+      {% if overview.payments_recent %}
+        <table class="mt-3 w-full text-left text-sm">
+          <thead class="text-xs uppercase tracking-wide text-stone-500">
+            <tr><th class="py-1">Reference</th><th class="py-1">Status</th><th class="py-1">Expected</th><th class="py-1">Created</th></tr>
+          </thead>
+          <tbody class="divide-y divide-stone-100">
+            {% for payment in overview.payments_recent %}
+              <tr>
+                <td class="py-2 text-stone-700">{{ payment.reference }}</td>
+                <td class="py-2 text-stone-600">{{ payment.get_status_display }}</td>
+                <td class="py-2 text-stone-600">{{ payment.currency }} {{ payment.expected_amount }}</td>
+                <td class="py-2 text-stone-500">{{ payment.created_at|date:"j M Y" }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% else %}<p class="mt-3 text-sm text-stone-500">No payments recorded.</p>{% endif %}
+    </div>
+  {% endif %}
+</div>
+{% endblock %}

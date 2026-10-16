@@ -1,0 +1,109 @@
+{% extends "dashboard/base.html" %}
+{% load perm_tags %}
+{% has_capability user 'support.approve' as can_approve %}
+
+{% block dashboard_content %}
+<div class="grid gap-6 lg:grid-cols-[1fr_320px]">
+  <div class="space-y-4">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 class="text-lg font-semibold text-stone-900">{{ ticket.subject }}</h2>
+          <p class="mt-1 text-sm text-stone-500">{{ ticket.reference }} · {{ ticket.customer.email }}</p>
+        </div>
+        {% include "support/_status_badge.html" with status=ticket.status label=ticket.get_status_display %}
+      </div>
+      {% if ticket.related_type %}
+        <p class="mt-2 text-sm text-stone-600">Linked to <span class="font-medium">{{ ticket.related_type }}</span> · {{ ticket.related_id }}</p>
+      {% endif %}
+    </div>
+
+    <div class="space-y-3">
+      {% for message in ticket_messages %}
+        <div class="rounded-xl border p-4 {% if message.is_internal %}border-amber-300 bg-amber-50{% else %}border-stone-200 bg-white{% endif %}">
+          <div class="flex items-center justify-between text-xs text-stone-500">
+            <span class="font-medium text-stone-700">
+              {{ message.sender.email|default:"system" }}
+              {% if message.is_internal %}<span class="ml-2 rounded bg-amber-200 px-1.5 py-0.5 text-amber-900">Internal note</span>{% endif %}
+            </span>
+            <span>{{ message.created_at|date:"j M Y, H:i" }}</span>
+          </div>
+          <p class="mt-2 whitespace-pre-line text-sm text-stone-700">{{ message.message }}</p>
+          {% if message.attachments.all %}
+            <ul class="mt-2 space-y-1 text-sm">
+              {% for attachment in message.attachments.all %}
+                <li><a href="{% url 'support_dashboard:attachment_download' attachment.pk %}" class="text-brand-700 hover:underline">{{ attachment.original_filename|default:"attachment" }}</a></li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="font-medium text-stone-900">Reply</h3>
+      <form method="post" action="{% url 'support_dashboard:ticket_reply' ticket.reference %}" enctype="multipart/form-data" class="mt-4 space-y-4" novalidate>
+        {% csrf_token %}
+        {% include "components/form_field.html" with field=reply_form.message %}
+        {% include "components/form_field.html" with field=reply_form.is_internal %}
+        <div>
+          <label for="staff-attachments" class="block text-sm font-medium text-stone-700">Attachments</label>
+          <input id="staff-attachments" type="file" name="attachments" multiple class="mt-1 block w-full text-sm">
+        </div>
+        <button type="submit" class="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Add reply</button>
+      </form>
+    </div>
+  </div>
+
+  <aside class="space-y-4">
+    <div class="rounded-xl border border-stone-200 bg-white p-5">
+      <h3 class="text-sm font-semibold text-stone-900">Status</h3>
+      <form method="post" action="{% url 'support_dashboard:ticket_status' ticket.reference %}" class="mt-3 space-y-3">
+        {% csrf_token %}
+        {% include "components/form_field.html" with field=status_form.status %}
+        {% include "components/form_field.html" with field=status_form.reason %}
+        <button type="submit" class="w-full rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Update status</button>
+      </form>
+    </div>
+
+    {% if can_approve %}
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h3 class="text-sm font-semibold text-stone-900">Assignment</h3>
+        <form method="post" action="{% url 'support_dashboard:ticket_assign' ticket.reference %}" class="mt-3 space-y-3">
+          {% csrf_token %}
+          {% include "components/form_field.html" with field=assign_form.assignee %}
+          <button type="submit" class="w-full rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100">Save assignment</button>
+        </form>
+      </div>
+
+      <div class="rounded-xl border border-stone-200 bg-white p-5">
+        <h3 class="text-sm font-semibold text-stone-900">Priority</h3>
+        <form method="post" action="{% url 'support_dashboard:ticket_priority' ticket.reference %}" class="mt-3">
+          {% csrf_token %}
+          <label class="sr-only" for="priority">Priority</label>
+          <select id="priority" name="priority" class="w-full rounded-md border border-stone-300 px-3 py-2 text-sm">
+            <option value="low" {% if ticket.priority == 'low' %}selected{% endif %}>Low</option>
+            <option value="normal" {% if ticket.priority == 'normal' %}selected{% endif %}>Normal</option>
+            <option value="high" {% if ticket.priority == 'high' %}selected{% endif %}>High</option>
+            <option value="urgent" {% if ticket.priority == 'urgent' %}selected{% endif %}>Urgent</option>
+          </select>
+          <button type="submit" class="mt-3 w-full rounded-md border border-stone-300 px-4 py-2 text-sm font-medium hover:bg-stone-100">Update priority</button>
+        </form>
+      </div>
+    {% endif %}
+
+    <div class="rounded-xl border border-stone-200 bg-white p-5 text-sm">
+      <h3 class="text-sm font-semibold text-stone-900">History</h3>
+      <ul class="mt-3 space-y-2">
+        {% for entry in ticket.status_history.all %}
+          <li class="text-xs text-stone-500">
+            <span class="font-medium text-stone-700">{{ entry.new_status }}</span>
+            {% if entry.previous_status %}from {{ entry.previous_status }}{% endif %}
+            · {{ entry.changed_by.email|default:"system" }} · {{ entry.created_at|date:"j M, H:i" }}
+          </li>
+        {% endfor %}
+      </ul>
+    </div>
+  </aside>
+</div>
+{% endblock %}

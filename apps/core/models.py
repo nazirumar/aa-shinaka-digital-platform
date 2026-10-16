@@ -5,6 +5,8 @@ app (timestamps, soft deletion) plus the verified Nigeria location reference
 data (36 states + FCT, and their LGAs / area councils).
 """
 
+import uuid
+
 from django.db import models
 from django.utils import timezone
 
@@ -12,6 +14,17 @@ from django.utils import timezone
 class TimeStampedModel(models.Model):
     """Abstract base adding immutable ``created_at`` and mutable ``updated_at``."""
 
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True, editable=False)
+    updated_at = models.DateTimeField(auto_now=True, editable=False)
+
+    class Meta:
+        abstract = True
+
+
+class UUIDTimeStampedModel(models.Model):
+    """Abstract base with a UUID primary key plus created/updated timestamps."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     created_at = models.DateTimeField(auto_now_add=True, db_index=True, editable=False)
     updated_at = models.DateTimeField(auto_now=True, editable=False)
 

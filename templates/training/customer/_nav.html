@@ -1,0 +1,11 @@
+{% load i18n %}
+{% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
+<nav class="mb-6 flex flex-wrap gap-1 border-b border-stone-200 pb-2 text-sm" aria-label="{% trans 'Training sections' %}">
+  <a href="{% url 'training_account:home' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'home' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Overview" %}</a>
+  <a href="{% url 'training_account:my_courses' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'my_courses' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "My courses" %}</a>
+  <a href="{% url 'training_account:upcoming_sessions' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'upcoming_sessions' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Upcoming" %}</a>
+  <a href="{% url 'training_account:enrollment_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'enrollment_list' or url_name == 'enrollment_detail' or url_name == 'assessment_take' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Enrolments" %}</a>
+  <a href="{% url 'training_account:certificate_list' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'certificate_list' or url_name == 'certificate_view' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Certificates" %}</a>
+  <a href="{% url 'training_account:payment_history' %}" class="rounded-md px-3 py-1.5 {% if url_name == 'payment_history' %}bg-brand-50 font-medium text-brand-800{% else %}text-stone-600 hover:bg-stone-100{% endif %}">{% trans "Payments" %}</a>
+</nav>
+{% endwith %}
