@@ -3,7 +3,80 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — Phases 13–14: security hardening, staging verification & launch readiness
+## [Unreleased] — Phase 15: Hostinger VPS deployment preparation
+
+### Added
+
+- **Production Compose stack for a single-host VPS** (`deploy/docker-compose.yml`):
+  web (Gunicorn), PostgreSQL, Redis, one Celery worker, one Celery beat and nginx,
+  with `restart` policies, health checks, per-service CPU/memory limits, JSON log
+  rotation, and a `frontend` bridge network plus an `internal: true` `backend`
+  network. Only nginx publishes host ports.
+- **Single controlled release step**: a one-shot `migrate` service runs
+  `check`/`collectstatic`/`migrate`; `web`/`worker`/`beat` set
+  `RUN_MIGRATIONS=false` and wait on `service_completed_successfully`, so
+  concurrent migrations are impossible.
+- **Deployment scripts**: `db_migrate.sh` (host-locked controlled migration),
+  `backup_docker.sh` (in-container `pg_dump`, host-side encryption + upload),
+  `disk_check.sh` (disk/Docker growth monitor), `host_hardening.sh` (SSH keys,
+  ufw, fail2ban, unattended upgrades; dry-run unless `--apply`),
+  `render_nginx.sh` (refuses placeholder domains), `ssl_bootstrap.sh` and
+  `ssl_renew.sh`.
+- **nginx bootstrap config** (`deploy/nginx/bootstrap.conf`) to solve the ACME
+  chicken-and-egg before the first certificate exists.
+- **`.dockerignore`** so `.env`, deployment env files, `media/`, `staticfiles/`,
+  TLS material, `.git`, `node_modules/`, `.venv/`, `tests/` and `docs/` never
+  enter the image; plus **`.gitattributes`** pinning LF for every file executed on
+  the Linux host (`*.sh`, `*.conf`, `Dockerfile`, `*.yml`, `*.service`,
+  `*.timer`), because a CRLF shell script fails on the VPS with
+  `bad interpreter: /usr/bin/env bash^M`.
+- **`docs/HOSTINGER_VPS_DEPLOYMENT.md`** — the full Ubuntu 24.04 + Docker Compose
+  host procedure (provisioning, SSH, hardening, DNS/TLS, migration, backups,
+  monitoring, rollback, troubleshooting).
+- **`tests/test_phase15_deploy.py`** — 48 deployment-invariant tests over the
+  rendered Compose model and the env templates (network isolation, single
+  migrator, single beat, limits, health checks, persistent volumes, secret
+  hygiene, env-file isolation).
+
+### Fixed
+
+- **Staging could load production secrets.** Compose *appends* `env_file` lists
+  when an override file is merged, so the staging overlay's `env_file` never
+  replaced the production one — staging required `deploy/.env.production` to
+  exist and would inherit any variable staging did not itself define. The env
+  file is now selected by interpolation (`APP_ENV_FILE`, defaulting to
+  `.env.production`), and the staging overlay declares no `env_file` at all.
+- **`disk_check.sh` parsed the device column incorrectly** when a device name
+  contained spaces, and a failing `docker` probe under `set -o pipefail` made the
+  monitor always exit non-zero.
+- **`validate_env.sh`** now requires `POSTGRES_PASSWORD`/`REDIS_PASSWORD`, checks
+  that `DATABASE_URL` and the Redis URLs embed the matching passwords and are
+  URL-safe, and warns when `DB_SSLMODE_REQUIRE=True` (which the bundled
+  PostgreSQL, having no TLS listener, cannot satisfy).
+
+### Security
+
+- `.env.production.example` no longer ships `POSTGRES_PASSWORD` unset (which made
+  `docker compose config` fail) and defaults `DB_SSLMODE_REQUIRE=False` for the
+  internal Docker network.
+- `smoke_test.sh` now asserts that invoices, receipts, payment evidence and
+  export/support documents are not anonymously reachable.
+
+### Verification (Phase 15, executed locally)
+
+- `ruff check` + `ruff format --check` clean; `manage.py check` clean;
+  `makemigrations --check` clean; full pytest suite green.
+- `docker compose config` exits 0 for both the production file and the staged
+  production+staging overlay (client-side; the Docker daemon is unavailable here).
+- `validate_env.sh` accepts a valid env and rejects a bad one; `render_nginx.sh`
+  refuses placeholder/malformed hosts; `disk_check.sh` returns the correct exit
+  codes; the smoke test passes against the local dev server with every private
+  route returning 302.
+- **NOT VERIFIED:** image build, host hardening, TLS issuance, host restore drill,
+  monitoring alerts, staging performance/axe and a real Paystack test transaction
+  — all require a real host and owner-supplied credentials.
+
+## [Phase 13–14] — security hardening, staging verification & launch readiness
 
 ### Added
 

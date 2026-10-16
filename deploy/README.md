@@ -1,60 +1,113 @@
-# Deployment assets — AA Shinaka platform (Phases 12–14)
+# Deployment assets — AA Shinaka platform (Phase 15)
 
-Reference deployment configuration for an **approved Linux VPS or compatible
-cloud host**. Nothing here deploys automatically and nothing assumes a hosting
-provider: replace the `EXAMPLE_DOMAIN` placeholders with the owner-approved
-production domain.
+Production deployment configuration for a **Hostinger KVM VPS on Ubuntu 24.04
+LTS** (Docker Compose), with a bare-metal `systemd` alternative. Nothing here
+deploys automatically, changes DNS, or enables live payments.
+
+The step-by-step host procedure lives in
+[`../docs/HOSTINGER_VPS_DEPLOYMENT.md`](../docs/HOSTINGER_VPS_DEPLOYMENT.md);
+what was actually verified (and what could not be) lives in
+[`../docs/PHASE_15_HOSTINGER_REPORT.md`](../docs/PHASE_15_HOSTINGER_REPORT.md).
 
 ## What is here
 
 | Path | Purpose |
 |---|---|
-| `Dockerfile` | Multi-stage image: Tailwind build + Python runtime (uv + Gunicorn). |
-| `docker-compose.yml` | Reference stack: PostgreSQL, Redis, web, Celery worker, beat, nginx. |
-| `docker-compose.staging.yml` | Staging override: distinct project name, `.env.staging`, non-standard ports (isolation). |
-| `gunicorn.conf.py` | WSGI server config (behind nginx). |
-| `entrypoint.sh` | Runs checks, migrations and collectstatic before Gunicorn. |
-| `.env.production.example` | Every production environment variable, with no secrets. |
-| `.env.staging.example` | Staging environment template (test-mode Paystack only). |
-| `nginx/aa-shinaka.conf` | TLS termination, static/media serving, default-deny media. |
+| `Dockerfile` | Multi-stage image: Tailwind build + Python runtime (uv + Gunicorn), non-root. |
+| `.dockerignore` | Keeps secrets, host state and dev caches out of the image. |
+| `docker-compose.yml` | Full stack with internal networks, limits, health checks and log rotation. |
+| `docker-compose.staging.yml` | Staging override: distinct project name, non-standard ports. |
+| `gunicorn.conf.py` | WSGI server config (behind nginx), environment-driven. |
+| `entrypoint.sh` | Optional checks/migrations/collectstatic before the service command. |
+| `.env.production.example` | Every production variable, with no secrets. |
+| `.env.staging.example` | Staging template (test-mode Paystack only). |
+| `nginx/aa-shinaka.conf` | TLS template: static/media, default-deny media, rate limits, security headers. |
+| `nginx/bootstrap.conf` | HTTP-only config used to obtain the first certificate. |
+| `nginx/conf.d/` | Render target for the active site config (gitignored). |
 | `systemd/*.service`, `*.timer` | Bare-metal alternative to Compose. |
-| `scripts/backup.sh` / `restore.sh` | Verified, optionally-encrypted PostgreSQL backups. |
-| `scripts/restore_drill.sh` | Isolated restore rehearsal (RTO input). |
-| `scripts/healthcheck.sh` | External health probe for monitoring/cron. |
+| `scripts/backup.sh` | Bare-metal verified, optionally-encrypted PostgreSQL backup. |
+| `scripts/backup_docker.sh` | Compose backup: `pg_dump` in the container, encrypt + upload on the host. |
+| `scripts/restore.sh`, `scripts/restore_drill.sh` | Restore, and isolated restore rehearsal. |
+| `scripts/db_migrate.sh` | **Controlled migration** (single container, host lock, optional pre-backup). |
 | `scripts/validate_env.sh` | Fail-safe environment validation before any build/restart. |
 | `scripts/preflight.sh` | Non-destructive pre-deploy gate (env + checks + migrations + verifier). |
-| `scripts/smoke_test.sh` | Post-deploy HTTP smoke test. |
-| `scripts/verify_host.sh` | Host security verification (TLS, redirect, media deny, ports). |
-| `scripts/deploy.sh` | Build, migrate, collectstatic, restart, smoke test. |
+| `scripts/deploy.sh` | Preflight, build, single release step, start, smoke test. |
 | `scripts/staging_deploy.sh` | Staging orchestrator (preflight, backup, migrate, smoke). |
 | `scripts/rollback.sh` | Safe code rollback (no migration reversal). |
+| `scripts/render_nginx.sh` | Render the site config for the owner-approved domain. |
+| `scripts/ssl_bootstrap.sh`, `scripts/ssl_renew.sh` | Issue and renew Let's Encrypt certificates. |
+| `scripts/host_hardening.sh` | SSH/ufw/fail2ban/unattended-upgrades (dry-run by default). |
+| `scripts/disk_check.sh` | Disk and Docker-growth monitor (cron-friendly). |
+| `scripts/smoke_test.sh` | Post-deploy HTTP + private-document access smoke test. |
+| `scripts/verify_host.sh` | Host security verification (TLS, redirect, media deny, ports). |
 | `scripts/loadtest.py` | Dependency-free read-only load tester. |
 
-## Two supported topologies
+## Stack topology
 
-1. **Docker Compose** (recommended when Docker is available). Uses
-   `deploy/docker-compose.yml` and `deploy/nginx/`.
-2. **Bare metal** (`nginx` + `systemd`). Uses `deploy/systemd/*.service` and the
-   same nginx config; put the app in `/srv/aa-shinaka` with a `.venv`.
-
-## First deploy (Compose)
-
-```bash
-cp deploy/.env.production.example deploy/.env.production
-# edit deploy/.env.production (secrets, hosts, TLS)
-./deploy/scripts/validate_env.sh deploy/.env.production   # must pass
-docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
-docker compose -f deploy/docker-compose.yml exec web python manage.py sync_roles
-docker compose -f deploy/docker-compose.yml exec web python manage.py createsuperuser
+```
+                 ┌──────────── public ────────────┐
+  :80/:443  nginx (TLS terminates here)
+                 └───────┬────────────────────────┘
+                    frontend network
+                         │
+        ┌────────────────┼─────────────────┐
+      web            worker             beat
+   (Gunicorn)      (Celery)        (Celery beat ×1)
+        └────────────────┼─────────────────┘
+                  backend network (internal: true)
+                         │
+                    db (PostgreSQL)   redis
 ```
 
-Issue TLS certificates for the real domain (certbot/ACM) and place
-`fullchain.pem` / `privkey.pem` in `deploy/nginx/certs/`.
+* **Only nginx publishes host ports.** PostgreSQL and Redis have no `ports:` and
+  live on the `backend` network, which is `internal: true`.
+* **Exactly one container migrates.** Every long-running service sets
+  `RUN_MIGRATIONS=false`; the one-shot `migrate` service runs the system check,
+  `collectstatic` and `migrate`, and `web`/`worker`/`beat` wait for it with
+  `depends_on: service_completed_successfully`.
+* **Exactly one Celery beat.** Never `--scale beat=N` — two schedulers
+  double-fire every periodic task.
+* Named volumes `pgdata`, `media` and `staticfiles` outlive `docker compose down`.
+  Never run `docker compose down -v` in production.
 
-> **Host hygiene:** ensure no root `.env` file exists on the host. Settings read
-> a local `.env` as a fallback, and the repository's `.env` holds development
-> values. Real environment variables (the Compose `env_file` / systemd
-> `EnvironmentFile`) take precedence, but the fallback must not be present.
+## Quick start (Compose)
+
+```bash
+cp deploy/.env.production.example deploy/.env.production   # fill it in
+./deploy/scripts/validate_env.sh deploy/.env.production    # must pass
+./deploy/scripts/render_nginx.sh yourdomain.com            # owner-approved domain
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
+```
+
+Then, once the stack is healthy:
+
+```bash
+./deploy/scripts/db_migrate.sh --with-backup     # controlled migration
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml \
+  run --rm --no-deps web python manage.py sync_roles
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml \
+  run --rm --no-deps web python manage.py createsuperuser
+```
+
+Issue TLS **after DNS points here and the owner approves**:
+
+```bash
+./deploy/scripts/ssl_bootstrap.sh yourdomain.com ops@yourdomain.com --staging  # rehearse
+./deploy/scripts/ssl_bootstrap.sh yourdomain.com ops@yourdomain.com            # real
+```
+
+## Environment file selection
+
+Compose **appends** `env_file` lists when override files are merged, so the
+overlay cannot replace a hard-coded path. The base file therefore interpolates
+the name — `${APP_ENV_FILE:-.env.production}` — and:
+
+* production sets `APP_ENV_FILE=.env.production` (the default);
+* staging sets `APP_ENV_FILE=.env.staging` in `deploy/.env.staging` and the
+  overlay declares **no** `env_file` at all.
+
+This keeps the two environments' secrets genuinely separate. `tests/test_phase15_deploy.py`
+pins the behaviour down.
 
 ## Staging (isolated from production)
 
@@ -68,18 +121,24 @@ cp deploy/.env.staging.example deploy/.env.staging   # fill every value
 ./deploy/scripts/staging_deploy.sh <git-ref>
 ```
 
-The staging override publishes nginx on ports 8080/8443 so it can share a host
+The staging overlay publishes nginx on ports 8080/8443 so it can share a host
 with production without a clash.
 
 ## Pre-deploy and verification
 
 ```bash
-./deploy/scripts/preflight.sh deploy/.env.production          # non-destructive gate
-BASE_URL=https://DOMAIN ./deploy/scripts/smoke_test.sh        # post-deploy smoke
-BASE_URL=https://DOMAIN HOST=DOMAIN ./deploy/scripts/verify_host.sh
-docker compose ... exec web python manage.py verify_deployment
+./deploy/scripts/preflight.sh deploy/.env.production            # non-destructive gate
+BASE_URL=https://yourdomain.com ./deploy/scripts/smoke_test.sh  # post-deploy smoke
+BASE_URL=https://yourdomain.com ./deploy/scripts/verify_host.sh
+docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml \
+  run --rm --no-deps web python manage.py verify_deployment
 ```
 
-Nothing here deploys automatically, enables live Paystack credentials or
-changes DNS. See `docs/PRODUCTION_RUNBOOK.md`,
-`docs/PRODUCTION_LAUNCH_PLAN.md` and `docs/DISASTER_RECOVERY.md`.
+> **Host hygiene:** ensure no root `.env` file exists on the host. Settings read
+> a local `.env` as a fallback, and the repository's `.env` holds development
+> values (including `DJANGO_SECURE_SSL_REDIRECT=False`). Real environment
+> variables take precedence, but the fallback must not be present.
+
+Nothing here deploys automatically, enables live Paystack credentials or changes
+DNS. See `docs/PRODUCTION_RUNBOOK.md`, `docs/PRODUCTION_LAUNCH_PLAN.md`,
+`docs/STAGING_TEST_PLAN.md` and `docs/DISASTER_RECOVERY.md`.

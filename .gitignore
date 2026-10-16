@@ -28,6 +28,12 @@ node_modules/
 !deploy/.env.production.example
 !deploy/.env.staging.example
 
+# Deployment state — rendered per deployment, never committed
+/deploy/nginx/certs/
+/deploy/nginx/certbot-www/
+/deploy/nginx/conf.d/default.conf
+/backups/
+
 # Tooling caches
 .pytest_cache/
 .ruff_cache/

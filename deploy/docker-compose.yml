@@ -1,13 +1,64 @@
-# Production-style deployment for an approved Linux VPS or compatible cloud host.
+# ===========================================================================
+# AA Shinaka Digital Business Platform — PRODUCTION stack (Docker Compose).
 #
-#   1. cp deploy/.env.production.example deploy/.env.production  (fill it in)
-#   2. docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
+#   1. cp deploy/.env.production.example deploy/.env.production   (fill it in)
+#   2. deploy/scripts/render_nginx.sh <your-domain>
+#   3. docker compose --env-file deploy/.env.production -f deploy/docker-compose.yml up -d --build
 #
-# This is a reference architecture (nginx + Gunicorn + PostgreSQL + Redis +
-# Celery worker + Celery beat). Do not use the default passwords below in a real
-# deployment — override every value in deploy/.env.production.
+# Topology
+#   nginx (80/443, public) -> web (Gunicorn, internal) -> db / redis
+#                             worker (Celery)  -> db / redis
+#                             beat  (Celery scheduler, exactly one) -> redis
+#                             migrate (one-shot release step: collectstatic + migrate)
+#
+# Hardening baked into this file
+#   * PostgreSQL and Redis are published on NO host port and live only on the
+#     `backend` network, which is `internal: true` (no internet egress).
+#   * Only `nginx` publishes host ports (80/443).
+#   * `web`, `worker` and `beat` set RUN_MIGRATIONS=false; migrations run only
+#     in the single `migrate` service, so they can never race.
+#   * Restart policies, health checks, resource limits, log rotation and
+#     `no-new-privileges` are set on every service.
+#   * Volumes (`pgdata`, `media`, `staticfiles`) outlive `docker compose down`,
+#     so the database and uploaded files survive container recreation.
+#
+# Do not use the default values below on a real host — override every secret in
+# deploy/.env.production. Run deploy/scripts/validate_env.sh before `up`.
+# ===========================================================================
+
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "5"
+
+x-app-base: &app-base
+  build:
+    context: ..
+    dockerfile: deploy/Dockerfile
+  image: aa-shinaka:latest
+  restart: unless-stopped
+  init: true
+  security_opt:
+    - no-new-privileges:true
+  # The env-file NAME is interpolated, not hard-coded, because Compose APPENDS
+  # `env_file` lists when an override file is merged — so an overlay can never
+  # *replace* a hard-coded path. Production uses the default; staging sets
+  # APP_ENV_FILE=.env.staging in deploy/.env.staging and overrides nothing,
+  # which keeps the two environments' secrets genuinely separate.
+  env_file:
+    - ${APP_ENV_FILE:-.env.production}
+  networks:
+    - frontend
+    - backend
+  logging: *default-logging
+  volumes:
+    - media:/app/media
 
 services:
+  # ---------------------------------------------------------------------
+  # PostgreSQL — internal only, persistent named volume.
+  # ---------------------------------------------------------------------
   db:
     image: postgres:16-alpine
     restart: unless-stopped
@@ -15,100 +66,212 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-aa_shinaka}
       POSTGRES_USER: ${POSTGRES_USER:-aa_shinaka}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in deploy/.env.production}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --auth-host=scram-sha-256"
+    # No `ports:` — never reachable from outside the `backend` network.
+    networks:
+      - backend
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aa_shinaka}"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    stop_grace_period: 60s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1G }
 
+  # ---------------------------------------------------------------------
+  # Redis — broker (Celery) + cache (rate limiting), password protected and
+  # reachable only from the internal `backend` network.
+  # ---------------------------------------------------------------------
   redis:
     image: redis:7-alpine
     restart: unless-stopped
-    command: ["redis-server", "--save", "60", "1", "--appendonly", "yes"]
+    # Shell form so $REDIS_PASSWORD is expanded inside the container, not by
+    # Compose. `protected-mode` stays on and there is no published port.
+    command:
+      - sh
+      - -c
+      - >-
+        exec redis-server
+        --appendonly yes
+        --save 60 1
+        --maxmemory 128mb
+        --maxmemory-policy allkeys-lru
+        --requirepass "$$REDIS_PASSWORD"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD in deploy/.env.production}
+    networks:
+      - backend
     volumes:
       - redisdata:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD-SHELL", "redis-cli -a \"$$REDIS_PASSWORD\" ping | grep -q PONG"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
 
-  web:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-    restart: unless-stopped
-    env_file:
-      - .env.production
+  # ---------------------------------------------------------------------
+  # One-shot release step. Runs `check --deploy`, collectstatic and migrate,
+  # then exits. Web/worker/beat wait for it to complete successfully, so a
+  # broken migration stops the rollout instead of starting a half-migrated app.
+  # Exactly one container performs migrations — never several at once.
+  # ---------------------------------------------------------------------
+  migrate:
+    <<: *app-base
+    restart: "no"
+    command: ["python", "manage.py", "migrate", "--noinput"]
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
-      # The web port is only exposed on the internal network; trust the proxy's
-      # forwarded headers from there (nginx sets X-Forwarded-Proto/Host).
-      FORWARDED_ALLOW_IPS: "*"
+      RUN_MIGRATIONS: "false"       # the command above is the migration
+      RUN_COLLECTSTATIC: "true"     # collect once, here, into the shared volume
+      DB_SSLMODE_REQUIRE: "false"   # PostgreSQL is local: no TLS on the wire
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+    networks:
+      - backend
+    volumes:
+      - staticfiles:/app/staticfiles
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 768M }
+
+  # ---------------------------------------------------------------------
+  # Django + Gunicorn. Port 8000 is exposed on the internal networks only.
+  # ---------------------------------------------------------------------
+  web:
+    <<: *app-base
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.prod
+      # Trust forwarded headers from nginx, which is the only peer on the
+      # `frontend` network.
+      FORWARDED_ALLOW_IPS: "*"
+      DB_SSLMODE_REQUIRE: "false"   # PostgreSQL is local: no TLS on the wire
+      RUN_MIGRATIONS: "false"       # migrations belong to the `migrate` service
+      RUN_COLLECTSTATIC: "false"    # static belongs to the `migrate` service
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      GUNICORN_TIMEOUT: ${GUNICORN_TIMEOUT:-60}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
     expose:
       - "8000"
     volumes:
       - media:/app/media
       - staticfiles:/app/staticfiles
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz/')"]
+      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=5)"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 40s
+    stop_grace_period: 30s
+    deploy:
+      resources:
+        limits: { cpus: "1.5", memory: 1G }
 
+  # ---------------------------------------------------------------------
+  # Celery worker. Media is mounted so notification/export tasks can read and
+  # write uploaded files. Do NOT scale this above 1 replica without a shared
+  # media backend (the media volume is host-local).
+  # ---------------------------------------------------------------------
   worker:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-    restart: unless-stopped
-    command: ["celery", "-A", "config", "worker", "-l", "info", "--concurrency", "${CELERY_CONCURRENCY:-4}"]
-    env_file:
-      - .env.production
+    <<: *app-base
+    command:
+      [
+        "celery",
+        "-A",
+        "config",
+        "worker",
+        "-l",
+        "info",
+        "--concurrency",
+        "${CELERY_CONCURRENCY:-4}",
+        "--max-tasks-per-child",
+        "200",
+      ]
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       RUN_MIGRATIONS: "false"
       RUN_COLLECTSTATIC: "false"
+      DB_SSLMODE_REQUIRE: "false"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    volumes:
-      - media:/app/media
+      migrate:
+        condition: service_completed_successfully
+    stop_grace_period: 60s
+    deploy:
+      resources:
+        limits: { cpus: "1.5", memory: 1G }
 
+  # ---------------------------------------------------------------------
+  # Celery beat — the periodic-task scheduler.
+  # RUN ONE INSTANCE ONLY: running two beats double-fires every periodic task
+  # (duplicate emails, duplicate exports). Never `--scale beat=N` /
+  # `docker compose up --scale beat=2`.
+  # ---------------------------------------------------------------------
   beat:
-    build:
-      context: ..
-      dockerfile: deploy/Dockerfile
-    restart: unless-stopped
-    command: ["celery", "-A", "config", "beat", "-l", "info", "--schedule", "/tmp/celerybeat-schedule"]
-    env_file:
-      - .env.production
+    <<: *app-base
+    command:
+      [
+        "celery",
+        "-A",
+        "config",
+        "beat",
+        "-l",
+        "info",
+        "--schedule",
+        "/tmp/celerybeat-schedule",
+        "--max-interval",
+        "300",
+      ]
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.prod
       RUN_MIGRATIONS: "false"
       RUN_COLLECTSTATIC: "false"
+      DB_SSLMODE_REQUIRE: "false"
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 256M }
 
-  # Optional anti-virus backend (Phase 13). Enable with:
-  #   docker compose --profile scanning ... up -d
+  # ---------------------------------------------------------------------
+  # Optional ClamAV backend (Phase 13 upload scanning).
+  #   docker compose --profile scanning up -d
   # and set CLAMAV_SOCKET=/var/run/clamav/clamd.ctl in deploy/.env.production.
-  # Without it the app still runs its built-in signature scanner.
+  # Without it the application still runs its built-in signature scanner.
+  # ---------------------------------------------------------------------
   clamav:
     image: clamav/clamav:stable
     profiles: ["scanning"]
     restart: unless-stopped
+    networks:
+      - backend
     volumes:
       - clamd_sock:/var/run/clamav
     healthcheck:
@@ -116,24 +279,86 @@ services:
       interval: 60s
       timeout: 10s
       retries: 10
+      start_period: 300s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: "1.0", memory: 1G }
 
+  # ---------------------------------------------------------------------
+  # nginx — the ONLY public entry point. TLS terminates here.
+  # The rendered site config is bind-mounted from ./nginx/conf.d (see
+  # deploy/scripts/render_nginx.sh); certs from ./nginx/certs; the ACME
+  # webroot from ./nginx/certbot-www.
+  # ---------------------------------------------------------------------
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
     depends_on:
-      - web
+      web:
+        condition: service_healthy
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
+    networks:
+      - frontend
     volumes:
-      - ./nginx/aa-shinaka.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
       - ./nginx/certs:/etc/nginx/certs:ro
+      - ./nginx/certbot-www:/var/www/certbot:ro
       - media:/srv/media:ro
       - staticfiles:/srv/staticfiles:ro
+    healthcheck:
+      # The HTTP server block always answers on :80 (ACME + 301), so this works
+      # before and after certificates exist.
+      test: ["CMD-SHELL", "wget --spider -q http://127.0.0.1/ >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging: *default-logging
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 128M }
+
+  # ---------------------------------------------------------------------
+  # Optional Let's Encrypt helper (only after a real domain is configured).
+  #   docker compose --profile tls run --rm certbot
+  # See deploy/scripts/ssl_bootstrap.sh and docs/HOSTINGER_VPS_DEPLOYMENT.md.
+  # ---------------------------------------------------------------------
+  certbot:
+    image: certbot/certbot:latest
+    profiles: ["tls"]
+    restart: "no"
+    networks:
+      - frontend
+    volumes:
+      - ./nginx/certbot-www:/var/www/certbot
+      - ./nginx/certs:/etc/letsencrypt
+    deploy:
+      resources:
+        limits: { cpus: "0.5", memory: 256M }
 
 volumes:
   pgdata:
+    driver: local
   redisdata:
+    driver: local
   media:
+    driver: local
   staticfiles:
+    driver: local
   clamd_sock:
+    driver: local
+
+networks:
+  # Public-facing: nginx <-> web. Also the egress path for web/worker (SMTP and
+  # the Paystack API).
+  frontend:
+    driver: bridge
+  # Internal only: db, redis, and the app services. `internal: true` removes the
+  # default route, so nothing on this network can be reached from the internet
+  # or call out to it.
+  backend:
+    driver: bridge
+    internal: true

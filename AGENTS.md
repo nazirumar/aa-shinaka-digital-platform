@@ -21,9 +21,15 @@ tests and documentation** — a staging settings profile with a hard Paystack
 test-mode guard, deployment/rollback/smoke/verify scripts, a
 `manage.py verify_deployment` command and the launch-approval pack — see
 `docs/PHASE_14_STAGING_REPORT.md` and `docs/PRODUCTION_LAUNCH_APPROVAL.md`.
-No staging host, DNS change, live Paystack credential or production data was
-available or touched, so host-execution gates are **NOT VERIFIED**. Status
-remains **READY FOR STAGING** (not launched). Later phases must not start without
+Phase 15 (Hostinger VPS deployment preparation) is delivered as **configuration,
+automation, tests and documentation** — a production Docker Compose stack
+(web/PostgreSQL/Redis/Celery worker/Celery beat/nginx, internal networks, one
+controlled migration service), environment-driven production settings, host
+hardening/backup/TLS scripts and a step-by-step guide — see
+`docs/HOSTINGER_VPS_DEPLOYMENT.md` and `docs/PHASE_15_HOSTINGER_REPORT.md`. No
+VPS, DNS change, live Paystack credential or production data was available or
+touched, so every host-execution gate is **NOT VERIFIED**. Status remains
+**READY FOR STAGING** (not deployed). Later phases must not start without
 approval.
 
 Hard exclusions — never add: oil & gas features, multi-vendor marketplace

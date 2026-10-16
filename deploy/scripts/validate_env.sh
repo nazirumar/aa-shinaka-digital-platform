@@ -17,6 +17,7 @@ fail=0
 
 err() { printf 'validate_env: ERROR: %s\n' "$*" >&2; fail=1; }
 info() { printf 'validate_env: %s\n' "$*"; }
+warn() { printf 'validate_env: WARNING: %s\n' "$*" >&2; }
 
 [ -f "$ENV_FILE" ] || { printf 'validate_env: env file not found: %s\n' "$ENV_FILE" >&2; exit 2; }
 
@@ -36,6 +37,8 @@ REQUIRED=(
   DJANGO_ALLOWED_HOSTS
   CSRF_TRUSTED_ORIGINS
   DATABASE_URL
+  POSTGRES_PASSWORD
+  REDIS_PASSWORD
   CACHE_URL
   EMAIL_BACKEND
   EMAIL_HOST
@@ -75,11 +78,49 @@ case "$(get DATABASE_URL)" in
   *) err "DATABASE_URL must be a postgres:// URL";;
 esac
 
+# --- Database credentials must describe the same database -------------------
+# The container is initialised from POSTGRES_*, while Django connects with
+# DATABASE_URL. If the two passwords differ, the database comes up healthy and
+# every request fails — a slow, confusing outage. Catch it here.
+db_url="$(get DATABASE_URL)"
+postgres_password="$(get POSTGRES_PASSWORD)"
+if [ -n "$db_url" ] && [ -n "$postgres_password" ]; then
+  url_password="$(printf '%s' "$db_url" | sed -E 's#^[a-z]+://[^:@/]+:([^@]*)@.*#\1#')"
+  if [ "$url_password" != "$postgres_password" ]; then
+    err "the password in DATABASE_URL does not match POSTGRES_PASSWORD"
+  fi
+fi
+
+# --- Cache / Redis ----------------------------------------------------------
 case "$(get CACHE_URL)" in
   redis://*|rediss://*) ;;
   "") ;;
   *) err "CACHE_URL must point at Redis (redis:// or rediss://)";;
 esac
+
+redis_password="$(get REDIS_PASSWORD)"
+if [ -n "$redis_password" ]; then
+  # It is embedded in redis:// URLs, so reserved characters would break them.
+  case "$redis_password" in
+    *[!A-Za-z0-9_]*) err "REDIS_PASSWORD must be URL-safe ([A-Za-z0-9_]); it is embedded in the Redis URLs";;
+  esac
+  for key in CACHE_URL CELERY_BROKER_URL CELERY_RESULT_BACKEND; do
+    value="$(get "$key")"
+    if [ -n "$value" ]; then
+      case "$value" in
+        *":${redis_password}@"*) ;;
+        *) err "$key does not embed REDIS_PASSWORD (they must match)";;
+      esac
+    fi
+  done
+fi
+
+# --- PostgreSQL transport ---------------------------------------------------
+# PostgreSQL runs inside the Compose network with no TLS listener and no
+# published port. Requiring SSL there makes psycopg refuse to connect.
+if printf '%s' "$(get DB_SSLMODE_REQUIRE)" | grep -qiE '^(1|true|yes)$'; then
+  warn "DB_SSLMODE_REQUIRE=True: the bundled postgres container serves no TLS. Set it to False for the Compose deployment (keep True only for a managed remote database)."
+fi
 
 email="$(get EMAIL_BACKEND)"
 case "$email" in

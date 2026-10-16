@@ -1,20 +1,52 @@
-# Build context exclusions for the production image.
-.git
-.github
-.venv
-__pycache__
-*.pyc
+# Build-context exclusions for deploy/Dockerfile.
+#
+# Keep this list tight: everything here is excluded from `COPY . .`, which keeps
+# the runtime image small and — critically — keeps secrets and host state out of
+# it. `static/`, `templates/`, `uv.lock` and the Tailwind inputs MUST stay.
+
+# --- Secrets: never enter the image ----------------------------------------
 .env
 .env.*
-!.env.example
-media
-staticfiles
-node_modules
-.pytest_cache
-.ruff_cache
+deploy/.env.production
+deploy/.env.staging
+deploy/.env.staging.example
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+
+# --- Host/runtime state -----------------------------------------------------
+media/
+staticfiles/
+backups/
+deploy/nginx/certs/
+deploy/nginx/certbot-www/
+deploy/nginx/conf.d/
+*.dump
+*.dump.*
+*.log
+
+# --- VCS / CI ---------------------------------------------------------------
+.git
+.github
+.gitignore
+
+# --- Dependencies & tool caches (image installs its own) --------------------
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
 .coverage
-htmlcov
-docs
-tests
-*.sqlite3
-backups
+htmlcov/
+storage-report/
+
+# --- Not needed at runtime --------------------------------------------------
+tests/
+docs/
+*.md
+.DS_Store
+Thumbs.db

@@ -8,7 +8,7 @@ storage & warehousing, export, product sales and a training academy.
 > **Scope note.** Oil and Gas is out of scope. This platform does not integrate
 > with AgriTrade ERP and has no multi-vendor marketplace features.
 
-## Status — Phases 1–14 complete (staging verification; not launched)
+## Status — Phases 1–15 complete (Hostinger VPS deployment prepared; not deployed)
 
 **Phase 1 — Foundation**
 
@@ -359,11 +359,52 @@ infrastructure**
   [`docs/PHASE_14_STAGING_REPORT.md`](docs/PHASE_14_STAGING_REPORT.md) and
   [`docs/PRODUCTION_LAUNCH_APPROVAL.md`](docs/PRODUCTION_LAUNCH_APPROVAL.md).
 
+**Phase 15 — Hostinger VPS deployment preparation**
+
+- **Production Compose stack** (`deploy/docker-compose.yml`), reworked for a
+  single-host VPS: web (Gunicorn) + PostgreSQL + Redis + one Celery worker + one
+  Celery beat + nginx, with `restart` policies, health checks, per-service CPU/
+  memory limits, JSON log rotation and two networks — a `frontend` bridge and an
+  `internal: true` `backend`. **Only nginx publishes host ports**; PostgreSQL and
+  Redis are never reachable from outside the host.
+- **One controlled release step.** A one-shot `migrate` service runs the system
+  check, `collectstatic` and `migrate`; `web`/`worker`/`beat` set
+  `RUN_MIGRATIONS=false` and wait on `service_completed_successfully`, so two
+  containers can never migrate at once.
+- **Environment-driven settings** through `deploy/.env.production.example`
+  (`DEBUG=False`, `SECRET_KEY`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`,
+  `DATABASE_URL`, Redis/Celery, SMTP, Paystack test mode, HTTPS/secure cookies,
+  logging, static/media) — no secret is committed.
+- **Security automation**: `host_hardening.sh` (SSH keys, ufw, fail2ban,
+  unattended upgrades; dry-run by default), `render_nginx.sh` (refuses
+  placeholders), `ssl_bootstrap.sh` / `ssl_renew.sh` (Let's Encrypt), a hardened
+  nginx template with rate limits and a **default-deny `/media/`** rule, plus
+  `.dockerignore` so secrets and host state never enter the image.
+- **Storage & backups**: persistent `pgdata`/`media`/`staticfiles` volumes that
+  survive container recreation; `backup_docker.sh` runs `pg_dump` in the
+  container and encrypts/upload the dump **on the host** (keys never enter a
+  container); `disk_check.sh` monitors disk and Docker growth; restore and
+  migration-rollback guidance.
+- **Staging isolation fixed and proven.** Compose *appends* `env_file` entries
+  across override files, so the overlay can never replace a hard-coded path; the
+  env file is now selected by interpolation (`APP_ENV_FILE`), and staging renders
+  successfully with no production env file present.
+- **Verified locally:** `ruff check`/`format --check`, `manage.py check`,
+  `makemigrations --check`, the full pytest suite and `docker compose config` for
+  both production and staging all pass; the smoke test's private-document
+  assertions confirm invoices, receipts, payment evidence and export documents
+  are not anonymously reachable.
+- **Not verified (no VPS, domain, TLS or credentials):** image build, host
+  hardening, TLS issuance, the host restore drill, monitoring alerts and a real
+  Paystack test transaction. See
+  [`docs/HOSTINGER_VPS_DEPLOYMENT.md`](docs/HOSTINGER_VPS_DEPLOYMENT.md) and
+  [`docs/PHASE_15_HOSTINGER_REPORT.md`](docs/PHASE_15_HOSTINGER_REPORT.md).
+
 Phase 12 is delivered as a *readiness* phase and is **awaiting owner approval**.
-Phases 13–14 are delivered as hardening, automation and documentation. The
-platform remains **READY FOR STAGING** (not launched) and requires a separate
-explicit approval for production deployment and live Paystack. Later phases must
-not start without approval.
+Phases 13–15 are delivered as hardening, automation, deployment configuration and
+documentation. The platform remains **READY FOR STAGING** (not deployed) and
+requires a separate explicit approval to provision a host, change DNS or enable
+live Paystack. Later phases must not start without approval.
 
 ## Documentation
 
@@ -386,6 +427,8 @@ not start without approval.
 | [`docs/PHASE_12_COMPLETION_REPORT.md`](docs/PHASE_12_COMPLETION_REPORT.md) | Phase 12 hardening/deployment deliverables and accepted gaps |
 | [`docs/PHASE_13_COMPLETION_REPORT.md`](docs/PHASE_13_COMPLETION_REPORT.md) | Phase 13 security hardening & staging prep (MFA, upload scanning, CI, Paystack guard) |
 | [`docs/PHASE_14_STAGING_REPORT.md`](docs/PHASE_14_STAGING_REPORT.md) | Phase 14 staging verification: what passed locally vs what is NOT VERIFIED |
+| [`docs/HOSTINGER_VPS_DEPLOYMENT.md`](docs/HOSTINGER_VPS_DEPLOYMENT.md) | Phase 15 step-by-step Hostinger VPS deployment guide (Ubuntu 24.04 + Docker Compose) |
+| [`docs/PHASE_15_HOSTINGER_REPORT.md`](docs/PHASE_15_HOSTINGER_REPORT.md) | Phase 15 deliverables, real test evidence and PASSED/FAILED/NOT VERIFIED gates |
 | [`docs/PRODUCTION_LAUNCH_APPROVAL.md`](docs/PRODUCTION_LAUNCH_APPROVAL.md) | Phase 14 go/no-go decision record (PASSED/FAILED/NOT VERIFIED/N-A) |
 | [`docs/PRODUCTION_LAUNCH_PLAN.md`](docs/PRODUCTION_LAUNCH_PLAN.md) | DNS/TLS/migration/backup/smoke/rollback/payment-activation launch procedure |
 | [`docs/STAGING_TEST_PLAN.md`](docs/STAGING_TEST_PLAN.md) | Executable host procedure for staging verification (steps 4–13) |

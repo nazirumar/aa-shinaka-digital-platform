@@ -6,26 +6,27 @@
 #
 # What this changes:
 #   * a distinct Compose project name ("aa-shinaka-staging") so every named
-#     volume and container is namespaced away from production;
-#   * the per-service env file is switched to deploy/.env.staging;
+#     volume, container and network is namespaced away from production;
 #   * nginx publishes non-standard host ports (8080/8443) so staging can share a
 #     host with production without a port clash.
 #
-# It deliberately does NOT change any image, command or health check, so staging
-# runs the exact same application shape the launch will use.
+# It deliberately does NOT change any image, command, health check or limit, so
+# staging runs the exact same application shape the launch will use.
+#
+# IMPORTANT — why there is no `env_file:` here:
+#   Compose APPENDS `env_file` lists when override files are merged, so a
+#   staging overlay that added `.env.staging` would still load the production
+#   file too (and would fail outright if it did not exist). Staging therefore
+#   selects its env file by setting APP_ENV_FILE=.env.staging in
+#   deploy/.env.staging, which the base file interpolates. The two
+#   environments never read each other's secrets.
+#
+# Before `up`, render the staging site config for the staging hostname:
+#   deploy/scripts/render_nginx.sh staging.yourdomain.com
 # ---------------------------------------------------------------------------
 name: aa-shinaka-staging
 
 services:
-  web:
-    env_file:
-      - .env.staging
-  worker:
-    env_file:
-      - .env.staging
-  beat:
-    env_file:
-      - .env.staging
   nginx:
     ports:
       - "8080:80"
