@@ -22,7 +22,7 @@ env:
   DJANGO_SETTINGS_MODULE: config.settings.test
   DJANGO_SECRET_KEY: ci-only-not-a-real-secret-key-0123456789-abcdefghijklmnopqrstuvwxyz
   DATABASE_URL: postgres://aa_shinaka:aa_shinaka@localhost:5432/aa_shinaka
-  CACHE_URL: locmem://
+  CACHE_URL: locmemcache://
 
 jobs:
   lint:

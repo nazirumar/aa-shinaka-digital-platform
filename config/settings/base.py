@@ -145,7 +145,11 @@ PASSWORD_RESET_TIMEOUT = env("PASSWORD_RESET_TIMEOUT")
 # Cache — used for rate limiting and (in production) shared state.
 # ---------------------------------------------------------------------------
 CACHES = {
-    "default": env.cache("CACHE_URL", default="locmem://"),
+    # django-environ's in-process scheme is "locmemcache://" (NOT "locmem://",
+    # which it rejects with ImproperlyConfigured). The default keeps the app
+    # bootable when CACHE_URL is unset (a fresh clone or a container without it);
+    # production overrides this with Redis in prod.py.
+    "default": env.cache("CACHE_URL", default="locmemcache://"),
 }
 
 # ---------------------------------------------------------------------------

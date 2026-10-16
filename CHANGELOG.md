@@ -3,6 +3,36 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — Fix: invalid default cache URL
+
+### Fixed
+
+- **The app crashed at import whenever `CACHE_URL` was not set.** The settings
+  default was `locmem://`, but django-environ 0.14 only accepts the
+  `locmemcache://` scheme and raises
+  `ImproperlyConfigured: Invalid cache schema locmem` for `locmem://`. Every
+  environment that did not set `CACHE_URL` — a fresh clone using `.env.example`,
+  a container started without that variable, CI — died during Django settings
+  import. `config/settings/base.py` now defaults to `locmemcache://`;
+  `.env.example` and `.github/workflows/ci.yml` use the same valid scheme.
+  A focused regression test (`tests/test_settings_defaults.py`) validates the
+  cache URL in `base.py`, `.env.example` and `ci.yml` against django-environ.
+
+## [Unreleased] — Local Docker development stack
+
+### Added
+
+- **Root-level `docker-compose.yml`** so `docker compose config` and
+  `docker compose up` work from the repository root (previously Compose had to be
+  pointed at `deploy/docker-compose.yml` with `-f`). Runs the development shape —
+  Django `runserver`, PostgreSQL, Redis, a Celery worker and Celery beat — with
+  persistent `pgdata`/`redisdata` volumes, health checks, an explicit `migrate`
+  gate and Paystack forced to test mode. Reuses `deploy/Dockerfile` and does not
+  touch any `deploy/` production file.
+- **`docs/LOCAL_DOCKER_DEVELOPMENT.md`** — how the root dev stack and the
+  production-shaped `deploy/` local-test stack differ, and the exact commands for
+  each.
+
 ## [Unreleased] — Pre-hosting deployment readiness
 
 ### Added
