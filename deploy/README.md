@@ -17,12 +17,15 @@ what was actually verified (and what could not be) lives in
 | `.dockerignore` | Keeps secrets, host state and dev caches out of the image. |
 | `docker-compose.yml` | Full stack with internal networks, limits, health checks and log rotation. |
 | `docker-compose.staging.yml` | Staging override: distinct project name, non-standard ports. |
+| `docker-compose.local.yml` | Local-test override: production shape on a laptop, plus a Mailpit inbox. |
 | `gunicorn.conf.py` | WSGI server config (behind nginx), environment-driven. |
 | `entrypoint.sh` | Optional checks/migrations/collectstatic before the service command. |
 | `.env.production.example` | Every production variable, with no secrets. |
 | `.env.staging.example` | Staging template (test-mode Paystack only). |
+| `.env.local.example` | Local-test template (plain HTTP, Mailpit, test-mode Paystack). |
 | `nginx/aa-shinaka.conf` | TLS template: static/media, default-deny media, rate limits, security headers. |
 | `nginx/bootstrap.conf` | HTTP-only config used to obtain the first certificate. |
+| `nginx/local.conf` | HTTP-only site for the local-test stack (same media default-deny). |
 | `nginx/conf.d/` | Render target for the active site config (gitignored). |
 | `systemd/*.service`, `*.timer` | Bare-metal alternative to Compose. |
 | `scripts/backup.sh` | Bare-metal verified, optionally-encrypted PostgreSQL backup. |
@@ -34,7 +37,7 @@ what was actually verified (and what could not be) lives in
 | `scripts/deploy.sh` | Preflight, build, single release step, start, smoke test. |
 | `scripts/staging_deploy.sh` | Staging orchestrator (preflight, backup, migrate, smoke). |
 | `scripts/rollback.sh` | Safe code rollback (no migration reversal). |
-| `scripts/render_nginx.sh` | Render the site config for the owner-approved domain. |
+| `scripts/render_nginx.sh` | Render the site config for the owner-approved domain (or `--local`). |
 | `scripts/ssl_bootstrap.sh`, `scripts/ssl_renew.sh` | Issue and renew Let's Encrypt certificates. |
 | `scripts/host_hardening.sh` | SSH/ufw/fail2ban/unattended-upgrades (dry-run by default). |
 | `scripts/disk_check.sh` | Disk and Docker-growth monitor (cron-friendly). |
@@ -104,10 +107,36 @@ the name — `${APP_ENV_FILE:-.env.production}` — and:
 
 * production sets `APP_ENV_FILE=.env.production` (the default);
 * staging sets `APP_ENV_FILE=.env.staging` in `deploy/.env.staging` and the
-  overlay declares **no** `env_file` at all.
+  overlay declares **no** `env_file` at all;
+* local sets `APP_ENV_FILE=.env.local` in `deploy/.env.local`, likewise with no
+  `env_file` in the overlay.
 
-This keeps the two environments' secrets genuinely separate. `tests/test_phase15_deploy.py`
+This keeps the three environments' secrets genuinely separate. `tests/test_phase15_deploy.py`
 pins the behaviour down.
+
+## Local test stack (no VPS required)
+
+The production-shaped stack runs on a development machine with a thin overlay —
+same image, same services (nginx, Gunicorn, PostgreSQL, Redis, Celery worker +
+beat), plus a **Mailpit** capture inbox so real email delivery is exercised
+without sending mail:
+
+```bash
+cp deploy/.env.local.example deploy/.env.local
+./deploy/scripts/render_nginx.sh --local
+docker compose --env-file deploy/.env.local \
+  -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up -d --build
+# Site  : http://localhost:8080
+# Inbox : http://localhost:8025
+```
+
+It runs `config.settings.local` — the production settings with **only** the
+plain-HTTP controls relaxed (non-`Secure` cookies, no SSL redirect, `http://`
+CSRF origin). `DEBUG` stays `False`, Redis is the real cache, document scanning
+uses the real policy (`UPLOAD_SCAN_ENFORCEMENT=log` tolerates a missing ClamAV),
+and Paystack stays **test-mode only**. The plain-HTTP allowances are unreachable
+from production/staging: no other Compose file selects that module, and
+`tests/test_phase15_deploy.py` pins that down.
 
 ## Staging (isolated from production)
 

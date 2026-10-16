@@ -1,0 +1,87 @@
+# ===========================================================================
+# AA Shinaka Digital Business Platform — LOCAL TEST overlay.
+#
+# Runs the ENTIRE production-shaped stack (nginx, Gunicorn, PostgreSQL, Redis,
+# Celery worker + beat and a Mailpit capture inbox) on a developer machine, so
+# a release can be exercised end-to-end before any VPS, domain or certificate
+# exists.
+#
+# Always use it TOGETHER with the production file — it is a thin overlay and
+# supplies only what genuinely differs locally:
+#
+#   cp deploy/.env.local.example deploy/.env.local
+#   ./deploy/scripts/render_nginx.sh --local
+#   docker compose --env-file deploy/.env.local \
+#     -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up -d --build
+#
+#   Site   : http://localhost:8080
+#   Inbox  : http://localhost:8025   (every outbound email is captured here)
+#
+# Why this is an overlay and not a copy:
+#   * The published ports come from HTTP_PORT/HTTPS_PORT in deploy/.env.local,
+#     which the base file already interpolates — no port override is possible
+#     (Compose merges `ports` by union), and none is needed.
+#   * The env file is selected by APP_ENV_FILE in deploy/.env.local, for the same
+#     reason: Compose APPENDS `env_file` lists, so an overlay cannot replace one.
+#   * The nginx site is the HTTP-only deploy/nginx/local.conf, rendered into the
+#     same gitignored conf.d mount by `render_nginx.sh --local`.
+#
+# This overlay is for a development machine ONLY. It is not used on staging or
+# production, and it weakens nothing there: config.settings.local is selected
+# here explicitly and is the only consumer of the plain-HTTP allowances.
+# ===========================================================================
+
+name: aa-shinaka-local
+
+services:
+  # ---------------------------------------------------------------------
+  # Select the local settings module. Everything else (secret key, database
+  # URL, Redis URLs, SMTP host, Paystack test keys) still comes from
+  # deploy/.env.local, exactly as production reads deploy/.env.production.
+  # ---------------------------------------------------------------------
+  migrate:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+
+  web:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+
+  worker:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+
+  beat:
+    environment:
+      DJANGO_SETTINGS_MODULE: config.settings.local
+
+  # ---------------------------------------------------------------------
+  # Mailpit — a local SMTP sink with a web UI. It lets the real email code
+  # path run (production rejects console/locmem backends; EMAIL_HOST must not
+  # be "localhost"), so "a notification is recorded only once the backend
+  # confirms delivery" is genuinely exercised without sending real mail.
+  #
+  # Reachable from web/worker on `frontend`, and on http://localhost:8025 for
+  # the developer. It stores nothing on a volume: mail is disposable.
+  # ---------------------------------------------------------------------
+  mailpit:
+    image: axllent/mailpit:v1.21
+    restart: unless-stopped
+    # No shell/tools in the image, so no container healthcheck is possible.
+    # It is a disposable test sink; the app degrades safely if it is down.
+    environment:
+      MP_MAX_MESSAGES: "500"
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    networks:
+      - frontend
+    ports:
+      - "8025:8025"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    deploy:
+      resources:
+        limits: { cpus: "0.25", memory: 128M }

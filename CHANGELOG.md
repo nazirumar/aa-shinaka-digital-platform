@@ -3,6 +3,44 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — Pre-hosting deployment readiness
+
+### Added
+
+- **Local-test Compose stack** (`deploy/docker-compose.local.yml`,
+  `deploy/.env.local.example`, `deploy/nginx/local.conf`,
+  `config/settings/local.py`): runs the whole production shape (nginx, Gunicorn,
+  PostgreSQL, Redis, Celery worker + beat) on a laptop plus a **Mailpit** capture
+  inbox at `http://localhost:8025`, site on `http://localhost:8080`.
+  `config.settings.local` inherits production and relaxes *only* the plain-HTTP
+  controls (non-`Secure` cookies, no SSL redirect, `http://` CSRF origin);
+  `DEBUG` stays `False` and Paystack stays test-mode. Nothing but the local
+  overlay selects it.
+- **`render_nginx.sh --local`** to render the HTTP-only local site config.
+- **`tests/test_ci_security_gate.py`** — 9 tests pinning the CI dependency-scan
+  target, its un-waivable failure modes, finding classification against
+  pip-audit's real wording, full-SHA action pinning and the mandatory jobs.
+- **`docs/PRE_HOSTING_READINESS_REPORT.md`** — the 16-task pre-hosting
+  readiness report with real evidence and an explicit NOT VERIFIED list.
+
+### Fixed
+
+- **CI dependency scan audited the wrong environment.** `uvx … pip-audit`
+  (targetless) scanned pip-audit's own 29 tool dependencies, never the project's.
+  The workflow now exports the lock and audits it with `-r`, with an empty-export
+  guard.
+- **CI mis-classified real findings.** The regex missed pip-audit's actual
+  "Found N known vulnerabilities" wording, labelling a genuine finding as a tool
+  failure. It now matches the real wording and excludes the clean phrase.
+- **`deploy/.env.local.example` was git-ignored** by the broad `.env.*` rule;
+  added to the `.gitignore` whitelist.
+
+### Changed
+
+- `tests/test_phase15_deploy.py` — +12 local-stack deployment-invariant tests
+  (60 total).
+- `.dockerignore` — explicit `deploy/.env.local*` exclusions.
+
 ## [Unreleased] — Phase 15: Hostinger VPS deployment preparation
 
 ### Added

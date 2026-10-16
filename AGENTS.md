@@ -30,7 +30,12 @@ hardening/backup/TLS scripts and a step-by-step guide — see
 VPS, DNS change, live Paystack credential or production data was available or
 touched, so every host-execution gate is **NOT VERIFIED**. Status remains
 **READY FOR STAGING** (not deployed). Later phases must not start without
-approval.
+approval. A later pre-hosting readiness pass added a **local-test Compose stack**
+(`deploy/docker-compose.local.yml` + `config.settings.local`, HTTP on
+`localhost:8080`, Mailpit inbox on `:8025`), fixed two CI security-gate defects
+(the dependency scan now audits the project lock, and real findings are
+classified correctly) and produced `docs/PRE_HOSTING_READINESS_REPORT.md`. It
+deployed nothing and enabled no live payment.
 
 Hard exclusions — never add: oil & gas features, multi-vendor marketplace
 features, or any AgriTrade ERP integration. Never hardcode product categories,
@@ -41,7 +46,9 @@ state-specific prices, inventory or company achievements.
 - Python is managed by **uv** (Python 3.12). Always go through uv; the system
   `python` is 3.13.
 - Env comes from `.env` (gitignored; `.env.example` is the template). Settings:
-  `config.settings.dev` (default) / `config.settings.prod`.
+  `config.settings.dev` (default) / `config.settings.prod`; `config.settings.staging`
+  and `config.settings.local` add environment guards (staging is test-mode-Paystack
+  only; local relaxes only the plain-HTTP controls for the laptop stack).
 - `uv sync` installs Python deps; `npm install` installs Tailwind.
 
 | Task | Command |

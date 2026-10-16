@@ -31,6 +31,14 @@ was actually verified), [`PRODUCTION_LAUNCH_APPROVAL.md`](PRODUCTION_LAUNCH_APPR
 Nothing in this guide can proceed to production launch until the owner signs off
 `docs/BUSINESS_CONTENT_APPROVAL_CHECKLIST.md`.
 
+> **Rehearse locally first (no VPS needed).** The same image and service topology
+> can be exercised on a development machine:
+> `cp deploy/.env.local.example deploy/.env.local && ./deploy/scripts/render_nginx.sh --local`
+> then `docker compose --env-file deploy/.env.local -f deploy/docker-compose.yml -f deploy/docker-compose.local.yml up -d --build`
+> (site `http://localhost:8080`, captured email at `http://localhost:8025`). This
+> proves the startup order, the one-shot migration and the nginx static/media
+> behaviour before any host exists. See `deploy/README.md` → *Local test stack*.
+
 ---
 
 ## 1. Hostinger VPS setup

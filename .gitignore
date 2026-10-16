@@ -27,6 +27,7 @@ node_modules/
 !.env.example
 !deploy/.env.production.example
 !deploy/.env.staging.example
+!deploy/.env.local.example
 
 # Deployment state — rendered per deployment, never committed
 /deploy/nginx/certs/

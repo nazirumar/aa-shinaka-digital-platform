@@ -310,12 +310,13 @@ infrastructure**
   settings) and an end-to-end scenario suite (purchase→payment, service
   quotation, export order, training enrolment, support lifecycle, report export).
 - Deployment assets under [`deploy/`](deploy/README.md): Dockerfile, Compose
-  stack, gunicorn config, entrypoint, nginx site with **default-deny `/media/`**,
-  systemd units, verified backup/restore/healthcheck/deploy scripts, a
+  stack (production, staging and a laptop **local-test** overlay with a Mailpit
+  capture inbox), gunicorn config, entrypoint, nginx site with **default-deny
+  `/media/`**, systemd units, verified backup/restore/healthcheck/deploy scripts,
   production env template and a dependency-free load tester.
 - CI (`.github/workflows/ci.yml`): lint/format, system + migration checks, asset
-  build, tests with coverage, dependency vulnerability audit and a production
-  `manage.py check --deploy`.
+  build, tests with coverage, dependency vulnerability audit **against the project
+  lock** and a production `manage.py check --deploy`.
 - Operations documentation: production audit, disaster recovery, runbook,
   monitoring, data protection, launch content checklist, performance &
   accessibility, release checklist, and the final readiness report
@@ -429,6 +430,7 @@ live Paystack. Later phases must not start without approval.
 | [`docs/PHASE_14_STAGING_REPORT.md`](docs/PHASE_14_STAGING_REPORT.md) | Phase 14 staging verification: what passed locally vs what is NOT VERIFIED |
 | [`docs/HOSTINGER_VPS_DEPLOYMENT.md`](docs/HOSTINGER_VPS_DEPLOYMENT.md) | Phase 15 step-by-step Hostinger VPS deployment guide (Ubuntu 24.04 + Docker Compose) |
 | [`docs/PHASE_15_HOSTINGER_REPORT.md`](docs/PHASE_15_HOSTINGER_REPORT.md) | Phase 15 deliverables, real test evidence and PASSED/FAILED/NOT VERIFIED gates |
+| [`docs/PRE_HOSTING_READINESS_REPORT.md`](docs/PRE_HOSTING_READINESS_REPORT.md) | Pre-hosting readiness pass over the 16-task brief, with real evidence and fixes |
 | [`docs/PRODUCTION_LAUNCH_APPROVAL.md`](docs/PRODUCTION_LAUNCH_APPROVAL.md) | Phase 14 go/no-go decision record (PASSED/FAILED/NOT VERIFIED/N-A) |
 | [`docs/PRODUCTION_LAUNCH_PLAN.md`](docs/PRODUCTION_LAUNCH_PLAN.md) | DNS/TLS/migration/backup/smoke/rollback/payment-activation launch procedure |
 | [`docs/STAGING_TEST_PLAN.md`](docs/STAGING_TEST_PLAN.md) | Executable host procedure for staging verification (steps 4–13) |

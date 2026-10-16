@@ -458,6 +458,7 @@ def test_dockerignore_keeps_secrets_and_host_state_out_of_the_image():
         ".env",
         "deploy/.env.production",
         "deploy/.env.staging",
+        "deploy/.env.local",
         "media/",
         "staticfiles/",
         "deploy/nginx/certs/",
@@ -475,3 +476,216 @@ def test_dockerfile_builds_from_the_lockfile_and_runs_unprivileged():
     assert "COPY pyproject.toml uv.lock ./" in text
     assert "USER app" in text
     assert "npm ci" in text and "npm run build:css" in text
+
+
+# ---------------------------------------------------------------------------
+# LOCAL test stack
+#
+# The local stack is the production shape (same image, same services, same
+# settings inheritance) run on a developer machine over plain HTTP, with a
+# capture inbox instead of a real SMTP server. It must not weaken any production
+# control: the plain-HTTP allowances live only in config.settings.local, which
+# nothing but the local overlay selects.
+# ---------------------------------------------------------------------------
+
+LOCAL_OVERRIDE = DEPLOY / "docker-compose.local.yml"
+ENV_LOCAL = DEPLOY / ".env.local.example"
+NGINX_LOCAL = DEPLOY / "nginx" / "local.conf"
+LOCAL_SETTINGS = REPO / "config" / "settings" / "local.py"
+
+
+def _bash() -> str | None:
+    found = shutil.which("bash")
+    if found:
+        return found
+    for candidate in (
+        r"C:\Program Files\Git\bin\bash.exe",
+        r"C:\Program Files\Git\usr\bin\bash.exe",
+        "/bin/bash",
+        "/usr/bin/bash",
+    ):
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
+BASH = _bash()
+requires_bash = pytest.mark.skipif(BASH is None, reason="bash not available")
+
+
+@pytest.fixture(scope="module")
+def local_config() -> dict:
+    return _compose_config(LOCAL_OVERRIDE, ENV_LOCAL)
+
+
+@requires_docker
+def test_local_compose_config_is_valid_and_isolated(local_config):
+    """Local runs in its own project so it can never touch production volumes."""
+    assert local_config["name"] == "aa-shinaka-local"
+    published = {
+        str(p.get("published")) for p in local_config["services"]["nginx"].get("ports", [])
+    }
+    assert published == {"8080", "8443"}, published
+
+
+@requires_docker
+def test_local_stack_runs_the_production_shape_with_local_settings(local_config):
+    # Same services as production...
+    assert set(local_config["services"]) >= set(APP_SERVICES) | {"db", "redis", "nginx"}
+    # ...but each app service selects the local settings module, never prod.
+    for name in APP_SERVICES:
+        environment = local_config["services"][name].get("environment") or {}
+        assert environment.get("DJANGO_SETTINGS_MODULE") == "config.settings.local", name
+    # And the production stack still selects production.
+    assert "config.settings.prod" in COMPOSE.read_text(encoding="utf-8")
+
+
+@requires_docker
+def test_local_stack_keeps_the_database_and_redis_private(local_config):
+    for name in ("db", "redis"):
+        assert _networks(local_config["services"][name]) == {"backend"}, name
+        assert not local_config["services"][name].get("ports"), f"{name} is published"
+
+
+@requires_docker
+def test_local_stack_adds_a_capture_inbox(local_config):
+    mailpit = local_config["services"]["mailpit"]
+    assert "mailpit" in mailpit["image"]
+    # Reachable by web/worker on the frontend network, UI exposed to the host.
+    assert _networks(mailpit) == {"frontend"}
+    published = {str(p.get("published")) for p in mailpit.get("ports", [])}
+    assert published == {"8025"}, published
+    # The SMTP port is NOT published to the host.
+    assert "1025" not in published
+    assert _limits(mailpit), "mailpit needs resource limits"
+
+
+def test_local_overlay_declares_no_env_file():
+    keys = [
+        line.strip()
+        for line in LOCAL_OVERRIDE.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.strip().startswith("#")
+    ]
+    assert not any(line.startswith("env_file:") for line in keys), (
+        "the local overlay must not declare `env_file`: Compose appends those "
+        "entries instead of replacing them, which would load the production file"
+    )
+
+
+def test_local_env_template_is_safe_and_self_contained():
+    values = _env(ENV_LOCAL)
+    assert values["APP_ENV_FILE"] == ".env.local"
+    # Payments stay off, exactly as in the other templates.
+    assert values["PAYSTACK_ENABLED"].lower() == "false"
+    assert values["PAYSTACK_LIVE_MODE"].lower() == "false"
+    assert not values["PAYSTACK_SECRET_KEY"].startswith("sk_live_")
+    # Internal database, no TLS on the wire.
+    assert values["DB_SSLMODE_REQUIRE"].lower() == "false"
+    # CSRF origins are supplied by config.settings.local, not the env file
+    # (prod.py only accepts https:// origins).
+    assert "CSRF_TRUSTED_ORIGINS" not in values
+    # Real SMTP to the capture inbox — never the console backend, and the host
+    # must not be "localhost" (prod.py rejects that).
+    assert values["EMAIL_BACKEND"] == "django.core.mail.backends.smtp.EmailBackend"
+    assert values["EMAIL_HOST"] == "mailpit"
+
+
+def test_local_env_template_passwords_are_internally_consistent():
+    values = _env(ENV_LOCAL)
+    assert values["REDIS_PASSWORD"].replace("_", "").isalnum()
+    url = values["DATABASE_URL"]
+    userinfo = url.split("://", 1)[1].split("@", 1)[0]
+    assert userinfo.split(":", 1)[1] == values["POSTGRES_PASSWORD"]
+    for key in ("CACHE_URL", "CELERY_BROKER_URL", "CELERY_RESULT_BACKEND"):
+        assert f":{values['REDIS_PASSWORD']}@" in values[key], key
+
+
+def test_local_settings_inherit_production_and_relax_only_plain_http():
+    text = LOCAL_SETTINGS.read_text(encoding="utf-8")
+    # Inherits production (and therefore every hardened control).
+    assert "from .prod import *" in text
+    assert 'ENVIRONMENT = "local"' in text
+    # Only the plain-HTTP controls are relaxed...
+    assert "SESSION_COOKIE_SECURE = False" in text
+    assert "CSRF_COOKIE_SECURE = False" in text
+    assert "SECURE_SSL_REDIRECT = False" in text
+    assert "SECURE_HSTS_SECONDS = 0" in text
+    # ...payment safety is not, and DEBUG must never be switched on here.
+    assert "PAYSTACK_LIVE_MODE = False" in text
+    assert "DEBUG = True" not in text
+
+
+def test_production_and_staging_never_select_the_local_settings():
+    """The plain-HTTP allowances must be unreachable outside the local overlay."""
+    for path in (COMPOSE, STAGING_OVERRIDE):
+        assert "config.settings.local" not in path.read_text(encoding="utf-8"), path.name
+    # Production keeps the secure cookies hard-on (not env-driven).
+    prod_text = (REPO / "config" / "settings" / "prod.py").read_text(encoding="utf-8")
+    assert "SESSION_COOKIE_SECURE = True" in prod_text
+    assert "CSRF_COOKIE_SECURE = True" in prod_text
+
+
+def test_local_nginx_is_http_only_and_denies_private_media():
+    text = NGINX_LOCAL.read_text(encoding="utf-8")
+    assert "listen 443" not in text
+    assert "ssl_certificate" not in text
+    assert "Strict-Transport-Security" not in text
+    # Same default-deny as production: private documents are never served.
+    assert "location /media/ {" in text
+    assert "return 404;" in text
+    aliases = [
+        line.split("alias", 1)[1].strip().rstrip(";")
+        for line in text.splitlines()
+        if "alias /srv/media/" in line
+    ]
+    assert aliases, "expected public media aliases"
+    for alias in aliases:
+        assert alias.startswith(
+            ("/srv/media/catalog/", "/srv/media/cms/", "/srv/media/training/")
+        ), f"unexpected public media alias: {alias}"
+    forbidden = ("invoice", "payment", "export", "document", "attachment", "order")
+    for alias in aliases:
+        assert not any(word in alias.lower() for word in forbidden), alias
+
+
+def _render_repo(tmp_path: Path) -> Path:
+    """Mirror the layout render_nginx.sh expects so it can run in isolation."""
+    (tmp_path / "deploy" / "nginx").mkdir(parents=True)
+    (tmp_path / "deploy" / "scripts").mkdir(parents=True)
+    for name in ("local.conf", "aa-shinaka.conf", "bootstrap.conf"):
+        shutil.copy(DEPLOY / "nginx" / name, tmp_path / "deploy" / "nginx" / name)
+    shutil.copy(
+        DEPLOY / "scripts" / "render_nginx.sh",
+        tmp_path / "deploy" / "scripts" / "render_nginx.sh",
+    )
+    return tmp_path
+
+
+@requires_bash
+def test_render_nginx_script_renders_the_local_config(tmp_path):
+    root = _render_repo(tmp_path)
+    proc = subprocess.run(
+        [BASH, "deploy/scripts/render_nginx.sh", "--local"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode == 0, f"{proc.stdout}\n{proc.stderr}"
+    out = root / "deploy" / "nginx" / "conf.d" / "default.conf"
+    assert out.exists()
+    assert out.read_text(encoding="utf-8") == NGINX_LOCAL.read_text(encoding="utf-8")
+
+
+@requires_bash
+def test_render_nginx_local_mode_refuses_a_domain(tmp_path):
+    root = _render_repo(tmp_path)
+    proc = subprocess.run(
+        [BASH, "deploy/scripts/render_nginx.sh", "--local", "shop.example.com"],
+        cwd=root,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    assert proc.returncode != 0
+    assert not (root / "deploy" / "nginx" / "conf.d" / "default.conf").exists()

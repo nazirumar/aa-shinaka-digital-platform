@@ -131,6 +131,16 @@ jobs:
           enable-cache: true
       - run: uv sync --frozen
 
+      # Audit the PROJECT's locked dependencies. Running `pip-audit` with no
+      # target through `uvx` audits the ephemeral uvx tool environment (i.e.
+      # pip-audit's own dependencies), never this project's — so the lock is
+      # exported and passed explicitly with `-r`. An empty export is a hard
+      # failure rather than a silent pass.
+      - name: Export the locked requirements for auditing
+        run: >-
+          uv export --frozen --no-emit-project --format requirements-txt
+          --no-hashes > requirements-audit.txt
+
       # Mandatory scan (no continue-on-error). `--strict` also fails when the
       # scan itself cannot complete, so BOTH outcomes block the merge — this
       # step only distinguishes them so the right fix is applied:
@@ -139,14 +149,22 @@ jobs:
       - name: Dependency vulnerability scan (pip-audit, pinned)
         run: |
           set +e
-          uvx --from pip-audit==2.10.1 pip-audit --strict --progress-spinner off > audit.log 2>&1
+          if [ ! -s requirements-audit.txt ]; then
+            echo "::error::requirements-audit.txt is empty — the lock export failed; refusing to report a clean scan."
+            exit 1
+          fi
+          uvx --from pip-audit==2.10.1 pip-audit --strict --progress-spinner off -r requirements-audit.txt > audit.log 2>&1
           status=$?
           cat audit.log
           if [ "$status" -eq 0 ]; then
             echo "No known vulnerabilities found."
             exit 0
           fi
-          if grep -qiE "found [0-9]+ vulnerabilit|vulnerabilit(y|ies) (were )?found" audit.log; then
+          # Real pip-audit output, e.g. "Found 8 known vulnerabilities in 1
+          # package". The "No known vulnerabilities found." phrasing (seen when
+          # --strict aborts the scan) must NOT be read as a finding.
+          if grep -qiE "found [0-9]+ (known )?vulnerabilit|vulnerabilit(y|ies) (were )?found" audit.log \
+             && ! grep -qi "no known vulnerabilities found" audit.log; then
             echo "::error::DEPENDENCY VULNERABILITY FINDING (not a tool failure): known-vulnerable packages are pinned in uv.lock. Update or remove the affected packages, then re-run."
             exit 1
           fi
