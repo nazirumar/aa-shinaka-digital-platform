@@ -14,4 +14,10 @@ urlpatterns = [
     path("staff/<uuid:pk>/edit/", views.staff_edit, name="staff_edit"),
     path("staff/<uuid:pk>/toggle-active/", views.staff_toggle_active, name="staff_toggle_active"),
     path("audit/", views.audit_log, name="audit_log"),
+    path("security/uploads/", views.upload_scans, name="upload_scans"),
+    path(
+        "security/uploads/<int:pk>/release/",
+        views.upload_scan_release,
+        name="upload_scan_release",
+    ),
 ]

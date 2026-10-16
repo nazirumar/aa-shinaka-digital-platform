@@ -10,6 +10,8 @@ from django.http import FileResponse, Http404, HttpRequest, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
+from apps.core.upload_security import enforce_downloadable
+
 from . import selectors, services
 from .forms import SupportAttachmentForm, SupportReplyForm, SupportTicketForm
 from .models import SupportAttachment, SupportStatus
@@ -79,6 +81,7 @@ def ticket_create(request: HttpRequest) -> HttpResponse:
                     files=request.FILES.getlist("attachments"),
                     related_type=form.cleaned_data.get("related_type", ""),
                     related_id=form.cleaned_data.get("related_id", ""),
+                    request=request,
                 )
             except ValidationError as exc:
                 form.add_error(None, exc)
@@ -171,6 +174,9 @@ def attachment_download(request: HttpRequest, pk) -> HttpResponse:
     if attachment.message_id and attachment.message.is_internal:
         # Internal notes and their files are never exposed to customers.
         raise Http404("Attachment not found.")
+    enforce_downloadable(
+        attachment.file, kind="support_attachment", actor=request.user, request=request
+    )
     response = FileResponse(attachment.file.open("rb"), as_attachment=True)
     if attachment.original_filename:
         response["Content-Disposition"] = f'attachment; filename="{attachment.original_filename}"'

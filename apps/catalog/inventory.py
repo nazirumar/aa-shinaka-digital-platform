@@ -95,6 +95,66 @@ def _rollup_on_hand(listing: ProductListing) -> Decimal:
     return total
 
 
+def _recompute_rollup(listing: ProductListing) -> Decimal:
+    """Re-derive both roll-ups from the authoritative per-warehouse balances.
+
+    ``stock_on_hand`` and ``stock_reserved`` are denormalised sums of
+    ``StockBalance`` rows. Recomputing (rather than adding/subtracting) keeps
+    them exactly consistent with Σ balances even when a release targets a
+    different warehouse than the one that placed the hold.
+    """
+    totals = StockBalance.objects.filter(listing=listing).aggregate(
+        on_hand=Sum("on_hand"), reserved=Sum("reserved")
+    )
+    listing.stock_on_hand = totals["on_hand"] or ZERO
+    listing.stock_reserved = totals["reserved"] or ZERO
+    listing.save(update_fields=["stock_on_hand", "stock_reserved", "updated_at"])
+    return listing.stock_on_hand
+
+
+def _available_by_warehouse(
+    listing: ProductListing, *, variant: ProductVariant | None = None
+) -> dict:
+    """Map ``warehouse_id -> unreserved available`` for a listing/variant."""
+    rows = StockBalance.objects.filter(listing=listing, variant=variant, warehouse__is_active=True)
+    return {balance.warehouse_id: balance.on_hand - balance.reserved for balance in rows}
+
+
+def select_warehouse(
+    listing: ProductListing,
+    *,
+    quantity,
+    variant: ProductVariant | None = None,
+    preferred: Warehouse | None = None,
+) -> Warehouse:
+    """Choose the warehouse to fulfil from — explicitly and deterministically.
+
+    Order of preference: an explicitly named warehouse, then the platform
+    default, then any active warehouse whose unreserved stock covers the line.
+    Single-warehouse deployments therefore always resolve to ``MAIN``; the
+    caller never has a warehouse chosen for it by luck.
+    """
+    amount = _as_decimal(quantity)
+    if preferred is not None:
+        return preferred
+    default = default_warehouse()
+    available = _available_by_warehouse(listing, variant=variant)
+    if available.get(default.pk, ZERO) >= amount:
+        return default
+    # Exactly one candidate that can cover the whole line, in a stable order.
+    covering = [warehouse_id for warehouse_id, qty in sorted(available.items()) if qty >= amount]
+    if len(covering) == 1:
+        return Warehouse.objects.get(pk=covering[0])
+    if len(covering) > 1:
+        # Several could cover it: prefer the one with the most headroom
+        # (deterministic tie-break on the id string).
+        best = max(covering, key=lambda warehouse_id: (available[warehouse_id], str(warehouse_id)))
+        return Warehouse.objects.get(pk=best)
+    # Nothing covers it: fall back to the default so the caller gets the
+    # familiar out-of-stock error from ``place_reservation``.
+    return default
+
+
 def _sync_listing_status(listing: ProductListing) -> None:
     available = listing.stock_on_hand - listing.stock_reserved
     if available <= 0 and listing.status == ListingStatus.ACTIVE:
@@ -323,15 +383,15 @@ def place_reservation(
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
         balance = get_balance(listing, warehouse=resolved, variant=variant, for_update=True)
-        if listing.stock_on_hand - listing.stock_reserved < amount:
+        available_here = balance.on_hand - balance.reserved
+        if available_here < amount:
             raise ValidationError(
-                f"Only {listing.available_stock} of {listing.product.name} "
-                f"({listing.packaging}) is available."
+                f"Only {available_here} of {listing.product.name} "
+                f"({listing.packaging}) is available at {resolved.name}."
             )
         balance.reserved = balance.reserved + amount
         balance.save(update_fields=["reserved", "updated_at"])
-        listing.stock_reserved = listing.stock_reserved + amount
-        listing.save(update_fields=["stock_reserved", "updated_at"])
+        _recompute_rollup(listing)
     _sync_caller(caller, listing)
     return amount
 
@@ -343,16 +403,23 @@ def release_reservation(
     variant: ProductVariant | None = None,
     warehouse: Warehouse | None = None,
 ) -> None:
-    """Release a previously placed reservation (never below zero)."""
+    """Release a previously placed reservation (never below zero).
+
+    The roll-up is recomputed from Σ balances afterwards, so releasing against
+    the wrong warehouse can never desynchronise ``stock_reserved`` from the
+    per-warehouse rows.
+    """
     amount = _as_decimal(quantity)
+    if amount <= 0:
+        raise ValidationError("Release quantity must be positive.")
+    resolved = resolve_warehouse(warehouse)
     caller = listing
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
-        balance = get_balance(listing, warehouse=warehouse, variant=variant, for_update=True)
+        balance = get_balance(listing, warehouse=resolved, variant=variant, for_update=True)
         balance.reserved = max(balance.reserved - amount, ZERO)
         balance.save(update_fields=["reserved", "updated_at"])
-        listing.stock_reserved = max(listing.stock_reserved - amount, ZERO)
-        listing.save(update_fields=["stock_reserved", "updated_at"])
+        _recompute_rollup(listing)
     _sync_caller(caller, listing)
 
 
@@ -367,24 +434,25 @@ def commit_reservation(
 ) -> StockMovement:
     """Turn a reservation into a sale: reduce on-hand and reserved together."""
     amount = _as_decimal(quantity)
+    if amount <= 0:
+        raise ValidationError("Committed quantity must be positive.")
+    resolved = resolve_warehouse(warehouse)
     caller = listing
     with transaction.atomic():
         listing = ProductListing.objects.select_for_update().get(pk=listing.pk)
-        balance = get_balance(listing, warehouse=warehouse, variant=variant, for_update=True)
+        balance = get_balance(listing, warehouse=resolved, variant=variant, for_update=True)
         if balance.on_hand < amount:
             raise ValidationError("Committed quantity exceeds stock on hand.")
         balance.on_hand = balance.on_hand - amount
         balance.reserved = max(balance.reserved - amount, ZERO)
         balance.save(update_fields=["on_hand", "reserved", "updated_at"])
-        listing.stock_reserved = max(listing.stock_reserved - amount, ZERO)
-        listing.save(update_fields=["stock_reserved", "updated_at"])
-        total = _rollup_on_hand(listing)
+        total = _recompute_rollup(listing)
         movement = _write_movement(
             listing,
             delta=-amount,
             kind=StockMovementKind.SALE,
             balance_after=total,
-            warehouse=warehouse,
+            warehouse=resolved,
             variant=variant,
             reference=reference[:100],
             note="Order payment confirmed",

@@ -16,6 +16,7 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.permissions import capability_required
 from apps.accounts.roles import Capability
+from apps.core.upload_security import enforce_downloadable
 
 from . import selectors, services
 from .forms import SupportAssignForm, SupportStaffReplyForm, SupportStatusForm
@@ -174,6 +175,9 @@ def attachment_download(request: HttpRequest, pk) -> HttpResponse:
     attachment = SupportAttachment.objects.filter(pk=pk).first()
     if attachment is None:
         raise Http404("Attachment not found.")
+    enforce_downloadable(
+        attachment.file, kind="support_attachment", actor=request.user, request=request
+    )
     response = FileResponse(attachment.file.open("rb"), as_attachment=True)
     if attachment.original_filename:
         response["Content-Disposition"] = f'attachment; filename="{attachment.original_filename}"'

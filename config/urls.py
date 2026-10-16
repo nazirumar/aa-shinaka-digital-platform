@@ -25,6 +25,7 @@ urlpatterns = [
     path("", include("apps.orders.urls")),
     path("accounts/", include("apps.accounts.urls")),
     path("account/", include("apps.accounts.account_urls")),
+    path("accounts/mfa/", include("apps.accounts.mfa.urls")),
     path("dashboard/", include("apps.dashboard.urls")),
     # Analytics, business intelligence and controlled reporting (Phase 11).
     path("dashboard/", include("apps.analytics.urls")),

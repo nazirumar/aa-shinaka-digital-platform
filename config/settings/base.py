@@ -52,6 +52,9 @@ LOCAL_APPS = [
     "apps.core",
     "apps.locations",
     "apps.accounts",
+    # Staff MFA (TOTP) — Phase 13. Separate app label so its migrations
+    # and admin registration stay isolated from the core accounts app.
+    "apps.accounts.mfa",
     "apps.catalog",
     "apps.orders",
     "apps.services",
@@ -165,11 +168,36 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = env.int("FILE_UPLOAD_MAX_MEMORY_SIZE", default=5 *
 DATA_UPLOAD_MAX_MEMORY_SIZE = env.int("DATA_UPLOAD_MAX_MEMORY_SIZE", default=5 * 1024 * 1024)
 DATA_UPLOAD_MAX_NUMBER_FIELDS = env.int("DATA_UPLOAD_MAX_NUMBER_FIELDS", default=2000)
 
+# ---------------------------------------------------------------------------
+# Upload scanning & quarantine (Phase 13, Step 4)
+# ---------------------------------------------------------------------------
+# enforce: unscannable uploads are rejected and unscanned files cannot be
+# downloaded (fail closed). log: scanner *failures* are audited and allowed
+# through; positively identified malware is blocked in both modes.
+UPLOAD_SCAN_ENFORCEMENT = env("UPLOAD_SCAN_ENFORCEMENT", default="enforce")
+# Optional ClamAV integration. With neither set, only the built-in signature
+# scanner (EICAR fixture + executable-header checks) runs.
+CLAMAV_SOCKET = env("CLAMAV_SOCKET", default="")
+CLAMAV_HOST = env("CLAMAV_HOST", default="")
+CLAMAV_PORT = env.int("CLAMAV_PORT", default=3310)
+CLAMAV_TIMEOUT = env.int("CLAMAV_TIMEOUT", default=20)
+# Hard cap on how much of one upload is read into memory for scanning.
+UPLOAD_SCAN_MAX_BYTES = env.int("UPLOAD_SCAN_MAX_BYTES", default=32 * 1024 * 1024)
+
 # Authentication rate limiting (attempts / window in seconds).
 LOGIN_RATE_LIMIT_ATTEMPTS = env.int("LOGIN_RATE_LIMIT_ATTEMPTS", default=10)
 LOGIN_RATE_LIMIT_WINDOW = env.int("LOGIN_RATE_LIMIT_WINDOW", default=300)
 FORM_RATE_LIMIT_ATTEMPTS = env.int("FORM_RATE_LIMIT_ATTEMPTS", default=20)
 FORM_RATE_LIMIT_WINDOW = env.int("FORM_RATE_LIMIT_WINDOW", default=3600)
+
+# ---------------------------------------------------------------------------
+# Multi-factor authentication (Phase 13, privileged staff only)
+# ---------------------------------------------------------------------------
+# How long a parked (password-ok, MFA-not-yet-passed) login session survives.
+MFA_CHALLENGE_TIMEOUT = env.int("MFA_CHALLENGE_TIMEOUT", default=300)  # 5 minutes
+# TOTP verification attempts per window, keyed by user id + client IP.
+MFA_RATE_LIMIT_ATTEMPTS = env.int("MFA_RATE_LIMIT_ATTEMPTS", default=5)
+MFA_RATE_LIMIT_WINDOW = env.int("MFA_RATE_LIMIT_WINDOW", default=300)
 
 # ---------------------------------------------------------------------------
 # Commerce business rules (Phase 5). No rate is invented — defaults are zero.
@@ -186,6 +214,10 @@ ORDER_TAX_RATE = env("ORDER_TAX_RATE", default="0.00")
 PAYSTACK_ENABLED = env.bool("PAYSTACK_ENABLED", default=False)
 PAYSTACK_SECRET_KEY = env("PAYSTACK_SECRET_KEY", default="")
 PAYSTACK_PUBLIC_KEY = env("PAYSTACK_PUBLIC_KEY", default="")
+# Phase 13 launch gate: the platform is test-mode only. A live key (sk_live_…)
+# is ignored (payments fail closed) unless this is explicitly switched on after
+# the owner approves a production launch.
+PAYSTACK_LIVE_MODE = env.bool("PAYSTACK_LIVE_MODE", default=False)
 # Paystack signs webhooks with the secret key; set this only if you enable a
 # separate webhook secret in the dashboard.
 PAYSTACK_WEBHOOK_SECRET = env("PAYSTACK_WEBHOOK_SECRET", default="")

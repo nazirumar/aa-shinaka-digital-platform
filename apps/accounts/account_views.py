@@ -12,6 +12,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.views.decorators.http import require_http_methods, require_POST
 
 from apps.core.audit import record_audit
+from apps.core.upload_security import enforce_downloadable
 
 from . import documents as document_services
 from .activity import activity_feed
@@ -211,6 +212,7 @@ def document_download(request: HttpRequest, kind: str, pk) -> HttpResponse:
     document = document_services.service_file(request.user, kind, pk)
     if document is None or not document.file:
         raise Http404("Document not found.")
+    enforce_downloadable(document.file, kind=kind, actor=request.user, request=request)
     record_audit(
         actor=request.user,
         action="account.document_downloaded",

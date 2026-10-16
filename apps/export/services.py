@@ -27,6 +27,7 @@ from django.utils import timezone
 from apps.accounts.permissions import has_capability
 from apps.accounts.roles import Capability
 from apps.core.audit import record_audit
+from apps.core.upload_security import bind_scanned_file, screen_upload
 from apps.notifications import events as notification_events
 
 from . import notifications, selectors
@@ -805,7 +806,6 @@ def record_verified_payment(order: ExportOrder, *, amount, actor=None, payment=N
 # ---------------------------------------------------------------------------
 
 
-@transaction.atomic
 def add_document(
     order: ExportOrder,
     *,
@@ -824,21 +824,24 @@ def add_document(
     _require(file, "A file is required.")
     if document_type.requires_expiry:
         _require(expiration_date is not None, f"{document_type.name} requires an expiry date.")
-    return ExportDocument.objects.create(
-        order=order,
-        document_type=document_type,
-        file=file,
-        issuing_organization=issuing_organization,
-        document_reference=document_reference,
-        issue_date=issue_date,
-        expiration_date=expiration_date,
-        is_customer_visible=is_customer_visible,
-        verification_status=verification_status,
-        uploaded_by=_audit_actor(actor),
-    )
+    scan = screen_upload(file, kind="export_document", actor=actor)
+    with transaction.atomic():
+        document = ExportDocument.objects.create(
+            order=order,
+            document_type=document_type,
+            file=file,
+            issuing_organization=issuing_organization,
+            document_reference=document_reference,
+            issue_date=issue_date,
+            expiration_date=expiration_date,
+            is_customer_visible=is_customer_visible,
+            verification_status=verification_status,
+            uploaded_by=_audit_actor(actor),
+        )
+        bind_scanned_file(scan, document.file)
+    return document
 
 
-@transaction.atomic
 def upload_customer_document(
     order: ExportOrder,
     *,
@@ -852,15 +855,19 @@ def upload_customer_document(
     if order.customer_id != getattr(customer, "id", None):
         raise PermissionDenied("You can only upload documents to your own export order.")
     _require(file, "A file is required.")
-    return ExportDocument.objects.create(
-        order=order,
-        document_type=document_type,
-        file=file,
-        document_reference=document_reference,
-        expiration_date=expiration_date,
-        verification_status=DocumentVerificationStatus.SUBMITTED,
-        uploaded_by=customer,
-    )
+    scan = screen_upload(file, kind="export_document", actor=customer)
+    with transaction.atomic():
+        document = ExportDocument.objects.create(
+            order=order,
+            document_type=document_type,
+            file=file,
+            document_reference=document_reference,
+            expiration_date=expiration_date,
+            verification_status=DocumentVerificationStatus.SUBMITTED,
+            uploaded_by=customer,
+        )
+        bind_scanned_file(scan, document.file)
+    return document
 
 
 @transaction.atomic

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from django.db.models import Q, QuerySet
 
+from apps.core.models import FileScanRecord
+
 from .models import AuditLog
 
 
@@ -34,4 +36,14 @@ def audit_search(*, query: str = "", action: str = "") -> QuerySet[AuditLog]:
         )
     if action:
         queryset = queryset.filter(action=action)
+    return queryset
+
+
+def scan_records(*, status: str = "", kind: str = "") -> QuerySet[FileScanRecord]:
+    """Upload-scan records for the security review screen (newest first)."""
+    queryset = FileScanRecord.objects.select_related("uploaded_by", "released_by")
+    if status:
+        queryset = queryset.filter(status=status)
+    if kind:
+        queryset = queryset.filter(kind=kind)
     return queryset

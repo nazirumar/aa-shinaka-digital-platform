@@ -179,7 +179,7 @@ def test_active_and_approved_are_both_required(administrator):
     services.approve_destination(destination, actor=administrator)
     destination.refresh_from_db()
     assert destination.is_active is False
-    assert selectors.active_destinations().filter(pk=destination.pk).exists() is False
+    assert selectors.approved_active_destinations().filter(pk=destination.pk).exists() is False
 
 
 def test_destination_activation_is_audited(administrator, destination):

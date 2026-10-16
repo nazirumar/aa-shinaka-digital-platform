@@ -344,12 +344,14 @@ def place_order(
             checkout_token=checkout_token,
         )
 
-        warehouse = inventory.default_warehouse()
         for line in summary["lines"]:
             listing = line["listing"]
             variant = line["variant"]
             quantity = line["quantity"]
             unit_price = _money(line["unit_price"])
+            # Choose the fulfilment warehouse deliberately (default when
+            # single-warehouse, otherwise one that can cover the line).
+            warehouse = inventory.select_warehouse(listing, quantity=quantity, variant=variant)
             item = OrderItem.objects.create(
                 order=order,
                 listing=listing,

@@ -42,8 +42,35 @@ class PaystackError(Exception):
         self.status_code = status_code
 
 
+def _is_live_key() -> bool:
+    """A live (money-moving) Paystack key, as opposed to a test key."""
+    key = _secret_key()
+    return key.startswith("sk_live_") or key.startswith("pk_live_")
+
+
+def live_key_blocked() -> bool:
+    """True when a *live* key is configured but live mode is switched off.
+
+    This is the Phase 13 fail-closed guard: the platform ships "test mode only",
+    so a live key left in the environment must never move real money until the
+    owner explicitly sets ``PAYSTACK_LIVE_MODE=True`` (a launch gate).
+    """
+    return _is_live_key() and not bool(getattr(settings, "PAYSTACK_LIVE_MODE", False))
+
+
 def is_enabled() -> bool:
-    """Whether live Paystack calls are configured and switched on."""
+    """Whether Paystack calls are configured and switched on.
+
+    Disabled (fail closed) if a live key is present while live mode is off, even
+    when ``PAYSTACK_ENABLED`` is true — a misconfiguration can never charge a
+    real card by accident.
+    """
+    if live_key_blocked():
+        logger.warning(
+            "A live Paystack key is configured but PAYSTACK_LIVE_MODE is off; "
+            "payments are disabled until launch is explicitly approved."
+        )
+        return False
     return bool(getattr(settings, "PAYSTACK_ENABLED", False)) and bool(
         getattr(settings, "PAYSTACK_SECRET_KEY", "")
     )
@@ -98,6 +125,12 @@ def _request(method: str, path: str, payload: dict | None = None) -> dict:
     secret = _secret_key()
     if not secret:
         raise PaystackError("Paystack is not configured.", code="not_configured")
+    if live_key_blocked():
+        # Defence in depth: never send a live key unless launch is approved.
+        raise PaystackError(
+            "Live Paystack mode is disabled pending launch approval.",
+            code="live_mode_disabled",
+        )
 
     url = f"{_api_base()}{path}"
     data = json.dumps(payload).encode("utf-8") if payload is not None else None
@@ -187,6 +220,7 @@ __all__ = [
     "from_kobo",
     "initialize_transaction",
     "is_enabled",
+    "live_key_blocked",
     "refund_transaction",
     "to_kobo",
     "verify_transaction",

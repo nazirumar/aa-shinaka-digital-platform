@@ -1,5 +1,9 @@
 name: CI
 
+# Every job below is a MANDATORY check. Configure branch protection on
+# `master` to require: lint, checks, assets, test, security.
+# No job uses `continue-on-error`; a failing job blocks the merge.
+
 on:
   push:
     branches: ["**"]
@@ -9,6 +13,10 @@ on:
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
+
+# Least privilege: the workflow only reads the repository.
+permissions:
+  contents: read
 
 env:
   DJANGO_SETTINGS_MODULE: config.settings.test
@@ -21,8 +29,10 @@ jobs:
     name: Lint & format
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      # Actions pinned to full commit SHAs (version in the comment) so a
+      # moved tag can never inject different code into the pipeline.
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -36,7 +46,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.4
         env:
           POSTGRES_DB: aa_shinaka
           POSTGRES_USER: aa_shinaka
@@ -46,8 +56,8 @@ jobs:
           --health-cmd "pg_isready -U aa_shinaka"
           --health-interval 10s --health-timeout 5s --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
         with:
           enable-cache: true
       - run: uv sync --frozen
@@ -60,10 +70,10 @@ jobs:
     name: Static asset build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
-          node-version: "20"
+          node-version: "20.18.0"
           cache: npm
       - run: npm ci --no-audit --no-fund
       - run: npm run build:css
@@ -75,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:16.4
         env:
           POSTGRES_USER: aa_shinaka
           POSTGRES_PASSWORD: aa_shinaka
@@ -88,16 +98,24 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - name: Run tests with coverage
+      - name: Security tests (auth, MFA, hardening, E2E) — run first, fail fast
+        run: >-
+          uv run pytest
+          tests/test_security.py
+          tests/test_production_security.py
+          tests/test_mfa.py
+          tests/test_e2e.py
+          -q
+      - name: Run full suite with coverage
         run: uv run pytest --cov=apps --cov=config --cov-report=xml --cov-report=term-missing -q
       - name: Upload coverage artifact
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: coverage-xml
           path: coverage.xml
@@ -107,14 +125,34 @@ jobs:
     name: Security checks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
         with:
           enable-cache: true
       - run: uv sync --frozen
-      - name: Dependency vulnerability scan (pip-audit)
-        run: uvx pip-audit --strict --progress-spinner off
-        continue-on-error: true
+
+      # Mandatory scan (no continue-on-error). `--strict` also fails when the
+      # scan itself cannot complete, so BOTH outcomes block the merge — this
+      # step only distinguishes them so the right fix is applied:
+      #   * vulnerability finding  -> bump/replace the vulnerable dependency
+      #   * tool/service failure   -> re-run / fix the scanner, never waive
+      - name: Dependency vulnerability scan (pip-audit, pinned)
+        run: |
+          set +e
+          uvx --from pip-audit==2.10.1 pip-audit --strict --progress-spinner off > audit.log 2>&1
+          status=$?
+          cat audit.log
+          if [ "$status" -eq 0 ]; then
+            echo "No known vulnerabilities found."
+            exit 0
+          fi
+          if grep -qiE "found [0-9]+ vulnerabilit|vulnerabilit(y|ies) (were )?found" audit.log; then
+            echo "::error::DEPENDENCY VULNERABILITY FINDING (not a tool failure): known-vulnerable packages are pinned in uv.lock. Update or remove the affected packages, then re-run."
+            exit 1
+          fi
+          echo "::error::TOOL FAILURE (not a vulnerability finding): pip-audit could not complete (exit $status) — network/service/collection problem. Re-run the workflow; do not waive or merge."
+          exit 1
+
       - name: Django deployment check (production settings)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.prod

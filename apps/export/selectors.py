@@ -83,8 +83,13 @@ def document_requirements_for(destination, *, product=None, category=None):
     return qs
 
 
-def active_destinations():
-    """Destinations that are approved *and* switched on for trade."""
+def approved_active_destinations():
+    """Destinations that are approved *and* switched on for trade.
+
+    Named explicitly to distinguish it from the ``overview_metrics`` key
+    ``active_destinations`` (which counts active destinations regardless of
+    approval).
+    """
     return ExportDestination.objects.filter(is_active=True, approval_status="approved")
 
 

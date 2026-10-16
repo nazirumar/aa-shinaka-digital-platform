@@ -17,6 +17,7 @@ from django.http import FileResponse, Http404, HttpResponse
 from django.shortcuts import redirect, render
 from django.views.decorators.http import require_POST
 
+from apps.core.upload_security import enforce_downloadable
 from apps.orders import payments as order_payments
 
 from . import documents, selectors, services
@@ -203,6 +204,9 @@ def resource_download(request, pk):
         return redirect(resource.external_url)
     if not resource.file:
         raise Http404("Resource file not found.")
+    enforce_downloadable(
+        resource.file, kind="training_resource", actor=request.user, request=request
+    )
     return FileResponse(
         resource.file.open("rb"),
         as_attachment=True,

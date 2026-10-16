@@ -24,6 +24,7 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.permissions import capability_required, has_capability, user_capabilities
 from apps.accounts.roles import Capability
+from apps.core.upload_security import enforce_downloadable
 
 from . import charts, exports, services
 from . import selectors as sel
@@ -339,6 +340,9 @@ def _context_for_page(page, filters, *, show_finance):
 
     elif page == "inventory":
         summary_row = sel.stock_summary()
+        # Compute the low-stock set once: the KPI needs the full count, the table
+        # only the first 25. Calling the selector twice was the L-1 double-compute.
+        low_stock = sel.low_stock_listings(limit=500)
         kpis = [
             _kpi(
                 "On hand",
@@ -350,7 +354,7 @@ def _context_for_page(page, filters, *, show_finance):
             _kpi("Available", summary_row["available"], kind="decimal"),
             _kpi("Warehouses", summary_row["warehouse_count"]),
             _kpi("Active listings", summary_row["listing_count"]),
-            _kpi("Low-stock listings", len(sel.low_stock_listings(limit=500))),
+            _kpi("Low-stock listings", len(low_stock)),
         ]
         tables = [
             _table(
@@ -374,7 +378,7 @@ def _context_for_page(page, filters, *, show_finance):
                     _col("available", "Available", "decimal"),
                     _col("threshold", "Threshold", "decimal"),
                 ],
-                sel.low_stock_listings(limit=25),
+                low_stock[:25],
                 show_finance=show_finance,
             ),
         ]
@@ -815,6 +819,8 @@ def report_download(request, pk):
         raise PermissionDenied("Financial reports require the finance capability.")
     if not export.file:
         raise Http404("This report has no stored file (it may have expired).")
+    # Platform-generated export: no user uploaded these bytes, so no scan gate.
+    enforce_downloadable(export.file, trusted=True)
     services.record_report_access(
         actor=request.user,
         export=export,

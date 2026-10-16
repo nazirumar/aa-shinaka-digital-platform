@@ -24,8 +24,10 @@ from apps.accounts.permissions import (
 from apps.accounts.roles import Capability
 from apps.accounts.selectors import account_counts, staff_directory
 from apps.accounts.services import assign_role, set_staff_active, update_staff
+from apps.core.models import FileScanRecord
+from apps.core.upload_security import release_scan
 
-from .selectors import activity_for, audit_search, recent_activity
+from .selectors import activity_for, audit_search, recent_activity, scan_records
 
 
 @capability_required(Capability.STAFF_VIEW)
@@ -223,3 +225,46 @@ def audit_log(request: HttpRequest) -> HttpResponse:
     if request.headers.get("HX-Request"):
         return render(request, "dashboard/audit/_table.html", context)
     return render(request, "dashboard/audit/list.html", context)
+
+
+@capability_required(Capability.MEDIA_MANAGE)
+def upload_scans(request: HttpRequest) -> HttpResponse:
+    """Security review of every upload scan: clean, blocked and errored files.
+
+    Reviewers with the media-management capability can release a file that the
+    scanner could not clear (see ``upload_scan_release``)."""
+    status = request.GET.get("status", "")
+    kind = request.GET.get("kind", "")
+    records = scan_records(status=status, kind=kind)
+    page = Paginator(records, 50).get_page(request.GET.get("page"))
+    context = {
+        "records": page,
+        "page_obj": page,
+        "selected_status": status,
+        "selected_kind": kind,
+        "statuses": FileScanRecord.Status.choices,
+        "kinds": (
+            FileScanRecord.objects.order_by("kind").values_list("kind", flat=True).distinct()
+        ),
+        "page_title": "Upload security",
+        "active_nav": "upload_scans",
+        "breadcrumbs": [
+            {"label": "Dashboard", "url": "dashboard:home"},
+            {"label": "Upload security"},
+        ],
+    }
+    return render(request, "dashboard/audit/upload_scans.html", context)
+
+
+@require_POST
+@capability_required(Capability.MEDIA_MANAGE)
+def upload_scan_release(request: HttpRequest, pk) -> HttpResponse:
+    """Authorised release of a quarantined/blocked upload after review."""
+    record = get_object_or_404(FileScanRecord, pk=pk)
+    try:
+        release_scan(record, actor=request.user, request=request, note=request.POST.get("note", ""))
+    except (PermissionDenied, ValidationError) as exc:
+        messages.error(request, "; ".join(getattr(exc, "messages", [str(exc)])))
+    else:
+        messages.success(request, "File released. It can now be downloaded.")
+    return redirect("dashboard:upload_scans")

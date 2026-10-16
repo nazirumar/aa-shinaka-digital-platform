@@ -1,8 +1,8 @@
 # Final Production Readiness Report — AA Shinaka Digital Business Platform
 
-**Phase:** 12
+**Phase:** 12 (hardened further in Phase 13)
 **Date:** 2026-10-16
-**Prepared by:** engineering (Phase 12)
+**Prepared by:** engineering (Phase 12; Phase 13 addendum below)
 **Decision owner:** AA Shinaka business owner
 
 ---
@@ -11,7 +11,7 @@
 
 # READY FOR STAGING
 
-Every code-level gate passes (708 tests, 0 failures; lint, format, system check,
+Every code-level gate passes (790 tests, 0 failures; lint, format, system check,
 migration guard, production `check --deploy` and the CSS build all clean). The
 remaining items are **host-execution gates** (§4) that cannot run in the
 development environment: TLS, the `/media/` deny, a backup/restore drill, live
@@ -22,6 +22,13 @@ gate in §4 is executed and passes on staging and the owner signs off
 `docs/LAUNCH_CONTENT_CHECKLIST.md`. It must not be quoted as production-launch
 ready before then. It is **not** `NOT READY`: nothing is blocked by an unknown
 code defect.
+
+> **Phase 13 addendum (2026-10-16):** the two code-level gaps that Phase 12
+> accepted for a controlled launch — **staff MFA** and **upload malware
+> scanning** — are now implemented and tested, inventory selection/reservations
+> are hardened for multi-warehouse with concurrency evidence, and CI is
+> mandatory. Full detail and evidence: `docs/PHASE_13_COMPLETION_REPORT.md`.
+> **No deployment, DNS change or live Paystack key was performed.**
 
 ---
 
@@ -41,18 +48,20 @@ code defect.
 |---|---|
 | Security audit completed, findings triaged | ✅ 0 Critical, 3 High (all fixed), 5 Medium, 6 Low |
 | All Critical/High findings fixed with test evidence | ✅ |
+| Medium/Low audit items closed in Phase 13 | ✅ M-3, M-4, L-1, L-2 fixed; MFA implemented |
 | Lint & format | ✅ `ruff check` / `ruff format --check` clean |
 | Django system check | ✅ 0 issues |
 | Missing-migration guard | ✅ "No changes detected" |
 | Production `check --deploy` | ✅ clean at `--fail-level ERROR` (only the deliberate HSTS-preload warning remains) |
 | Automated security tests | ✅ 23 passing |
 | End-to-end scenarios A–F | ✅ 6 passing |
-| Full regression suite | ✅ 708 passing, 0 failures, 0 skipped |
+| Full regression suite | ✅ 790 passing, 0 failures, 0 skipped |
 | Deployment assets & DR | ✅ provided (host verification pending) |
 | No deployment / DNS / live keys performed | ✅ |
 
 ## 2. Hardening applied
 
+**Phase 12**
 - Ten `GET`-mutating staff endpoints now `@require_POST` (CSRF/state change).
 - Payment webhook honours the `PAYSTACK_ENABLED` kill switch; events are
   recorded and deduplicated; signed-only, raw-body HMAC verification.
@@ -64,6 +73,22 @@ code defect.
 - Paid-order cancellation via the generic transition restocks the ledger.
 - `primary_image` N+1 removed.
 
+**Phase 13**
+- **Staff MFA (TOTP)** with single-use hashed recovery codes; login is parked
+  until a confirmed second factor is presented; secrets encrypted at rest;
+  disable/reset require a fresh code and are audited (`apps/accounts/mfa/`).
+- **Upload malware scanning** (`apps/core/upload_security.py`): scan-before-store,
+  quarantine, `FileScanRecord` forensics, fail-closed policy, lazy re-scan and
+  capability-gated release; optional ClamAV backend in the Compose reference stack.
+- **Inventory hardening**: explicit `select_warehouse`, per-warehouse oversell
+  guard, roll-up recomputation from Σ balances, and PostgreSQL concurrency tests.
+- **Paystack test-mode guard**: a live key (`sk_live_…`) is refused (fail closed)
+  unless `PAYSTACK_LIVE_MODE=True` after launch approval.
+- **CI hardened**: actions pinned to commit SHAs, `pip-audit` pinned with
+  `--strict`, mandatory (non-blocking scanners removed), security subset runs
+  first, tool failures distinguished from vulnerability findings.
+- Analytics double-compute (L-1) and export selector naming (L-2) resolved.
+
 ## 3. Verification evidence
 
 | Command | Result |
@@ -73,10 +98,12 @@ code defect.
 | `uv run python manage.py check` | No issues |
 | `uv run python manage.py makemigrations --check --dry-run` | No changes detected |
 | prod `manage.py check --deploy` | Clean (only HSTS-preload warning, deliberate) |
-| `uv run pytest` (full suite) | 708 passed, 0 failures, 0 skipped (6m03s) |
+| `uv run pytest` (full suite) | 790 passed, 0 failures, 0 skipped (4m57s) |
 | `npm run build:css` | Bundle built, non-empty |
 
-Tests are not reported as passing unless they actually ran and passed.
+Tests are not reported as passing unless they actually ran and passed. Phase 13
+added 82 tests (MFA 26, upload security 32, inventory concurrency 18, Paystack
+test-mode 6); all prior suites remain green.
 
 ## 4. Launch gates that must be verified on the host (NOT VERIFIED here)
 
@@ -98,12 +125,14 @@ These require a real staging/production host and are **not** claimed as done:
 
 | Gap | Severity | Rationale / plan |
 |---|---|---|
-| No MFA for privileged staff | High for GA | Accepted for a *controlled* launch; **required before general availability**. |
-| No malware scanning of uploads | Medium | Type/size validation + authorised download; add async AV scan next. |
-| Multi-warehouse reservations use the MAIN warehouse | Medium | Correct for the current single-warehouse operation; revisit before multi-warehouse. |
 | HSTS preload disabled | Low | Deliberate/irreversible; enable only after all subdomains are HTTPS. |
 | No third-party penetration test | Medium | Recommended before GA. |
+| Dependabot alert untriaged | Low | CI runs pinned `pip-audit` (Phase 13); one GitHub alert not reproduced locally. |
 | Deployment-dependent controls | — | Must be verified on the host (§4). |
+
+> Closed in Phase 13 (previously accepted gaps): staff MFA, upload malware
+> scanning and multi-warehouse reservation selection are now implemented and
+> tested. See `docs/PHASE_13_COMPLETION_REPORT.md`.
 
 ## 6. Scope compliance
 
@@ -119,4 +148,4 @@ Proceed to **staging**, execute the §4 gates, run the load/accessibility passes
 and complete the launch content checklist. When every §4 gate is green and the
 owner has approved, this report may be quoted as **READY FOR CONTROLLED
 PRODUCTION LAUNCH**. Do not treat the current commit as a general-availability
-release while the MFA and penetration-test gaps remain.
+release while the penetration-test gap remains.

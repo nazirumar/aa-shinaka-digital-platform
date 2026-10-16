@@ -21,6 +21,7 @@ from apps.core.ratelimit import reset as reset_rate_limit
 
 from .emails import send_email_verification
 from .forms import EmailAuthenticationForm, RegisterForm
+from .mfa.services import mfa_enforced
 from .services import confirm_email_token
 
 
@@ -75,7 +76,12 @@ def register(request: HttpRequest) -> HttpResponse:
     window=settings.LOGIN_RATE_LIMIT_WINDOW,
 )
 def login_view(request: HttpRequest) -> HttpResponse:
-    """Email/password login with rate limiting and safe redirect handling."""
+    """Email/password login with rate limiting and safe redirect handling.
+
+    Privileged accounts with MFA confirmed are **not** logged in here: the
+    session is parked as ``mfa_pending`` and the user must pass the TOTP (or
+    recovery code) challenge at ``mfa:challenge`` first.
+    """
     if request.user.is_authenticated:
         return redirect("account:dashboard")
 
@@ -84,6 +90,15 @@ def login_view(request: HttpRequest) -> HttpResponse:
         if form.is_valid():
             user = form.get_user()
             reset_rate_limit("login", f"ip:{request.META.get('REMOTE_ADDR', 'unknown')}")
+            if mfa_enforced(user):
+                # Park the credentials-check result; do NOT authenticate yet.
+                request.session.cycle_key()
+                request.session["mfa_pending_user_id"] = str(user.pk)
+                request.session["mfa_pending_next"] = _safe_redirect_target(
+                    request, settings.LOGIN_REDIRECT_URL
+                )
+                request.session.set_expiry(settings.MFA_CHALLENGE_TIMEOUT)
+                return redirect("mfa:challenge")
             # Session fixation protection: login() cycles the session key.
             login(request, user)
             messages.success(request, "You are signed in.")

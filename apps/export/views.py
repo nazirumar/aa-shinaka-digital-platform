@@ -19,6 +19,7 @@ from django.views.decorators.http import require_POST
 
 from apps.accounts.permissions import has_capability
 from apps.accounts.roles import Capability
+from apps.core.upload_security import enforce_downloadable
 from apps.orders import payments as order_payments
 from apps.orders.payment_models import PaymentProvider, PaymentState
 
@@ -260,6 +261,7 @@ def document_download(request, pk):
     if not is_staff:
         if document.order.customer_id != request.user.id or not document.is_customer_visible:
             raise PermissionDenied("You cannot access this document.")
+    enforce_downloadable(document.file, kind="export_document", actor=request.user, request=request)
     return FileResponse(
         document.file.open("rb"),
         as_attachment=True,

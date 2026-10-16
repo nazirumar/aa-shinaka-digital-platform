@@ -12,7 +12,11 @@ reporting) are done. Phase 12 (production security, QA, deployment & launch
 readiness) is delivered and awaiting owner approval — see
 `docs/PRODUCTION_READINESS_AUDIT.md`, `docs/PRODUCTION_RUNBOOK.md` and
 `docs/FINAL_PRODUCTION_READINESS_REPORT.md`. Phase 12 did **not** deploy, change
-DNS or enable live Paystack credentials. Later phases must not start without
+DNS or enable live Paystack credentials. Phase 13 (final security hardening &
+staging deployment prep) is also delivered — staff TOTP MFA, upload malware
+scanning/quarantine, multi-warehouse inventory hardening, hardened CI and a
+Paystack test-mode-only guard — see `docs/PHASE_13_COMPLETION_REPORT.md`. Status
+remains **READY FOR STAGING** (not launched). Later phases must not start without
 approval.
 
 Hard exclusions — never add: oil & gas features, multi-vendor marketplace

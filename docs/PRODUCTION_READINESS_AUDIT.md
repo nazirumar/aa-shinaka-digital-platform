@@ -24,8 +24,14 @@ follow-up), `NOT VERIFIED` (could not be confirmed in this environment).
 |---|---:|---:|---:|
 | Critical | 0 | 0 | 0 |
 | High | 3 | 3 | 0 |
-| Medium | 5 | 2 | 3 |
-| Low | 6 | 3 | 3 |
+| Medium | 5 | 4 | 1 |
+| Low | 6 | 5 | 1 |
+
+> **Phase 13 update (2026-10-16):** M-3 (warehouse selection), M-4 (malware
+> scanning), L-1 (analytics double-compute) and L-2 (export selector naming) were
+> closed, and **MFA for privileged staff is now implemented**. See
+> `docs/PHASE_13_COMPLETION_REPORT.md` for the evidence. The remaining open items
+> are non-blocking (Dependabot monitoring; host-verification steps).
 
 No Critical issue was found. Both `manage.py check --deploy` (production
 settings) and the 23-test security suite pass; those are prerequisites, not the
@@ -128,27 +134,47 @@ whole audit.
 
 ### M-3 — Reservations default to the single "MAIN" warehouse
 
-- **Description:** `place_order` does not choose a warehouse; inventory helpres
-  resolve to the default (`MAIN`) warehouse when none is supplied. Correct while
+- **Description:** `place_order` did not choose a warehouse; inventory helpers
+  resolved to the default (`MAIN`) warehouse when none was supplied. Correct while
   the business operates one fulfilment warehouse, but a multi-warehouse
   operation would reserve from the wrong location.
 - **Module:** `apps/catalog/inventory.py` (`resolve_warehouse`, `default_warehouse`),
   `apps/orders/services.py`.
-- **Evidence:** `resolve_warehouse(None)` → `MAIN`; order placement passes none.
+- **Evidence (pre-fix):** `resolve_warehouse(None)` → `MAIN`; order placement
+  passed none.
 - **Impact:** incorrect allocation only once more than one warehouse is in active
   use; no data loss today.
-- **Status:** `OPEN` — documented operational constraint. **Follow-up:** add
-  warehouse selection to checkout before enabling multi-warehouse fulfilment.
+- **Fix (Phase 13):** added `select_warehouse()` — explicit, deterministic
+  allocation that prefers the named/default warehouse and otherwise a warehouse
+  with enough unreserved stock; checkout now selects per line. `place_reservation`
+  additionally enforces a **per-warehouse** oversell guard, and
+  `release_reservation`/`commit_reservation` recompute the listing roll-up from
+  Σ balances so a release can never desynchronise `stock_reserved`.
+- **Status:** `FIXED`.
+- **Verification:** `tests/test_inventory_concurrency.py` (18 tests) — per-warehouse
+  oversell refusal, correct release, roll-up/balance consistency, single-warehouse
+  compatibility and **real PostgreSQL row-lock concurrency** (racing reservations
+  never oversell).
 
 ### M-4 — No malware scanning on uploaded files
 
-- **Description:** uploads are validated by type/size but not scanned for
+- **Description:** uploads were validated by type/size but not scanned for
   malicious content.
 - **Module:** `apps/*/validators.py` (support, training, export, documents).
 - **Impact:** a determined attacker could upload a malicious file; it is only
   served to authorised users and `Content-Disposition`/`nosniff` limit execution.
-- **Status:** `OPEN` — accepted risk for the controlled launch. **Follow-up:**
-  add an asynchronous AV scan (e.g. ClamAV) before the file is made downloadable.
+- **Fix (Phase 13):** new `apps/core/upload_security.py` scans every inbound
+  upload before storage (built-in EICAR + executable-magic detector, plus optional
+  ClamAV `clamd` INSTREAM over a unix/TCP socket). Infected files are rejected and
+  quarantined under `MEDIA_ROOT/quarantine/`; every scan and quarantine action is
+  recorded in `core.FileScanRecord` and the audit log. Downloads are gated by
+  `enforce_downloadable()` (lazy-scans legacy files); capability-checked release
+  (`release_scan`) is available to `media.manage` holders via the staff dashboard.
+  A `UPLOAD_SCAN_ENFORCEMENT` policy fails **closed** on scanner errors.
+- **Status:** `FIXED`.
+- **Verification:** `tests/test_upload_security.py` (32 tests) — EICAR rejection,
+  quarantine persistence, both scan policies, download blocking/lazy scan and
+  authorised release.
 
 ### M-4b — Late/duplicate provider capture on a cancelled or expired order
 
@@ -179,8 +205,8 @@ whole audit.
 
 | ID | Finding | Status | Notes / evidence |
 |---|---|---|---|
-| L-1 | `analytics` `_context_for_page` can compute a context twice on some pages | OPEN | Correctness unaffected; minor CPU. Documented for a later perf pass. |
-| L-2 | `apps.export.selectors.overview_metrics["active_destinations"]` and `export.selectors.active_destinations()` are two spellings of the same value | OPEN | Pre-existing; not user-visible. Cosmetic debt. |
+| L-1 | `analytics` `_context_for_page` can compute a context twice on some pages | FIXED | Phase 13: `low_stock_listings` computed once and sliced for both the KPI count and the table. |
+| L-2 | `apps.export.selectors.overview_metrics["active_destinations"]` and `export.selectors.active_destinations()` are two spellings of the same value | FIXED | Phase 13: renamed the function to `approved_active_destinations()` (the metric counts active-only); name collision removed. |
 | L-3 | Structured JSON logging does not scrub arbitrary PII from third-party log records | MITIGATED | App logs deliberately avoid PII; see `docs/DATA_PROTECTION.md`. |
 | L-4 | No machine API beyond the payment webhook (DRF deferred) | MITIGATED | Deliberate per `AGENTS.md`; reduces attack surface. |
 | L-5 | HSTS `preload` off by default | MITIGATED | Deliberate — irreversible; runbook documents the enable step. |
@@ -207,10 +233,13 @@ whole audit.
   no negative stock path.
 - **Webhooks:** HMAC-SHA512 signature verified against the raw body; events
   recorded with a unique id for duplicate handling.
-- **MFA for privileged staff:** **NOT VERIFIED / not implemented.** No second
-  factor exists in the codebase. For a *controlled* launch this is an accepted,
-  documented gap (see the final report) with a follow-up plan; it is a hard
-  blocker for a general-availability launch of finance/admin roles.
+- **MFA for privileged staff:** **IMPLEMENTED (Phase 13).** TOTP (RFC 6238) with
+  one-time hashed recovery codes, dependency-free (stdlib `hmac`/`hashlib`).
+  Privileged accounts are prompted to enrol; a confirmed device is required to
+  complete login (`apps/accounts/mfa/`). Secrets are encrypted at rest
+  (encrypt-then-MAC keyed from `DJANGO_SECRET_KEY`, with an optional
+  `MFA_SECRET_KEY`); disable requires a fresh code; owner/admin reset is audited
+  and re-requires confirmation. Verified by `tests/test_mfa.py` (26 tests).
 
 ---
 
@@ -221,7 +250,10 @@ whole audit.
 - Real provider (Paystack live) behaviour — only test-mode contracts verified.
 - Load/soak behaviour on the production host — see `docs/PERFORMANCE.md`; numbers
   there are method, not measurements.
-- MFA (not implemented), malware scanning (not implemented), Dependabot.
+- Dependabot alert triage (CI does run `pip-audit`, hardened in Phase 13).
+
+Phase 13 closed the earlier "MFA (not implemented)" and "malware scanning (not
+implemented)" gaps; both now have code and tests (see §5 and `docs/PHASE_13_COMPLETION_REPORT.md`).
 
 ---
 

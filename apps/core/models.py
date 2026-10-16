@@ -7,6 +7,7 @@ data (36 states + FCT, and their LGAs / area councils).
 
 import uuid
 
+from django.conf import settings
 from django.db import models
 from django.utils import timezone
 
@@ -82,6 +83,62 @@ class SoftDeleteModel(TimeStampedModel):
         self.is_deleted = False
         self.deleted_at = None
         self.save(update_fields=["is_deleted", "deleted_at", "updated_at"])
+
+
+class FileScanRecord(TimeStampedModel):
+    """Audit record for an uploaded file's malware scan lifecycle (Phase 13).
+
+    One row per scan attempt. ``file_path`` is the stored name once the file is
+    bound to its model field; freshly rejected uploads keep only a quarantine
+    copy. Downloads consult the latest record for a path: anything that is not
+    ``clean``/``released`` is blocked when enforcement is on.
+    """
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        CLEAN = "clean", "Clean"
+        INFECTED = "infected", "Infected"
+        ERROR = "error", "Scan error"
+        RELEASED = "released", "Released"
+
+    sha256 = models.CharField(max_length=64, db_index=True)
+    file_path = models.CharField(max_length=500, blank=True, db_index=True)
+    original_name = models.CharField(max_length=255, blank=True)
+    size_bytes = models.BigIntegerField(default=0)
+    kind = models.CharField(max_length=50, blank=True, db_index=True)
+    status = models.CharField(
+        max_length=20, choices=Status.choices, default=Status.PENDING, db_index=True
+    )
+    scanner = models.CharField(max_length=50, blank=True)
+    threat_name = models.CharField(max_length=255, blank=True)
+    detail = models.TextField(blank=True)
+    quarantine_path = models.CharField(max_length=500, blank=True)
+    uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+    scanned_at = models.DateTimeField(null=True, blank=True)
+    released_at = models.DateTimeField(null=True, blank=True)
+    released_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+    )
+
+    class Meta:
+        ordering = ["-created_at"]
+
+    def __str__(self) -> str:
+        return f"{self.original_name or self.sha256[:12]} [{self.status}]"
+
+    @property
+    def is_downloadable(self) -> bool:
+        return self.status in (self.Status.CLEAN, self.Status.RELEASED)
 
 
 # Backwards compatibility exports (placed after base classes)

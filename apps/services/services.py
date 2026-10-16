@@ -29,6 +29,7 @@ from django.utils import timezone
 from apps.accounts.permissions import has_capability
 from apps.accounts.roles import Capability
 from apps.core.audit import record_audit
+from apps.core.upload_security import bind_scanned_file, screen_upload
 from apps.notifications import events as notification_events
 
 from . import notifications
@@ -314,6 +315,7 @@ def add_attachment(
     name = getattr(file, "name", "") or ""
     if "." not in name or name.rsplit(".", 1)[-1].lower() not in ALLOWED_ATTACHMENT_EXTENSIONS:
         raise ValidationError("Unsupported file type.")
+    scan = screen_upload(file, kind="service_attachment", actor=uploaded_by)
     attachment = ServiceAttachment.objects.create(
         request=service_request,
         uploaded_by=uploaded_by,
@@ -323,6 +325,7 @@ def add_attachment(
         size=size,
         is_customer_visible=is_customer_visible,
     )
+    bind_scanned_file(scan, attachment.file)
     _log(service_request, actor=uploaded_by, action="attachment.added", detail=attachment.label)
     return attachment
 

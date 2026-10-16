@@ -101,6 +101,22 @@ services:
       redis:
         condition: service_healthy
 
+  # Optional anti-virus backend (Phase 13). Enable with:
+  #   docker compose --profile scanning ... up -d
+  # and set CLAMAV_SOCKET=/var/run/clamav/clamd.ctl in deploy/.env.production.
+  # Without it the app still runs its built-in signature scanner.
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scanning"]
+    restart: unless-stopped
+    volumes:
+      - clamd_sock:/var/run/clamav
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping", "3"]
+      interval: 60s
+      timeout: 10s
+      retries: 10
+
   nginx:
     image: nginx:1.27-alpine
     restart: unless-stopped
@@ -120,3 +136,4 @@ volumes:
   redisdata:
   media:
   staticfiles:
+  clamd_sock:

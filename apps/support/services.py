@@ -14,6 +14,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.core.audit import record_audit
+from apps.core.upload_security import bind_scanned_file, screen_uploads
 from apps.notifications import events as notification_events
 from apps.notifications.services import emit
 
@@ -80,7 +81,6 @@ def _apply_transition(
 # ---------------------------------------------------------------------------
 # Creation
 # ---------------------------------------------------------------------------
-@transaction.atomic
 def create_ticket(
     *,
     customer,
@@ -101,44 +101,49 @@ def create_ticket(
         raise ValidationError("Please describe your enquiry.")
     # Ownership check (raises ValidationError for another customer's record).
     resolve_related(customer, related_type, related_id)
+    # Scan uploads first: a rejected file must leave a forensic record even
+    # though the write transaction below rolls back.
+    screened = screen_uploads(files, kind="support_attachment", actor=customer, request=request)
 
-    ticket = SupportTicket.objects.create(
-        customer=customer,
-        subject=subject[:200],
-        category=category,
-        priority=priority,
-        status=SupportStatus.OPEN,
-        related_type=related_type or "",
-        related_id=str(related_id or "")[:64],
-    )
-    opener = SupportMessage.objects.create(ticket=ticket, sender=customer, message=message)
-    _create_attachments(ticket=ticket, message=opener, files=files, uploaded_by=customer)
-    SupportStatusHistory.objects.create(
-        ticket=ticket,
-        previous_status="",
-        new_status=SupportStatus.OPEN,
-        changed_by=customer,
-        reason="Ticket created.",
-    )
-    record_audit(
-        actor=customer,
-        action="support.ticket.created",
-        target=ticket,
-        after={"reference": ticket.reference, "category": ticket.category},
-    )
+    with transaction.atomic():
+        ticket = SupportTicket.objects.create(
+            customer=customer,
+            subject=subject[:200],
+            category=category,
+            priority=priority,
+            status=SupportStatus.OPEN,
+            related_type=related_type or "",
+            related_id=str(related_id or "")[:64],
+        )
+        opener = SupportMessage.objects.create(ticket=ticket, sender=customer, message=message)
+        _create_attachments(ticket=ticket, message=opener, screened=screened, uploaded_by=customer)
+        SupportStatusHistory.objects.create(
+            ticket=ticket,
+            previous_status="",
+            new_status=SupportStatus.OPEN,
+            changed_by=customer,
+            reason="Ticket created.",
+        )
+        record_audit(
+            actor=customer,
+            action="support.ticket.created",
+            target=ticket,
+            after={"reference": ticket.reference, "category": ticket.category},
+        )
     return ticket
 
 
-def _create_attachments(*, ticket, message, files, uploaded_by) -> None:
-    for upload in files or []:
+def _create_attachments(*, ticket, message, screened, uploaded_by) -> None:
+    for upload, scan in screened or []:
         validate_attachment(upload)
-        SupportAttachment.objects.create(
+        attachment = SupportAttachment.objects.create(
             ticket=ticket,
             message=message,
             file=upload,
             original_filename=getattr(upload, "name", "")[:255],
             uploaded_by=uploaded_by,
         )
+        bind_scanned_file(scan, attachment.file)
 
 
 def add_customer_message(
@@ -156,12 +161,15 @@ def add_customer_message(
         raise ValidationError("A message is required.")
     if ticket.status == SupportStatus.CLOSED:
         raise ValidationError("This ticket is closed. Reopen it to reply.")
+    screened = screen_uploads(files, kind="support_attachment", actor=sender, request=request)
 
     with transaction.atomic():
         support_message = SupportMessage.objects.create(
             ticket=ticket, sender=sender, message=message
         )
-        _create_attachments(ticket=ticket, message=support_message, files=files, uploaded_by=sender)
+        _create_attachments(
+            ticket=ticket, message=support_message, screened=screened, uploaded_by=sender
+        )
         if ticket.status == SupportStatus.WAITING_FOR_CUSTOMER:
             _apply_transition(
                 ticket, SupportStatus.IN_PROGRESS, actor=sender, reason="Customer replied."
@@ -183,6 +191,7 @@ def add_staff_message(
     """Staff reply or internal note. Public replies notify the customer."""
     if not message:
         raise ValidationError("A message is required.")
+    screened = screen_uploads(files, kind="support_attachment", actor=sender, request=request)
     with transaction.atomic():
         support_message = SupportMessage.objects.create(
             ticket=ticket,
@@ -190,7 +199,9 @@ def add_staff_message(
             message=message,
             is_internal=is_internal,
         )
-        _create_attachments(ticket=ticket, message=support_message, files=files, uploaded_by=sender)
+        _create_attachments(
+            ticket=ticket, message=support_message, screened=screened, uploaded_by=sender
+        )
         if not is_internal:
             if ticket.status in {
                 SupportStatus.OPEN,

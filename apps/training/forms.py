@@ -10,6 +10,7 @@ from __future__ import annotations
 from django import forms
 
 from apps.accounts.forms import TailwindFormMixin
+from apps.core.upload_security import bind_scanned_file, screen_upload
 
 from .models import (
     Assessment,
@@ -126,6 +127,9 @@ class ResourceForm(TrainingModelForm):
         file = self.cleaned_data.get("file")
         if file:
             validate_resource_file(file)
+            # Threats/scan failures raise ValidationError here; a clean verdict
+            # is stored and bound to the stored path in save().
+            self._scan_record = screen_upload(file, kind="training_resource")
         return file
 
     def clean(self):
@@ -133,6 +137,13 @@ class ResourceForm(TrainingModelForm):
         if not cleaned.get("file") and not cleaned.get("external_url"):
             raise forms.ValidationError("Provide a file or an external URL.")
         return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=commit)
+        scan = getattr(self, "_scan_record", None)
+        if commit and scan is not None and instance.file:
+            bind_scanned_file(scan, instance.file)
+        return instance
 
 
 # ---------------------------------------------------------------------------
