@@ -15,7 +15,14 @@ readiness) is delivered and awaiting owner approval — see
 DNS or enable live Paystack credentials. Phase 13 (final security hardening &
 staging deployment prep) is also delivered — staff TOTP MFA, upload malware
 scanning/quarantine, multi-warehouse inventory hardening, hardened CI and a
-Paystack test-mode-only guard — see `docs/PHASE_13_COMPLETION_REPORT.md`. Status
+Paystack test-mode-only guard — see `docs/PHASE_13_COMPLETION_REPORT.md`. Phase 14 (staging verification &
+controlled production launch) is delivered as **configuration, automation,
+tests and documentation** — a staging settings profile with a hard Paystack
+test-mode guard, deployment/rollback/smoke/verify scripts, a
+`manage.py verify_deployment` command and the launch-approval pack — see
+`docs/PHASE_14_STAGING_REPORT.md` and `docs/PRODUCTION_LAUNCH_APPROVAL.md`.
+No staging host, DNS change, live Paystack credential or production data was
+available or touched, so host-execution gates are **NOT VERIFIED**. Status
 remains **READY FOR STAGING** (not launched). Later phases must not start without
 approval.
 

@@ -4,7 +4,17 @@
 automatically and nothing changes DNS or enables live Paystack credentials.
 
 > Companion documents: `docs/DISASTER_RECOVERY.md`, `docs/MONITORING.md`,
-> `docs/RELEASE_CHECKLIST.md`, `deploy/README.md`.
+> `docs/RELEASE_CHECKLIST.md`, `docs/PRODUCTION_LAUNCH_PLAN.md`,
+> `docs/STAGING_TEST_PLAN.md`, `docs/PRODUCTION_LAUNCH_APPROVAL.md`,
+> `deploy/README.md`.
+
+> **Phase 14 tooling.** Pre-deploy and verification are largely automated now:
+> `deploy/scripts/validate_env.sh` (env safety), `preflight.sh` (non-destructive
+> gate), `smoke_test.sh` (post-deploy HTTP checks), `verify_host.sh` (TLS/headers/
+> media-deny/ports), `restore_drill.sh` (isolated restore rehearsal) and
+> `manage.py verify_deployment` (environment/DB/security report). Staging uses
+> `deploy/docker-compose.staging.yml` + `.env.staging` with
+> `DJANGO_SETTINGS_MODULE=config.settings.staging` (test-mode Paystack only).
 
 ---
 

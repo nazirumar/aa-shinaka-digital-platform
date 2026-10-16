@@ -1,0 +1,32 @@
+# ---------------------------------------------------------------------------
+# STAGING override for deploy/docker-compose.yml.
+#
+#   docker compose --env-file deploy/.env.staging \
+#     -f deploy/docker-compose.yml -f deploy/docker-compose.staging.yml up -d --build
+#
+# What this changes:
+#   * a distinct Compose project name ("aa-shinaka-staging") so every named
+#     volume and container is namespaced away from production;
+#   * the per-service env file is switched to deploy/.env.staging;
+#   * nginx publishes non-standard host ports (8080/8443) so staging can share a
+#     host with production without a port clash.
+#
+# It deliberately does NOT change any image, command or health check, so staging
+# runs the exact same application shape the launch will use.
+# ---------------------------------------------------------------------------
+name: aa-shinaka-staging
+
+services:
+  web:
+    env_file:
+      - .env.staging
+  worker:
+    env_file:
+      - .env.staging
+  beat:
+    env_file:
+      - .env.staging
+  nginx:
+    ports:
+      - "8080:80"
+      - "8443:443"

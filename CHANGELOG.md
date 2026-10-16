@@ -3,7 +3,53 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased] — Phase 12: production security, QA, deployment & launch readiness
+## [Unreleased] — Phases 13–14: security hardening, staging verification & launch readiness
+
+### Added
+
+- **Staff TOTP MFA** (`apps/accounts/mfa/`, label `accounts_mfa`): dependency-free
+  TOTP, encrypt-then-MAC secret storage, single-use hashed recovery codes,
+  rate-limited challenge/verify, capability-gated disable/reset.
+- **Upload malware scanning & quarantine** (`apps/core/upload_security.py`,
+  `FileScanRecord`): scan-before-store, fail-closed enforcement, admin review and
+  audited release; optional ClamAV backend in the Compose reference stack.
+- **`config.settings.staging`** and pure guards (`config/settings/_guards.py`):
+  staging refuses a live Paystack key or live mode at import time.
+- **`manage.py verify_deployment`**: read-only environment/DB/security verifier
+  (connection, migrations, role groups, reference data, cache, storage, security
+  settings, Paystack guard) with PASS/FAIL/WARN output and JSON report.
+- **Deployment automation**: `validate_env.sh`, `preflight.sh`, `smoke_test.sh`,
+  `verify_host.sh`, `staging_deploy.sh`, `rollback.sh`, `restore_drill.sh`;
+  `deploy/.env.staging.example`, `deploy/docker-compose.staging.yml`.
+- **Launch documentation**: `PHASE_14_STAGING_REPORT.md`,
+  `PRODUCTION_LAUNCH_APPROVAL.md`, `PRODUCTION_LAUNCH_PLAN.md`,
+  `STAGING_TEST_PLAN.md`, `BUSINESS_CONTENT_APPROVAL_CHECKLIST.md`.
+- **Tests**: MFA (26), upload security (32), inventory concurrency (18), Paystack
+  test-mode (6), staging guards / `verify_deployment` / route inventory (67).
+
+### Changed
+
+- **Inventory** selects an explicit warehouse, guards per-warehouse oversell and
+  recomputes roll-ups from Σ balances (multi-warehouse correctness).
+- **CI hardened**: actions pinned to commit SHAs, `pip-audit` pinned with
+  `--strict`, mandatory (non-blocking) checks.
+
+### Security
+
+- Paystack live-key fail-closed guard (`sk_live_` refused unless
+  `PAYSTACK_LIVE_MODE=True`); staging profile forbids live money outright.
+- Analytics double-compute (L-1) and export selector naming (L-2) resolved.
+
+### Verification (Phase 14, executed locally)
+
+- Full suite **857 passed, 0 failed**; lint/format/check/migrations clean;
+  production `check --deploy` clean; CSS build.
+- Real PostgreSQL backup/restore drill: restore 14 s (25 s total); restored DB
+  passed `migrate --check`.
+- Live local HTTP smoke test passed; local load baseline captured.
+- **No** staging deploy, DNS change, live Paystack key or production data change.
+
+## [Phase 12] — production security, QA, deployment & launch readiness
 
 ### Security
 

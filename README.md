@@ -8,7 +8,7 @@ storage & warehousing, export, product sales and a training academy.
 > **Scope note.** Oil and Gas is out of scope. This platform does not integrate
 > with AgriTrade ERP and has no multi-vendor marketplace features.
 
-## Status — Phases 1–12 complete
+## Status — Phases 1–14 complete (staging verification; not launched)
 
 **Phase 1 — Foundation**
 
@@ -322,8 +322,48 @@ infrastructure**
   (`docs/FINAL_PRODUCTION_READINESS_REPORT.md`). **No deployment, DNS change or
   live Paystack credential was performed by this phase.**
 
+**Phase 13 — Final security hardening & staging deployment prep**
+
+- **Staff TOTP MFA** with single-use hashed recovery codes; privileged logins are
+  parked until a second factor is presented; secrets encrypted at rest
+  (`apps/accounts/mfa/`).
+- **Upload malware scanning & quarantine** (`apps/core/upload_security.py`):
+  scan-before-store, `FileScanRecord` forensics, fail-closed policy, capability-
+  gated release, optional ClamAV in the Compose reference stack.
+- **Multi-warehouse inventory hardening** with per-warehouse oversell guards and
+  roll-ups recomputed from Σ balances (PostgreSQL concurrency tests).
+- **CI hardened**: actions pinned to commit SHAs, `pip-audit` pinned with
+  `--strict`, mandatory checks, tool failures distinguished from findings.
+- **Paystack test-mode guard**: a live key is refused (fail closed) unless
+  `PAYSTACK_LIVE_MODE=True`. See
+  [`docs/PHASE_13_COMPLETION_REPORT.md`](docs/PHASE_13_COMPLETION_REPORT.md).
+
+**Phase 14 — Staging verification & controlled production launch**
+
+- **`config.settings.staging`**: a production-shaped profile that refuses a live
+  Paystack key or live mode at import time (staging never moves real money).
+- **Deployment automation**: `validate_env.sh`, `preflight.sh`, `smoke_test.sh`,
+  `verify_host.sh`, `staging_deploy.sh`, `rollback.sh`, `restore_drill.sh`, plus
+  `deploy/.env.staging.example` and `deploy/docker-compose.staging.yml` (isolated
+  project/DB/Redis/volumes/ports).
+- **`manage.py verify_deployment`**: a read-only environment/DB/security verifier
+  (connection, migrations, role groups, reference data, cache, storage, security
+  settings, Paystack guard) with PASS/FAIL/WARN output and a JSON report.
+- **Executed for real in the dev environment**: full suite **857 passed**;
+  lint/format/check/migrations clean; production `check --deploy` clean; CSS
+  build; a **real PostgreSQL backup/restore drill** (restore 14 s, 25 s total);
+  a live local HTTP smoke test; and a local load baseline.
+- **Not verified (no staging host):** TLS, `/media/` deny on the host, the host
+  restore drill, monitoring test-alert, staging performance and the axe/Lighthouse
+  pass — carried as launch gates. See
+  [`docs/PHASE_14_STAGING_REPORT.md`](docs/PHASE_14_STAGING_REPORT.md) and
+  [`docs/PRODUCTION_LAUNCH_APPROVAL.md`](docs/PRODUCTION_LAUNCH_APPROVAL.md).
+
 Phase 12 is delivered as a *readiness* phase and is **awaiting owner approval**.
-Later phases are specified in the roadmap and must not start without approval.
+Phases 13–14 are delivered as hardening, automation and documentation. The
+platform remains **READY FOR STAGING** (not launched) and requires a separate
+explicit approval for production deployment and live Paystack. Later phases must
+not start without approval.
 
 ## Documentation
 
@@ -344,6 +384,12 @@ Later phases are specified in the roadmap and must not start without approval.
 | [`docs/PHASE_10_COMPLETION_REPORT.md`](docs/PHASE_10_COMPLETION_REPORT.md) | Phase 10 unified customer portal, notifications and support-centre deliverables, models, channels, URLs, tests and limitations |
 | [`docs/PHASE_11_COMPLETION_REPORT.md`](docs/PHASE_11_COMPLETION_REPORT.md) | Phase 11 analytics & reporting deliverables, models, report catalogue, URLs, tests and limitations |
 | [`docs/PHASE_12_COMPLETION_REPORT.md`](docs/PHASE_12_COMPLETION_REPORT.md) | Phase 12 hardening/deployment deliverables and accepted gaps |
+| [`docs/PHASE_13_COMPLETION_REPORT.md`](docs/PHASE_13_COMPLETION_REPORT.md) | Phase 13 security hardening & staging prep (MFA, upload scanning, CI, Paystack guard) |
+| [`docs/PHASE_14_STAGING_REPORT.md`](docs/PHASE_14_STAGING_REPORT.md) | Phase 14 staging verification: what passed locally vs what is NOT VERIFIED |
+| [`docs/PRODUCTION_LAUNCH_APPROVAL.md`](docs/PRODUCTION_LAUNCH_APPROVAL.md) | Phase 14 go/no-go decision record (PASSED/FAILED/NOT VERIFIED/N-A) |
+| [`docs/PRODUCTION_LAUNCH_PLAN.md`](docs/PRODUCTION_LAUNCH_PLAN.md) | DNS/TLS/migration/backup/smoke/rollback/payment-activation launch procedure |
+| [`docs/STAGING_TEST_PLAN.md`](docs/STAGING_TEST_PLAN.md) | Executable host procedure for staging verification (steps 4–13) |
+| [`docs/BUSINESS_CONTENT_APPROVAL_CHECKLIST.md`](docs/BUSINESS_CONTENT_APPROVAL_CHECKLIST.md) | Owner sign-off form for all business content |
 | [`docs/ANALYTICS_METRICS.md`](docs/ANALYTICS_METRICS.md) | Analytics KPI reference (mirrors `apps/analytics/metrics.py`) |
 | [`docs/PRODUCTION_READINESS_AUDIT.md`](docs/PRODUCTION_READINESS_AUDIT.md) | Phase 12 security audit: findings by severity, evidence, fix and verification status |
 | [`docs/FINAL_PRODUCTION_READINESS_REPORT.md`](docs/FINAL_PRODUCTION_READINESS_REPORT.md) | Phase 12 final status (NOT READY / READY FOR STAGING / READY FOR CONTROLLED PRODUCTION LAUNCH) |

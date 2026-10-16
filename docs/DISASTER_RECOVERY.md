@@ -110,7 +110,19 @@ cron/monitoring can alert. Schedule it with `deploy/systemd/aa-shinaka-backup.ti
 | Monthly | **Restore drill** into an isolated DB and run the §4 verification. Record RPO/RTO actually achieved. |
 | Before every release | Take and verify a fresh backup immediately before deploy (`deploy/scripts/deploy.sh`). |
 
-> **NOT VERIFIED in this environment:** no live host was provisioned, so no real
-> backup has been produced or restored. The scripts and this runbook are the
-> deliverable; a restore drill on staging is a launch gate in
-> `docs/PRODUCTION_RUNBOOK.md`.
+## 7. Drill executed in Phase 14 (local, real)
+
+A real drill was run against local PostgreSQL 18 using
+`deploy/scripts/restore_drill.sh`:
+
+| Metric | Result |
+|---|---|
+| Dump | custom format via `pg_dump -Fc` — 920 KB |
+| Restore target | isolated `aa_shinaka_drill` |
+| Restore time | 14 s |
+| Total wall time | 25 s |
+| Integrity | restored DB passed `manage.py migrate --check` (exit 0); 54 migrations, 16 users |
+
+This proves the backup/restore mechanics and gives a first RTO input. It does
+**not** verify the host: off-site copy, encryption keys, the nightly timer and a
+staging drill remain launch gates (`docs/PHASE_14_STAGING_REPORT.md` §10).

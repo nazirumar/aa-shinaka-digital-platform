@@ -1,8 +1,8 @@
 # Final Production Readiness Report — AA Shinaka Digital Business Platform
 
-**Phase:** 12 (hardened further in Phase 13)
+**Phase:** 12 (hardened in Phase 13; staging verification in Phase 14)
 **Date:** 2026-10-16
-**Prepared by:** engineering (Phase 12; Phase 13 addendum below)
+**Prepared by:** engineering (Phase 12; Phase 13 and Phase 14 addenda below)
 **Decision owner:** AA Shinaka business owner
 
 ---
@@ -11,17 +11,17 @@
 
 # READY FOR STAGING
 
-Every code-level gate passes (790 tests, 0 failures; lint, format, system check,
+Every code-level gate passes (857 tests, 0 failures; lint, format, system check,
 migration guard, production `check --deploy` and the CSS build all clean). The
-remaining items are **host-execution gates** (§4) that cannot run in the
+remaining items are **host-execution gates** (§4) that cannot run in this
 development environment: TLS, the `/media/` deny, a backup/restore drill, live
 monitoring and the load/accessibility passes.
 
 This report becomes **READY FOR CONTROLLED PRODUCTION LAUNCH** the moment every
 gate in §4 is executed and passes on staging and the owner signs off
-`docs/LAUNCH_CONTENT_CHECKLIST.md`. It must not be quoted as production-launch
-ready before then. It is **not** `NOT READY`: nothing is blocked by an unknown
-code defect.
+`docs/BUSINESS_CONTENT_APPROVAL_CHECKLIST.md`. It must not be quoted as
+production-launch ready before then. It is **not** `NOT READY`: nothing is blocked
+by an unknown code defect.
 
 > **Phase 13 addendum (2026-10-16):** the two code-level gaps that Phase 12
 > accepted for a controlled launch — **staff MFA** and **upload malware
@@ -29,6 +29,17 @@ code defect.
 > are hardened for multi-warehouse with concurrency evidence, and CI is
 > mandatory. Full detail and evidence: `docs/PHASE_13_COMPLETION_REPORT.md`.
 > **No deployment, DNS change or live Paystack key was performed.**
+
+> **Phase 14 addendum (2026-10-16):** staging verification and controlled-launch
+> preparation were delivered as **configuration, automation, tests and
+> documentation** — a `config.settings.staging` profile that refuses live
+> Paystack at import, deploy/preflight/rollback/smoke/verify scripts, and a
+> `manage.py verify_deployment` command. The full suite is now **857 passing, 0
+> failures**; a **real** local PostgreSQL backup/restore drill passed (25 s). No
+> staging host, domain, TLS, live key or production data was available, so every
+> host-execution gate remains **NOT VERIFIED** and the status stays
+> **READY FOR STAGING**. The go/no-go record is
+> `docs/PRODUCTION_LAUNCH_APPROVAL.md` (**NO-GO** pending host execution).
 
 ---
 
@@ -55,7 +66,7 @@ code defect.
 | Production `check --deploy` | ✅ clean at `--fail-level ERROR` (only the deliberate HSTS-preload warning remains) |
 | Automated security tests | ✅ 23 passing |
 | End-to-end scenarios A–F | ✅ 6 passing |
-| Full regression suite | ✅ 790 passing, 0 failures, 0 skipped |
+| Full regression suite | ✅ 857 passing, 0 failures, 0 skipped |
 | Deployment assets & DR | ✅ provided (host verification pending) |
 | No deployment / DNS / live keys performed | ✅ |
 
@@ -98,25 +109,32 @@ code defect.
 | `uv run python manage.py check` | No issues |
 | `uv run python manage.py makemigrations --check --dry-run` | No changes detected |
 | prod `manage.py check --deploy` | Clean (only HSTS-preload warning, deliberate) |
-| `uv run pytest` (full suite) | 790 passed, 0 failures, 0 skipped (4m57s) |
+| `uv run pytest` (full suite) | 857 passed, 0 failures, 0 skipped (7m21s) |
 | `npm run build:css` | Bundle built, non-empty |
 
 Tests are not reported as passing unless they actually ran and passed. Phase 13
 added 82 tests (MFA 26, upload security 32, inventory concurrency 18, Paystack
-test-mode 6); all prior suites remain green.
+test-mode 6); Phase 14 added 67 tests (route inventory, `verify_deployment`,
+staging guards). All prior suites remain green.
 
 ## 4. Launch gates that must be verified on the host (NOT VERIFIED here)
 
-These require a real staging/production host and are **not** claimed as done:
+These require a real staging/production host and are **not** claimed as done. The
+Phase 14 runbook for each is `docs/STAGING_TEST_PLAN.md`; the decision record is
+`docs/PRODUCTION_LAUNCH_APPROVAL.md`.
 
 1. TLS terminates correctly; HTTP 301-redirects to HTTPS.
 2. `curl -I https://HOST/media/<private-file>` returns 403/404; `/static/` serves 200.
 3. The application port is not publicly reachable (only nginx).
-4. A backup is produced and a **restore drill** succeeds (RPO/RTO measured).
+4. A backup is produced on the host and a **restore drill** succeeds (RPO/RTO
+   measured). *(A real local drill passed in Phase 14 — 25 s; the host drill,
+   off-site copy and scheduled timer remain to be verified.)*
 5. Monitoring/alerting is wired and fires a test alert.
 6. `sync_roles` run; superuser created; Nigeria locations imported
-   (37 states + 774 LGAs).
-7. `docs/LAUNCH_CONTENT_CHECKLIST.md` fully signed off by the owner.
+   (37 states + 774 LGAs). *(Local data is partial — 450 LGAs — and must be
+   re-imported from a verified source.)*
+7. `docs/BUSINESS_CONTENT_APPROVAL_CHECKLIST.md` (and
+   `docs/LAUNCH_CONTENT_CHECKLIST.md`) fully signed off by the owner.
 8. A load test and a WCAG 2.2 AA pass are executed on staging.
 9. A fresh verified backup exists immediately before launch.
 10. Paystack remains in **test mode** unless live keys are explicitly approved.
@@ -133,6 +151,12 @@ These require a real staging/production host and are **not** claimed as done:
 > Closed in Phase 13 (previously accepted gaps): staff MFA, upload malware
 > scanning and multi-warehouse reservation selection are now implemented and
 > tested. See `docs/PHASE_13_COMPLETION_REPORT.md`.
+>
+> Phase 14 adds `manage.py verify_deployment`, a staging settings profile with a
+> hard Paystack test-mode guard, and preflight/deploy/rollback/smoke/verify
+> scripts. It executed a real local backup/restore drill and a local load
+> baseline, and added 67 tests (857 total). See
+> `docs/PHASE_14_STAGING_REPORT.md`.
 
 ## 6. Scope compliance
 
