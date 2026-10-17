@@ -2,9 +2,10 @@
 
 This is a **development-only** command. It fills the database with the
 reference content the platform needs to look and behave like the real
-product — site configuration, navigation, CMS pages, catalogue, service
-config, training academy, export configuration and shipping zones — plus
-optionally a small set of transactional demo records.
+product — site configuration, navigation, CMS pages, catalogue, product
+variants, service config, training academy, export configuration, shipping
+zones, analytics reports and notification preferences — plus optionally a
+representative set of transactional demo records across every module.
 
 Nothing here is imported into production code, and no secret, real
 customer, or real transaction data is created. Staff replace the
@@ -22,8 +23,10 @@ from apps.core.management.commands.seed_data_support.media import ImageLibrary
 
 HELP = (
     "Seed development data (site, CMS, catalogue, services, training, "
-    "export, shipping). Use --with-demo-records to also create sample "
-    "orders, service requests, enrolments and export enquiries."
+    "export, shipping, analytics and notification preferences). Use "
+    "--with-demo-records to also create sample transactional records across "
+    "every module (orders and fulfilment, service workflows, training, export, "
+    "support, notifications and contact enquiries)."
 )
 
 
@@ -49,7 +52,11 @@ class Command(BaseCommand):
         parser.add_argument(
             "--with-demo-records",
             action="store_true",
-            help="Also create sample orders, service requests, enrolments and export enquiries.",
+            help=(
+                "Also create sample transactional records for every module "
+                "(orders, service workflows, training, export, support, "
+                "notifications, contact enquiries, quotations)."
+            ),
         )
         parser.add_argument(
             "--skip-locations",
@@ -89,8 +96,10 @@ class Command(BaseCommand):
             f"  Created this run: "
             f"{c['user']} users, {c['page']} pages, {c['hero_banner']} heroes, "
             f"{c['blog_post']} blog posts, {c['product']} products, "
-            f"{c['product_listing']} listings, {c['warehouse']} warehouses, "
-            f"{c['course']} courses, {c['training_session']} sessions.",
+            f"{c['product_listing']} listings, {c['product_variant']} variants, "
+            f"{c['warehouse']} warehouses, {c['course']} courses, "
+            f"{c['training_session']} sessions, {c['scheduled_report']} reports, "
+            f"{c['notification_preference']} notification preferences.",
             "  Existing (kept): sites, roles and all human-edited content preserved.",
             "  Demo data is illustrative only — replace it before any real use.",
         ]

@@ -1670,16 +1670,97 @@ def seed_shipping(ctx: SeedContext) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Analytics, catalogue variants & notification preferences
+# ---------------------------------------------------------------------------
+
+
+def seed_catalog_variants(ctx: SeedContext) -> None:
+    """Add representative variants to a few active listings (idempotent)."""
+    from apps.catalog.models import ProductVariant
+
+    listings = (
+        ProductListing.objects.filter(status=ListingStatus.ACTIVE)
+        .select_related("product")
+        .order_by("product__name", "created_at")[: content.PRODUCT_VARIANT_LIMIT]
+    )
+    created = 0
+    for listing in listings:
+        if ProductVariant.objects.filter(listing=listing).exists():
+            continue
+        for index, label in enumerate(content.PRODUCT_VARIANT_LABELS):
+            catalog_services.create_variant(
+                listing,
+                name=label,
+                notes="Development demo variant.",
+                sort_order=index * 10,
+                actor=ctx._admin,
+            )
+            created += 1
+    if created:
+        ctx.bumped("product_variant", created)
+    ctx.log(f"  · {created} product variants", verbosity=1)
+
+
+def seed_analytics(ctx: SeedContext) -> None:
+    """Create a few recurring reports so analytics has reference data."""
+    from apps.analytics.filters import ReportFilters
+    from apps.analytics.models import ScheduledReport
+    from apps.analytics.reports import get_report
+    from apps.analytics.services import create_scheduled_report
+
+    created = 0
+    for name, key, frequency, export_format in content.SCHEDULED_REPORTS:
+        if ScheduledReport.objects.filter(name=name).exists():
+            continue
+        definition = get_report(key)
+        if definition is None:
+            ctx.note(f"Scheduled report '{name}' skipped: unknown report key '{key}'.")
+            continue
+        create_scheduled_report(
+            name=name,
+            definition=definition,
+            filters=ReportFilters(),
+            frequency=frequency,
+            export_format=export_format,
+            recipients=[ctx._admin] if ctx._admin else [],
+            user=ctx._admin,
+        )
+        created += 1
+    if created:
+        ctx.bumped("scheduled_report", created)
+    ctx.log(f"  · {created} scheduled reports", verbosity=1)
+
+
+def seed_notification_preferences(ctx: SeedContext) -> None:
+    """Ensure every seeded user has a notification preference row."""
+    from apps.notifications import services as notification_services
+    from apps.notifications.models import NotificationPreference
+
+    created = 0
+    for entry in content.USERS:
+        user = ctx.user(entry["email"])
+        if user is None or NotificationPreference.objects.filter(user=user).exists():
+            continue
+        notification_services.get_preference(user)
+        created += 1
+    if created:
+        ctx.bumped("notification_preference", created)
+    ctx.log(f"  · {created} notification preferences", verbosity=1)
+
+
+# ---------------------------------------------------------------------------
 # Optional transactional demo records (--with-demo-records)
 # ---------------------------------------------------------------------------
 
 
 def seed_demo_records(ctx: SeedContext) -> None:
-    """Create a small set of *transactional* records so flows can be exercised.
+    """Create representative *transactional* records for every module.
 
-    These are real orders, service requests, enrolments and export
-    enquiries created through the public service layer — only enabled
-    with ``--with-demo-records`` so a plain seed run stays safe.
+    Real orders with fulfilment, service-division workflows, training
+    progression, export trade, support tickets, notifications and contact
+    enquiries are created through the public service layer — only enabled with
+    ``--with-demo-records`` so a plain seed run stays safe. Each section is
+    isolated so one failure never aborts the rest.
     """
     from apps.export import services as export_services
     from apps.services import services as services_services
@@ -1698,15 +1779,36 @@ def seed_demo_records(ctx: SeedContext) -> None:
         ctx.note("Demo records requested but no seeded customers found; skipping.")
         return
 
-    _demo_service_requests(ctx, services_services, customers)
-    _demo_enrolments(ctx, training_services, customers)
-    _demo_export_enquiries(ctx, export_services, customers)
-    _demo_orders(ctx, customers)
+    # Each section is isolated: a failure in one workflow is recorded as a note
+    # and never aborts the rest of the development seed run.
+    _safe_demo(ctx, "CMS contact enquiries", _demo_contact_enquiries, ctx, customers)
+    _safe_demo(ctx, "Support", _demo_support_tickets, ctx, customers)
+    _safe_demo(ctx, "Notifications", _demo_notifications, ctx, customers)
+    _safe_demo(ctx, "Service requests", _demo_service_requests, ctx, services_services, customers)
+    _safe_demo(ctx, "Service workflows", _demo_service_workflows, ctx, services_services, customers)
+    _safe_demo(ctx, "Enrolments", _demo_enrolments, ctx, training_services, customers)
+    _safe_demo(
+        ctx, "Training workflows", _demo_training_workflows, ctx, training_services, customers
+    )
+    _safe_demo(ctx, "Export enquiries", _demo_export_enquiries, ctx, export_services, customers)
+    _safe_demo(ctx, "Export workflows", _demo_export_workflows, ctx, export_services, customers)
+    _safe_demo(ctx, "Product orders", _demo_orders, ctx, customers)
+    _safe_demo(ctx, "Order fulfilment", _demo_order_fulfilment, ctx, customers)
+    _safe_demo(ctx, "Quotation requests", _demo_quotation_requests, ctx, customers)
 
     ctx.log(
-        "  · demo records created (service requests, enrolments, export enquiries, orders)",
+        "  · demo records created (CMS enquiries, support, notifications, service "
+        "workflows, training, export, orders, quotations)",
         verbosity=1,
     )
+
+
+def _safe_demo(ctx: SeedContext, label: str, func, *args, **kwargs) -> None:
+    """Run a demo seeding step, recording (never raising) any failure."""
+    try:
+        func(*args, **kwargs)
+    except Exception as exc:  # development seed data only — never abort the run
+        ctx.note(f"{label} demo skipped: {exc}")
 
 
 def _demo_service_requests(ctx, services_services, customers) -> None:
@@ -1854,6 +1956,761 @@ def Order_exists(customer) -> bool:
 
 
 # ---------------------------------------------------------------------------
+# Demo workflows — CMS, support, notifications
+# ---------------------------------------------------------------------------
+
+
+def _demo_contact_enquiries(ctx, customers) -> None:
+    from apps.cms import services as cms_services
+    from apps.cms.models import ContactEnquiry
+
+    for name, email, phone, division, subject, message in content.CONTACT_ENQUIRIES:
+        if ContactEnquiry.objects.filter(email__iexact=email, subject=subject).exists():
+            continue
+        cms_services.submit_contact_enquiry(
+            name=name,
+            email=email,
+            message=message,
+            phone=phone,
+            subject=subject,
+            division=division,
+        )
+        ctx.bumped("contact_enquiry")
+
+
+def _demo_support_tickets(ctx, customers) -> None:
+    from apps.support import services as support_services
+    from apps.support.models import SupportMessage, SupportTicket
+
+    agent = ctx.user("sales@aashinaka.example") or ctx._admin
+    for index, subject, category, priority, message in content.SUPPORT_TICKETS:
+        if index >= len(customers):
+            continue
+        customer = customers[index]
+        ticket = SupportTicket.objects.filter(customer=customer, subject=subject).first()
+        if ticket is None:
+            ticket = support_services.create_ticket(
+                customer=customer,
+                subject=subject,
+                category=category,
+                priority=priority,
+                message=message,
+            )
+            ctx.bumped("support_ticket")
+        has_staff_reply = (
+            SupportMessage.objects.filter(ticket=ticket, is_internal=False)
+            .exclude(sender=customer)
+            .exists()
+        )
+        if not has_staff_reply:
+            support_services.add_staff_message(
+                ticket=ticket,
+                sender=agent,
+                message="Thanks for reaching out — a member of our team is looking into this.",
+            )
+        if index == len(content.SUPPORT_TICKETS) - 1:
+            ticket.refresh_from_db()
+            if ticket.status not in {"resolved", "closed"}:
+                try:
+                    support_services.change_status(
+                        ticket,
+                        new_status="resolved",
+                        actor=agent,
+                        reason="Query answered (development demo).",
+                    )
+                    ctx.bumped("support_ticket_resolved")
+                except Exception as exc:
+                    ctx.note(f"Demo support ticket resolution skipped: {exc}")
+
+
+def _demo_notifications(ctx, customers) -> None:
+    from apps.notifications import services as notification_services
+    from apps.notifications.models import Notification, NotificationChannel
+
+    for customer in customers:
+        for category, title, message, url in content.DEMO_NOTIFICATIONS:
+            key = f"seed-demo:{customer.pk}:{category}"
+            if Notification.objects.filter(dedupe_key=key).exists():
+                continue
+            notification_services.emit(
+                recipient=customer,
+                category=category,
+                event="seed.demo",
+                title=title,
+                message=message,
+                url=url,
+                dedupe_key=key,
+                channels=[NotificationChannel.IN_APP],
+            )
+            ctx.bumped("notification")
+
+
+# ---------------------------------------------------------------------------
+# Demo workflows — services divisions
+# ---------------------------------------------------------------------------
+
+
+def _demo_service_workflows(ctx, services_services, customers) -> None:
+    if customers:
+        _safe_demo(ctx, "Consultancy", _consultancy_workflow, ctx, services_services, customers[0])
+        _safe_demo(ctx, "Storage", _storage_workflow, ctx, services_services, customers[0])
+        _safe_demo(
+            ctx,
+            "Service quotation",
+            _service_quotation_workflow,
+            ctx,
+            services_services,
+            customers[0],
+        )
+    if len(customers) > 1:
+        _safe_demo(
+            ctx,
+            "Farming",
+            _farming_workflow,
+            ctx,
+            services_services,
+            customers[1],
+            "KN",
+            "Kano Municipal",
+        )
+    if len(customers) > 2:
+        _safe_demo(ctx, "Marketing", _marketing_workflow, ctx, services_services, customers[2])
+
+
+def _consultancy_workflow(ctx, ss, customer) -> None:
+    from apps.services.models import ConsultancyService, ConsultationAppointment
+
+    if ConsultationAppointment.objects.filter(request__customer=customer).exists():
+        return
+    service = (
+        ConsultancyService.objects.filter(is_active=True, supports_online=True)
+        .order_by("sort_order")
+        .first()
+    )
+    consultant_user = ctx.user("consultant@aashinaka.example")
+    if service is None or consultant_user is None:
+        return
+    consultant = ss.create_consultant(
+        actor=ctx._admin,
+        user=consultant_user,
+        headline="Lead Agribusiness Consultant",
+        specializations="Farm business planning, agribusiness finance",
+        is_active=True,
+    )
+    slot_date = timezone.localdate() + dt.timedelta(days=7)
+    if not consultant.availability.filter(specific_date=slot_date).exists():
+        ss.set_consultant_availability(
+            consultant,
+            actor=ctx._admin,
+            specific_date=slot_date,
+            start_time=dt.time(9, 0),
+            end_time=dt.time(17, 0),
+        )
+    preferred = timezone.make_aware(dt.datetime.combine(slot_date, dt.time(10, 0)))
+    appointment = ss.book_consultation(
+        customer=customer,
+        service=service,
+        mode="online",
+        preferred_start=preferred,
+        description="Development demo consultation request.",
+        state=ctx.state("OY"),
+        lga=ctx.lga("OY", "Ibadan North"),
+    )
+    appointment = ss.confirm_appointment(appointment, actor=ctx._admin, consultant=consultant)
+    ss.complete_appointment(appointment, actor=ctx._admin, summary="Advisory session delivered.")
+    ss.record_consultation_report(
+        appointment,
+        actor=ctx._admin,
+        summary="Farm business plan reviewed.",
+        findings="Production costs and cash flow were mapped for the next season.",
+        recommendations="Adopt a simple record book and review input costs monthly.",
+    )
+    ctx.bumped("consultation_workflow")
+
+
+def _farming_workflow(ctx, ss, customer, state_code, lga_name) -> None:
+    from apps.services.models import FarmingService, FarmProject
+
+    if FarmProject.objects.filter(request__request__customer=customer).exists():
+        return
+    service = FarmingService.objects.filter(is_active=True).order_by("sort_order").first()
+    start = timezone.localdate() + dt.timedelta(days=10)
+    farm_request = ss.submit_farm_service_request(
+        customer=customer,
+        farm_location="Development demo farm, along the Zaria road",
+        requested_service=service,
+        state=ctx.state(state_code),
+        lga=ctx.lga(state_code, lga_name),
+        farm_size=D("2.0"),
+        area_unit="hectare",
+        crop_type="Maize",
+        season="wet",
+        expected_start_date=start,
+        budget_min=D("150000"),
+        budget_max=D("450000"),
+        additional_requirements="Soil test and land preparation.",
+        description="Development demo farming service request.",
+    )
+    project = ss.create_farm_project(
+        farm_request,
+        actor=ctx._admin,
+        name="Demo maize production project",
+        start_date=start,
+        end_date=start + dt.timedelta(days=120),
+        notes="Development demo project.",
+    )
+    ss.approve_farm_project(project, actor=ctx._admin, agreement_reference="AGR-DEMO-0001")
+    ss.activate_farm_project(project, actor=ctx._admin)
+    first = ss.add_farm_milestone(
+        project,
+        actor=ctx._admin,
+        title="Land preparation",
+        description="Clear, plough and harrow the plot.",
+        due_date=start,
+    )
+    second = ss.add_farm_milestone(
+        project,
+        actor=ctx._admin,
+        title="Planting",
+        description="Plant improved maize seed.",
+        due_date=start + dt.timedelta(days=14),
+    )
+    ss.update_farm_milestone(
+        first, actor=ctx._admin, status="completed", note="Completed on schedule."
+    )
+    visit = ss.record_farm_visit(
+        project,
+        actor=ctx._admin,
+        purpose="First supervision visit",
+        visit_date=start,
+        notes="Plot inspected; work on track.",
+        status="completed",
+    )
+    ss.add_farm_progress_report(
+        project,
+        actor=ctx._admin,
+        title="Week 1 progress",
+        visit=visit,
+        summary="Land prepared and improved seed sourced.",
+        progress_percent=25,
+    )
+    ss.update_farm_milestone(
+        second, actor=ctx._admin, status="in_progress", note="Planting underway."
+    )
+    ss.complete_farm_project(
+        project, actor=ctx._admin, note="Project delivered (development demo)."
+    )
+    ctx.bumped("farm_workflow")
+
+
+def _marketing_workflow(ctx, ss, customer) -> None:
+    from apps.services.models import MarketingCampaign, MarketingService
+
+    if MarketingCampaign.objects.filter(enquiry__request__customer=customer).exists():
+        return
+    service = MarketingService.objects.filter(is_active=True).order_by("sort_order").first()
+    start = timezone.localdate() + dt.timedelta(days=3)
+    enquiry = ss.submit_marketing_enquiry(
+        customer=customer,
+        product_type="Sesame seeds",
+        service=service,
+        available_quantity=D("5.0"),
+        product_location="Kano",
+        target_market="Export buyers",
+        marketing_requirements="Aggregation and offtake for five tonnes of sesame.",
+        preferred_timeline="Next four weeks",
+        description="Development demo marketing enquiry.",
+    )
+    proposal = ss.create_marketing_proposal(
+        enquiry,
+        actor=ctx._admin,
+        title="Sesame offtake proposal",
+        scope="Aggregate five tonnes and connect to export buyers.",
+        approach="Field aggregation, quality grading and a buyer introduction.",
+    )
+    ss.issue_marketing_proposal(proposal, actor=ctx._admin)
+    ss.decide_marketing_proposal(proposal, actor=customer, accepted=True, note="Accepted (demo).")
+    campaign = ss.create_marketing_campaign(
+        enquiry,
+        actor=ctx._admin,
+        name="Sesame offtake campaign",
+        start_date=start,
+        end_date=start + dt.timedelta(days=28),
+        targets="Aggregate five tonnes; secure one export buyer.",
+    )
+    ss.record_marketing_activity(
+        campaign,
+        actor=ctx._admin,
+        occurred_on=start,
+        title="Buyer outreach",
+        description="Shared quality samples with two prospective buyers.",
+        outcome="One buyer requested a formal quotation.",
+    )
+    ss.complete_marketing_campaign(campaign, actor=ctx._admin)
+    ctx.bumped("marketing_workflow")
+
+
+def _storage_workflow(ctx, ss, customer) -> None:
+    from apps.services.models import ProduceType, StorageBooking, StorageFacility
+
+    if StorageBooking.objects.filter(request__request__customer=customer).exists():
+        return
+    produce = ProduceType.objects.filter(name="Maize").first()
+    facility = None
+    if produce is not None:
+        facility = (
+            StorageFacility.objects.filter(is_active=True, accepted_produce_types=produce)
+            .order_by("name")
+            .first()
+        )
+    if facility is None:
+        facility = StorageFacility.objects.filter(is_active=True).first()
+    if facility is None:
+        return
+    start = timezone.localdate() + dt.timedelta(days=5)
+    end = start + dt.timedelta(days=60)
+    storage_request = ss.submit_storage_request(
+        customer=customer,
+        produce_type=produce,
+        quantity=D("10.0"),
+        unit=ctx.unit("tonne"),
+        preferred_facility=facility,
+        requested_start_date=start,
+        requested_end_date=end,
+        special_handling="Keep dry and palletised.",
+        description="Development demo storage request.",
+    )
+    booking = ss.create_storage_booking(
+        storage_request,
+        actor=ctx._admin,
+        facility=facility,
+        start_date=start,
+        end_date=end,
+        quantity=D("10.0"),
+    )
+    ss.confirm_storage_booking(booking, actor=ctx._admin, require_payment=False)
+    ss.storage_check_in(
+        booking,
+        actor=ctx._admin,
+        quantity=D("10.0"),
+        condition_notes="Received in good condition.",
+    )
+    ss.record_storage_inspection(
+        facility,
+        actor=ctx._admin,
+        condition="good",
+        findings="No pest activity; moisture within range.",
+        booking=booking,
+    )
+    ss.storage_check_out(
+        booking,
+        actor=ctx._admin,
+        quantity=D("10.0"),
+        condition_notes="Released in good condition.",
+    )
+    ctx.bumped("storage_workflow")
+
+
+def _service_quotation_workflow(ctx, ss, customer) -> None:
+    from apps.services.models import ServiceQuotation, ServiceRequest
+
+    if ServiceQuotation.objects.filter(customer=customer).exists():
+        return
+    service_request = None
+    candidates = ServiceRequest.objects.filter(
+        customer=customer, status__in=["submitted", "under_review", "quoted"]
+    ).order_by("created_at")
+    for candidate in candidates:
+        if not ServiceQuotation.objects.filter(request=candidate).exists():
+            service_request = candidate
+            break
+    if service_request is None:
+        return
+    quotation = ss.create_quotation(
+        actor=ctx._admin,
+        customer=customer,
+        service_request=service_request,
+        items=[
+            {
+                "description": "Advisory and field support package",
+                "quantity": D("1"),
+                "unit_price": D("75000"),
+            },
+            {
+                "description": "Follow-up review session",
+                "quantity": D("2"),
+                "unit_price": D("25000"),
+            },
+        ],
+        valid_until=timezone.localdate() + dt.timedelta(days=30),
+        terms="50% on acceptance; balance on delivery.",
+    )
+    ss.submit_quotation_for_approval(quotation, actor=ctx._admin)
+    ss.approve_quotation(quotation, actor=ctx._admin)
+    ss.issue_quotation(quotation, actor=ctx._admin)
+    ss.accept_quotation(quotation, actor=customer, note="Accepted (development demo).")
+    ctx.bumped("service_quotation")
+
+
+# ---------------------------------------------------------------------------
+# Demo workflows — training academy
+# ---------------------------------------------------------------------------
+
+
+def _demo_training_workflows(ctx, training_services, customers) -> None:
+    from apps.training import selectors as training_selectors
+    from apps.training.models import (
+        Assessment,
+        AttendanceRecord,
+        AttendanceSession,
+        Certificate,
+        CertificateStatus,
+        CertificateTemplate,
+        Enrollment,
+        EnrollmentStatus,
+        LessonProgress,
+    )
+
+    student = customers[0]
+    enrollment = (
+        Enrollment.objects.filter(student=student, session__course__certificate_eligible=True)
+        .exclude(status__in=[EnrollmentStatus.CANCELLED])
+        .select_related("session__course")
+        .order_by("created_at")
+        .first()
+    )
+    if enrollment is None:
+        return
+    course = enrollment.session.course
+
+    if enrollment.status in {
+        EnrollmentStatus.PENDING,
+        EnrollmentStatus.PAYMENT_PENDING,
+        EnrollmentStatus.WAITLISTED,
+    }:
+        enrollment = training_services.transition_enrollment(
+            enrollment,
+            EnrollmentStatus.CONFIRMED,
+            actor=ctx._admin,
+            note="Development demo: seat confirmed.",
+        )
+    if enrollment.status not in {
+        EnrollmentStatus.CONFIRMED,
+        EnrollmentStatus.COMPLETED,
+    }:
+        return
+
+    assessment = Assessment.objects.filter(course=course, title="Course knowledge check").first()
+    if assessment is None:
+        assessment = training_services.create_assessment(
+            actor=ctx._admin,
+            course=course,
+            title="Course knowledge check",
+            assessment_type="quiz",
+            description="Development demo knowledge check.",
+            passing_score=D("50"),
+            max_attempts=3,
+            completion_required=False,
+        )
+        question = training_services.add_question(
+            actor=ctx._admin,
+            assessment=assessment,
+            question_type="multiple_choice",
+            prompt="Which practice best protects stored grain?",
+            points=D("1"),
+            sort_order=0,
+        )
+        training_services.add_option(
+            actor=ctx._admin,
+            question=question,
+            text="Keep it dry and ventilated",
+            is_correct=True,
+            sort_order=0,
+        )
+        training_services.add_option(
+            actor=ctx._admin,
+            question=question,
+            text="Store it while damp",
+            is_correct=False,
+            sort_order=1,
+        )
+        training_services.publish_assessment(assessment, actor=ctx._admin)
+        ctx.bumped("assessment")
+
+    if (
+        assessment.is_published
+        and not enrollment.submissions.filter(assessment=assessment).exists()
+    ):
+        answers = {}
+        for item in assessment.questions.all():
+            correct = item.options.filter(is_correct=True).first()
+            if correct is not None:
+                answers[str(item.pk)] = str(correct.pk)
+        training_services.submit_assessment(
+            enrollment=enrollment, assessment=assessment, answers=answers, actor=student
+        )
+        ctx.bumped("assessment_submission")
+
+    session = enrollment.session
+    attendance_session = AttendanceSession.objects.filter(session=session).first()
+    if attendance_session is None:
+        attendance_session = training_services.create_attendance_session(
+            actor=ctx._admin,
+            session=session,
+            date=session.start_date,
+            topic="Opening session (development demo)",
+        )
+        ctx.bumped("attendance_session")
+    if not AttendanceRecord.objects.filter(
+        attendance_session=attendance_session, enrollment=enrollment
+    ).exists():
+        training_services.record_attendance(
+            actor=ctx._admin,
+            attendance_session=attendance_session,
+            enrollment=enrollment,
+            status="present",
+            note="Development demo attendance.",
+        )
+
+    for lesson in training_selectors.course_lessons(course):
+        if LessonProgress.objects.filter(
+            enrollment=enrollment, lesson=lesson, is_completed=True
+        ).exists():
+            continue
+        training_services.mark_lesson_complete(actor=student, enrollment=enrollment, lesson=lesson)
+        ctx.bumped("lesson_progress")
+
+    enrollment.refresh_from_db()
+    training_services.recompute_progress(enrollment)
+
+    if not Certificate.objects.filter(
+        student=student, course=course, status=CertificateStatus.ISSUED
+    ).exists():
+        template = CertificateTemplate.objects.filter(is_active=True).first()
+        try:
+            training_services.issue_certificate(
+                actor=ctx._admin, enrollment=enrollment, template=template
+            )
+            ctx.bumped("certificate")
+        except Exception as exc:
+            ctx.note(f"Demo training certificate skipped: {exc}")
+
+
+# ---------------------------------------------------------------------------
+# Demo workflows — export, orders & quotations
+# ---------------------------------------------------------------------------
+
+
+def _demo_export_workflows(ctx, export_services, customers) -> None:
+    from apps.export.models import (
+        ExportComplianceChecklist,
+        ExportEnquiry,
+        ExportOrder,
+        ExportOrderStatus,
+        ExportQuotation,
+        ExportShipment,
+    )
+
+    enquiry = (
+        ExportEnquiry.objects.filter(customer=customers[0])
+        .exclude(status__in=["rejected", "cancelled"])
+        .select_related("destination", "destination__country")
+        .order_by("created_at")
+        .first()
+    )
+    if enquiry is None:
+        return
+
+    quotation = ExportQuotation.objects.filter(enquiry=enquiry).first()
+    if quotation is None:
+        item = enquiry.items.select_related("product", "unit").first()
+        if item is None or item.product is None:
+            return
+        listing = (
+            ProductListing.objects.filter(product=item.product, status=ListingStatus.ACTIVE)
+            .order_by("selling_price")
+            .first()
+        )
+        unit_price = listing.selling_price if listing is not None else D("1000.00")
+        quotation = export_services.create_quotation(
+            enquiry=enquiry,
+            actor=ctx._admin,
+            currency="USD",
+            incoterm="FOB",
+            incoterm_version="2020",
+            named_place=f"{enquiry.destination.country.name} port",
+            payment_terms="30% deposit; balance before shipment.",
+            delivery_terms="Delivered to the named place.",
+            valid_until=timezone.localdate() + dt.timedelta(days=30),
+            deposit_percentage=30,
+            items=[
+                {
+                    "product": item.product,
+                    "description": item.product.name,
+                    "quantity": item.quantity,
+                    "unit": item.unit,
+                    "unit_price": unit_price,
+                }
+            ],
+        )
+        export_services.submit_quotation_for_approval(quotation, actor=ctx._admin)
+        export_services.approve_quotation(quotation, actor=ctx._admin)
+        ctx.bumped("export_quotation")
+
+    quotation.refresh_from_db()
+    order = ExportOrder.objects.filter(quotation=quotation).first()
+    if order is None:
+        if quotation.status != "issued":
+            return
+        order = export_services.accept_quotation(quotation, actor=customers[0])
+        ctx.bumped("export_order")
+
+    order.refresh_from_db()
+    if order.status == ExportOrderStatus.PENDING_PAYMENT:
+        amount = order.deposit_amount or order.total
+        if amount and amount > 0:
+            export_services.record_verified_payment(order, amount=amount, actor=ctx._admin)
+
+    checklist = ExportComplianceChecklist.objects.filter(order=order).first()
+    if checklist is None:
+        checklist = export_services.build_compliance_checklist(order, actor=ctx._admin)
+    if checklist.status != "approved":
+        for checklist_item in checklist.items.exclude(status__in=["verified", "not_applicable"]):
+            export_services.update_compliance_item(
+                checklist_item, actor=ctx._admin, status="verified", notes="Verified (demo)."
+            )
+        export_services.approve_compliance_checklist(checklist, actor=ctx._admin)
+        ctx.bumped("export_compliance")
+
+    order.refresh_from_db()
+    if order.status in {ExportOrderStatus.PAYMENT_VERIFIED, ExportOrderStatus.IN_PRODUCTION}:
+        export_services.transition_export_order(
+            order, ExportOrderStatus.READY_FOR_SHIPMENT, actor=ctx._admin
+        )
+        ctx.bumped("export_order_ready")
+
+    order.refresh_from_db()
+    shipment = ExportShipment.objects.filter(order=order).first()
+    if shipment is None and order.status == ExportOrderStatus.READY_FOR_SHIPMENT:
+        shipment = export_services.create_shipment(
+            order,
+            actor=ctx._admin,
+            transport_mode="sea",
+            origin="Lagos, Nigeria",
+            destination=f"{order.destination.country.name} port",
+            departure_date=timezone.localdate(),
+            estimated_arrival=timezone.localdate() + dt.timedelta(days=21),
+            tracking_reference="SEED-DEMO-0001",
+            notes="Development demo shipment.",
+        )
+        ctx.bumped("export_shipment")
+
+    if shipment is not None:
+        shipment.refresh_from_db()
+        if shipment.status not in {"delivered", "cancelled"}:
+            try:
+                export_services.transition_shipment(
+                    shipment, "delivered", actor=ctx._admin, note="Delivered (development demo)."
+                )
+                ctx.bumped("export_shipment_delivered")
+            except Exception as exc:
+                ctx.note(f"Demo export shipment skipped: {exc}")
+
+
+def _demo_order_fulfilment(ctx, customers) -> None:
+    from apps.orders import services as order_services
+    from apps.orders.models import ORDER_TRANSITIONS, Order, OrderStatus, Shipment, ShipmentStatus
+
+    for customer in customers:
+        order = Order.objects.filter(user=customer).order_by("created_at").first()
+        if order is None:
+            continue
+        order.refresh_from_db()
+        if order.payment_status != "paid" and order.status in {
+            OrderStatus.PENDING_PAYMENT,
+            OrderStatus.PAYMENT_REVIEW,
+        }:
+            order_services.settle_order(
+                order, actor=ctx._admin, reference="SEED-DEMO-PAY", note="Settled (demo)."
+            )
+            ctx.bumped("order_paid")
+        for target in (
+            OrderStatus.PROCESSING,
+            OrderStatus.READY_FOR_DISPATCH,
+            OrderStatus.DISPATCHED,
+            OrderStatus.DELIVERED,
+        ):
+            order.refresh_from_db()
+            if target not in ORDER_TRANSITIONS.get(order.status, frozenset()):
+                break
+            try:
+                order_services.transition_order(
+                    order, to_status=target, actor=ctx._admin, reason="Fulfilment (demo)."
+                )
+            except Exception as exc:
+                ctx.note(f"Demo order transition skipped: {exc}")
+                break
+        if not Shipment.objects.filter(order=order).exists():
+            shipment = order_services.create_shipment(
+                order,
+                method=order.shipping_method,
+                carrier="AA Shinaka Logistics (development demo)",
+                tracking_number="SEED-DEMO-0001",
+                notes="Development demo shipment.",
+                actor=ctx._admin,
+            )
+            order_services.update_shipment_status(
+                shipment,
+                status=ShipmentStatus.DELIVERED,
+                notes="Delivered (development demo).",
+                actor=ctx._admin,
+            )
+            ctx.bumped("order_shipment")
+
+
+def _demo_quotation_requests(ctx, customers) -> None:
+    from apps.orders import services as order_services
+    from apps.orders.models import QuotationRequest, QuotationStatus
+
+    listings = list(
+        ProductListing.objects.filter(status=ListingStatus.ACTIVE)
+        .select_related("product")
+        .order_by("?")[: len(customers)]
+    )
+    for customer, listing in zip(customers, listings, strict=False):
+        if QuotationRequest.objects.filter(user=customer).exists():
+            continue
+        contact_name = f"{customer.first_name} {customer.last_name}".strip() or customer.email
+        try:
+            order_services.create_quotation_request(
+                user=customer,
+                listing=listing,
+                quantity=D("5"),
+                packaging="50 kg bags",
+                contact_name=contact_name,
+                contact_email=customer.email,
+                contact_phone=getattr(customer, "phone", "") or "08000000000",
+                requirements="Bulk pricing requested (development demo).",
+            )
+            ctx.bumped("quotation_request")
+        except Exception as exc:
+            ctx.note(f"Demo quotation request skipped: {exc}")
+
+    quotation = QuotationRequest.objects.filter(status=QuotationStatus.SUBMITTED).first()
+    if quotation is not None:
+        try:
+            order_services.update_quotation(
+                quotation,
+                status=QuotationStatus.QUOTED,
+                actor=ctx._admin,
+                response_note="Pricing reviewed (development demo).",
+            )
+            ctx.bumped("quotation_request_quoted")
+        except Exception as exc:
+            ctx.note(f"Demo quotation update skipped: {exc}")
+
+
+# ---------------------------------------------------------------------------
 # Orchestration
 # ---------------------------------------------------------------------------
 
@@ -1870,16 +2727,22 @@ def run_all(ctx: SeedContext, *, skip_locations: bool = False) -> None:
     seed_blog(ctx)
     seed_legacy(ctx)
     seed_catalog(ctx)
+    seed_catalog_variants(ctx)
     seed_services(ctx)
     seed_training(ctx)
     seed_export(ctx)
     seed_shipping(ctx)
+    seed_analytics(ctx)
+    seed_notification_preferences(ctx)
     if ctx.with_demo_records:
         seed_demo_records(ctx)
 
 
 def dry_run(ctx: SeedContext, *, skip_locations: bool = False) -> None:
     """Read-only preflight: report what exists and what would be created."""
+    from apps.analytics.models import ScheduledReport
+    from apps.catalog.models import ProductVariant
+    from apps.notifications.models import NotificationPreference
 
     def present(model, **filters):
         return model.objects.filter(**filters).exists()
@@ -1925,6 +2788,18 @@ def dry_run(ctx: SeedContext, *, skip_locations: bool = False) -> None:
         f"  Shipping: {ShippingZone.objects.count()} zones, "
         f"{ShippingMethod.objects.count()} methods, "
         f"{ShippingRate.objects.count()} rates",
+        verbosity=0,
+    )
+    ctx.log(
+        f"  Product variants: {ProductVariant.objects.count()}",
+        verbosity=0,
+    )
+    ctx.log(
+        f"  Scheduled reports: {ScheduledReport.objects.count()}",
+        verbosity=0,
+    )
+    ctx.log(
+        f"  Notification preferences: {NotificationPreference.objects.count()}",
         verbosity=0,
     )
     ctx.log(

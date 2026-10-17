@@ -2651,3 +2651,122 @@ SHIPPING_RATES = [
     ("NORTH_EAST", "STANDARD", "6500.00", "300000.00"),
     ("NORTH_EAST", "EXPRESS", "9500.00", None),
 ]
+
+
+# ---------------------------------------------------------------------------
+# Analytics — recurring report configuration (always-on reference data)
+# ---------------------------------------------------------------------------
+
+#: (name, report_key, frequency, export_format). Keys are allow-listed in
+#: ``apps.analytics.reports``; non-financial keys are used so any staff member
+#: with the reporting capability may receive them.
+SCHEDULED_REPORTS = [
+    ("Weekly inventory stock", "inventory_stock", "weekly", "csv"),
+    ("Monthly service requests", "services_requests", "monthly", "csv"),
+    ("Weekly low-stock watchlist", "inventory_low_stock", "weekly", "csv"),
+]
+
+
+# ---------------------------------------------------------------------------
+# Catalogue — representative product variants (always-on reference data)
+# ---------------------------------------------------------------------------
+
+#: Variant labels applied to active listings that have none yet.
+PRODUCT_VARIANT_LABELS = ["Standard", "Premium"]
+PRODUCT_VARIANT_LIMIT = 8
+
+
+# ---------------------------------------------------------------------------
+# CMS — contact enquiries (demo records)
+# ---------------------------------------------------------------------------
+
+#: (name, email, phone, division, subject, message)
+CONTACT_ENQUIRIES = [
+    (
+        "Amaka Obi",
+        "amaka.obi@example.invalid",
+        "08040000001",
+        "storage",
+        "Storage for 20 tonnes of rice",
+        "I would like a quote to store 20 tonnes of rice for three months.",
+    ),
+    (
+        "Sani Bello",
+        "sani.bello@example.invalid",
+        "08040000002",
+        "farming_services",
+        "Land preparation for two hectares",
+        "Please contact me about land preparation for a two-hectare plot.",
+    ),
+    (
+        "Grace Umeh",
+        "grace.umeh@example.invalid",
+        "08040000003",
+        "training",
+        "Training for a cooperative group",
+        "Our cooperative would like training for 15 members on post-harvest handling.",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Support — demo tickets
+# ---------------------------------------------------------------------------
+
+#: (customer_index, subject, category, priority, message)
+SUPPORT_TICKETS = [
+    (
+        0,
+        "Where is my order?",
+        "product_order",
+        "normal",
+        "My order has not arrived yet. Please share the delivery status.",
+    ),
+    (
+        1,
+        "Certificate name correction",
+        "training",
+        "low",
+        "My certificate shows a misspelt name. Please advise on correcting it.",
+    ),
+    (
+        2,
+        "Storage inspection request",
+        "storage",
+        "high",
+        "Please arrange an inspection of my stored produce this week.",
+    ),
+]
+
+
+# ---------------------------------------------------------------------------
+# Notifications — demo inbox items
+# ---------------------------------------------------------------------------
+
+#: (category, title, message, url)
+DEMO_NOTIFICATIONS = [
+    (
+        "orders",
+        "Your order is on the way",
+        "Track your latest order from your customer portal.",
+        "/portal/orders/",
+    ),
+    (
+        "training",
+        "New course material",
+        "Fresh lessons were added to a course you are enrolled in.",
+        "/portal/training/",
+    ),
+    (
+        "support",
+        "We replied to your ticket",
+        "A support agent has responded to your request.",
+        "/portal/support/",
+    ),
+    (
+        "payments",
+        "Payment received",
+        "A payment on your account has been verified.",
+        "/portal/payments/",
+    ),
+]

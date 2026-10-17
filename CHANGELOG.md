@@ -3,6 +3,35 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — Expanded development seed data (every module)
+
+### Added
+
+- **Always-on reference data for the previously-empty modules.** A plain
+  `seed_data` run now also seeds catalogue `ProductVariant`s, three analytics
+  `ScheduledReport`s (inventory stock, low-stock and service requests) and a
+  `NotificationPreference` row per seeded user. All are idempotent and go
+  through the service layer.
+- **`--with-demo-records` now covers every domain.** The flag previously created
+  only orders, service requests, enrolments and export enquiries; it now also
+  exercises the full transactional workflows: CMS contact enquiries; support
+  tickets with staff replies and resolution; in-app notifications; the complete
+  consultancy, farm-project, marketing and storage service lifecycles plus a
+  service quotation; training attendance → assessment → lesson completion →
+  certificate; the export quotation → order → verified payment → compliance →
+  shipment → delivery chain; order settlement, status transitions and shipment;
+  and bulk quotation requests. Each section is isolated, so one failing workflow
+  is recorded as a note and never aborts the run.
+- **`tests/test_seed_data.py`** — new tests assert a plain run creates the new
+  reference data (and stays idempotent) and that a `--with-demo-records` run
+  populates every module, reports no silently-skipped workflow, and re-runs
+  without duplicating records.
+
+### Changed
+
+- **`seed_data` help text and run report** now describe the full module coverage.
+  The command remains development-only (`DEBUG`) and idempotent.
+
 ## [Unreleased] — Fix: invalid default cache URL
 
 ### Fixed

@@ -206,3 +206,89 @@ def test_seed_data_dry_run_does_not_write(capsys, settings):
 def test_seed_data_refuses_to_run_outside_development():
     with pytest.raises(CommandError, match="development-only"):
         call_command("seed_data")
+
+
+def test_seed_data_creates_reference_data_for_every_module(settings):
+    settings.DEBUG = True
+    call_command("seed_data", "--no-images")
+
+    from apps.analytics.models import ScheduledReport
+    from apps.catalog.models import ProductVariant
+    from apps.notifications.models import NotificationPreference
+
+    assert ProductVariant.objects.count() > 0
+    assert ScheduledReport.objects.count() == 3
+    assert NotificationPreference.objects.count() >= len(SEED_EMAILS)
+
+    # Re-running must not duplicate the new reference data.
+    variants = ProductVariant.objects.count()
+    reports = ScheduledReport.objects.count()
+    preferences = NotificationPreference.objects.count()
+    call_command("seed_data", "--no-images")
+    assert ProductVariant.objects.count() == variants
+    assert ScheduledReport.objects.count() == reports
+    assert NotificationPreference.objects.count() == preferences
+
+
+def test_seed_data_demo_records_cover_every_module(settings, capsys):
+    settings.DEBUG = True
+    call_command("seed_data", "--with-demo-records", "--no-images")
+
+    # No demo workflow should fail silently (each is isolated behind try/except).
+    assert "demo skipped" not in capsys.readouterr().out
+
+    from apps.cms.models import ContactEnquiry
+    from apps.export.models import ExportOrder, ExportShipment
+    from apps.notifications.models import Notification
+    from apps.orders.models import Order, PaymentStatus, QuotationRequest, Shipment
+    from apps.services.models import (
+        ConsultationReport,
+        FarmProject,
+        MarketingCampaign,
+        ServiceQuotation,
+        StorageBooking,
+    )
+    from apps.support.models import SupportTicket
+    from apps.training.models import Certificate, Enrollment
+
+    # Cross-cutting modules.
+    assert ContactEnquiry.objects.exists()
+    assert SupportTicket.objects.exists()
+    assert Notification.objects.exists()
+
+    # Orders, fulfilment and quotations.
+    assert Order.objects.filter(payment_status=PaymentStatus.PAID).exists()
+    assert Shipment.objects.exists()
+    assert QuotationRequest.objects.exists()
+
+    # Service divisions.
+    assert ConsultationReport.objects.exists()
+    assert FarmProject.objects.filter(status="completed").exists()
+    assert MarketingCampaign.objects.exists()
+    assert StorageBooking.objects.filter(status="checked_out").exists()
+    assert ServiceQuotation.objects.filter(status="accepted").exists()
+
+    # Training academy.
+    assert Enrollment.objects.filter(status="completed").exists()
+    assert Certificate.objects.exists()
+
+    # Export trade.
+    assert ExportOrder.objects.exists()
+    assert ExportShipment.objects.filter(status="delivered").exists()
+
+    # Re-running must not duplicate any demo records.
+    snapshot = (
+        ContactEnquiry.objects.count(),
+        SupportTicket.objects.count(),
+        Notification.objects.count(),
+        Order.objects.count(),
+        Shipment.objects.count(),
+    )
+    call_command("seed_data", "--with-demo-records", "--no-images")
+    assert (
+        ContactEnquiry.objects.count(),
+        SupportTicket.objects.count(),
+        Notification.objects.count(),
+        Order.objects.count(),
+        Shipment.objects.count(),
+    ) == snapshot
