@@ -3,6 +3,58 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — Categorised, active-aware dashboard sidebar
+
+### Added
+
+- **Collapsible sidebar categories.** The dashboard navigation is grouped into
+  labelled sections — Overview, Website, Catalogue, Orders, Finance, Services,
+  Export, Training, Support, Customers and Analytics — each with an icon and a
+  header you can expand or collapse. Open/closed choices are remembered in
+  `localStorage` (key `sidebar.groups`) so a collapsed section stays collapsed
+  while you navigate.
+- **Active-page awareness.** The category holding the current page is opened
+  automatically, marked with a gold dot on its header, and the active link is
+  scrolled into view and given `aria-current="page"` on load. The active link
+  itself is rendered with a stronger highlight and a gold marker.
+- **`tests/test_dashboard_sidebar.py`** — asserts the category groups and
+  collapsible controls render, the active link is marked and scrollable, and the
+  group styling is always emitted.
+
+### Fixed
+
+- **Cross-module sidebar highlights.** Active-link detection is now scoped to
+  the page's URL namespace, so overlapping names (catalogue vs training
+  *Categories*, orders vs export vs services *Quotations*, export vs training
+  *Reports*, catalogue vs export *Products*/*Orders*) no longer light up two
+  links at once.
+
+## [Unreleased] — Light/dark theme for the public site and dashboard
+
+### Added
+
+- **Light / Dark / System theme switcher** on the public navbar and the staff
+  dashboard header. The choice is saved in `localStorage`, defaults to the OS
+  setting (`System`) and is applied before first paint, so there is no flash of
+  the wrong theme. New components: `components/theme_init.html` (no-flash
+  bootstrap + Alpine `theme` store) and `components/theme_toggle.html`.
+- **Class-based dark mode** using Tailwind v4 `@custom-variant dark`, with
+  `color-scheme` set per theme so native form controls and scrollbars follow.
+- **Dark styling for the shared chrome and component library**: the public
+  navbar and mobile menu, the dashboard shell/header/dropdowns, and the shared
+  components (alerts, buttons, empty states, metric cards, section headings,
+  breadcrumbs, form fields, modals, pagination, language switcher and the
+  category/service/product/state/coming-soon cards). Form controls and CMS rich
+  text adapt through `static/src/app.css`.
+- **`tests/test_theme.py`** — asserts both surfaces bootstrap the theme store and
+  expose the switcher, and that the class-based dark variant is defined.
+
+### Notes
+
+- Inner page bodies adopt the theme progressively; the shared chrome, cards and
+  form controls are themed now. The public footer and the dashboard sidebar were
+  already dark and are unchanged.
+
 ## [Unreleased] — Expanded development seed data (every module)
 
 ### Added

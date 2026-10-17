@@ -4,11 +4,11 @@ Props: images — a list of MediaAsset objects (each with file, alt_text/title).
 {% endcomment %}
 <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4" x-data="{ active: null }">
   {% for image in images %}
-    <button type="button" class="group overflow-hidden rounded-lg border border-stone-200" @click="active = '{{ image.file.url }}'">
+    <button type="button" class="group overflow-hidden rounded-lg border border-stone-200 dark:border-stone-700" @click="active = '{{ image.file.url }}'">
       <img src="{{ image.file.url }}" alt="{{ image.alt_text|default:image.title }}" loading="lazy" decoding="async" class="aspect-square w-full object-cover transition group-hover:scale-105">
     </button>
   {% empty %}
-    <p class="col-span-full text-sm text-stone-500">{% trans "No images yet." %}</p>
+    <p class="col-span-full text-sm text-stone-500 dark:text-stone-400">{% trans "No images yet." %}</p>
   {% endfor %}
 
   <div x-show="active" x-cloak class="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/80 p-4" @click="active = null" @keydown.escape.window="active = null" role="dialog" aria-modal="true" aria-label="{% trans 'Image preview' %}">

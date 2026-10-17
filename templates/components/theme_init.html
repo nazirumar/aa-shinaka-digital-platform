@@ -1,0 +1,67 @@
+{% comment %}
+Theme bootstrap. Include in <head> BEFORE the stylesheet so the saved/OS theme
+is applied before first paint (no flash of the wrong theme), and before Alpine
+loads so the ``theme`` store is registered on ``alpine:init``.
+Preferences: ``light`` | ``dark`` | ``system`` (default). Persisted in
+localStorage under the ``theme`` key; ``system`` follows the OS setting.
+{% endcomment %}
+<script>
+  (function () {
+    try {
+      var stored = localStorage.getItem('theme');
+      var dark =
+        stored === 'dark' ||
+        (stored !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+      if (dark) {
+        document.documentElement.classList.add('dark');
+      }
+    } catch (e) {
+      /* storage unavailable — fall back to the OS preference */
+    }
+  })();
+</script>
+<script>
+  document.addEventListener('alpine:init', function () {
+    function systemDark() {
+      return window.matchMedia('(prefers-color-scheme: dark)').matches;
+    }
+    function resolve(preference) {
+      return preference === 'dark' || (preference === 'system' && systemDark());
+    }
+    Alpine.store('theme', {
+      preference: 'system',
+      isDark: false,
+      init: function () {
+        try {
+          this.preference = localStorage.getItem('theme') || 'system';
+        } catch (e) {
+          this.preference = 'system';
+        }
+        this.isDark = resolve(this.preference);
+        document.documentElement.classList.toggle('dark', this.isDark);
+        var self = this;
+        window
+          .matchMedia('(prefers-color-scheme: dark)')
+          .addEventListener('change', function () {
+            if (self.preference === 'system') {
+              self.set('system');
+            }
+          });
+      },
+      set: function (value) {
+        this.preference = value;
+        try {
+          if (value === 'system') {
+            localStorage.removeItem('theme');
+          } else {
+            localStorage.setItem('theme', value);
+          }
+        } catch (e) {
+          /* ignore */
+        }
+        this.isDark = resolve(value);
+        document.documentElement.classList.toggle('dark', this.isDark);
+      },
+    });
+  });
+</script>

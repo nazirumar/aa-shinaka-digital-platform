@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+/* Class-based dark mode: the `<html>` element gets a `.dark` class (set by the
+   inline theme script before first paint), and every `dark:` utility applies. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Native form controls and scrollbars follow the active theme. */
+:root {
+  color-scheme: light;
+}
+.dark {
+  color-scheme: dark;
+}
+
 /* Hide Alpine-controlled elements until Alpine initialises. */
 [x-cloak] {
   display: none !important;
@@ -79,5 +91,126 @@
   .rich-text blockquote {
     @apply border-l-4 border-harvest pl-4 italic text-stone-600;
   }
+}
+
+/* Dashboard sidebar navigation. Plain CSS so the rules are always emitted,
+   independent of Tailwind's content-based pruning; theme colours come from
+   the `@theme` tokens declared above. */
+.sidebar-nav {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.25) transparent;
+}
+.sidebar-nav::-webkit-scrollbar {
+  width: 6px;
+}
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background-color: rgb(255 255 255 / 0.2);
+  border-radius: 9999px;
+}
+.sidebar-nav::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sidebar-link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--color-brand-100);
+  transition:
+    transform 200ms ease-out,
+    background-color 200ms ease-out,
+    color 200ms ease-out;
+}
+.sidebar-link:hover {
+  transform: translateX(0.125rem);
+  background-color: rgb(255 255 255 / 0.1);
+  color: #fff;
+}
+.sidebar-link.is-active {
+  background-color: rgb(255 255 255 / 0.14);
+  font-weight: 600;
+  color: #fff;
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / 0.18);
+}
+.sidebar-link.is-active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 50%;
+  height: 1.25rem;
+  width: 0.25rem;
+  transform: translateY(-50%);
+  border-radius: 9999px;
+  background-color: var(--color-gold-400);
+}
+
+/* Collapsible navigation categories (group header button + indented body). */
+.sidebar-group-header {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-brand-300);
+  transition:
+    background-color 200ms ease-out,
+    color 200ms ease-out;
+}
+.sidebar-group-header:hover {
+  background-color: rgb(255 255 255 / 0.06);
+  color: #fff;
+}
+.sidebar-group-header:focus-visible {
+  outline: 2px solid var(--color-gold-400);
+  outline-offset: 2px;
+}
+.sidebar-group-body {
+  margin-top: 0.125rem;
+  margin-left: 0.5rem;
+  padding-left: 0.5rem;
+  border-left: 1px solid rgb(255 255 255 / 0.1);
+}
+
+/* Form controls in dark mode. Django widgets carry their styling from Python
+   form classes and page templates, so one rule keeps every input/select/
+   textarea legible instead of editing each widget. These rules are unlayered,
+   so they take precedence over Tailwind's layered utilities. */
+.dark input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]),
+.dark select,
+.dark textarea {
+  background-color: #1c1917; /* stone-900 */
+  border-color: #57534e; /* stone-600 */
+  color: #f5f5f4; /* stone-100 */
+}
+.dark input::placeholder,
+.dark textarea::placeholder {
+  color: #a8a29e; /* stone-400 */
+}
+
+/* Rich text from CMS body fields inside dark mode. */
+.dark .rich-text {
+  color: #e7e5e4; /* stone-200 */
+}
+.dark .rich-text h2,
+.dark .rich-text h3 {
+  color: #fff;
+}
+.dark .rich-text a {
+  color: var(--color-brand-300);
+}
+.dark .rich-text blockquote {
+  border-color: var(--color-harvest);
+  color: #d6d3d1; /* stone-300 */
 }
 

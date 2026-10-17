@@ -4,7 +4,7 @@
   <input name="next" type="hidden" value="{{ request.get_full_path }}">
   <label for="language-switch-{{ variant|default:'inline' }}" class="sr-only">{% trans "Language" %}</label>
   <select id="language-switch-{{ variant|default:'inline' }}" name="language" onchange="this.form.submit()"
-          class="{% if variant == 'block' %}w-full {% endif %}rounded-md border border-stone-300 bg-white px-2 py-1 text-sm text-stone-700 focus:border-forest focus:outline-none focus:ring-2 focus:ring-leaf/30">
+          class="{% if variant == 'block' %}w-full {% endif %}rounded-md border border-stone-300 bg-white px-2 py-1 text-sm text-stone-700 focus:border-forest focus:outline-none focus:ring-2 focus:ring-leaf/30 dark:border-stone-600 dark:bg-stone-900 dark:text-stone-200 dark:focus:border-brand-400 dark:focus:ring-brand-400/30">
     {% get_available_languages as AVAILABLE_LANGUAGES %}
     {% for code, name in AVAILABLE_LANGUAGES %}
       <option value="{{ code }}" {% if code == CURRENT_LANGUAGE %}selected{% endif %}>{{ name }}</option>

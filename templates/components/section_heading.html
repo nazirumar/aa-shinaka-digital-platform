@@ -2,9 +2,9 @@
 Section heading. Props: eyebrow, title, subtitle, heading_id, align (left|center), cta_label, cta_url.
 {% endcomment %}
 <div class="{% if align == 'center' %}mx-auto max-w-2xl text-center{% else %}max-w-3xl{% endif %}">
-  {% if eyebrow %}<p class="text-sm font-semibold uppercase tracking-wider text-harvest-dark">{{ eyebrow }}</p>{% endif %}
-  <h2 {% if heading_id %}id="{{ heading_id }}"{% endif %} class="mt-2 text-2xl font-bold tracking-tight text-stone-900 sm:text-3xl">{{ title }}</h2>
-  {% if subtitle %}<p class="mt-3 text-stone-600">{{ subtitle }}</p>{% endif %}
+  {% if eyebrow %}<p class="text-sm font-semibold uppercase tracking-wider text-harvest-dark dark:text-harvest">{{ eyebrow }}</p>{% endif %}
+  <h2 {% if heading_id %}id="{{ heading_id }}"{% endif %} class="mt-2 text-2xl font-bold tracking-tight text-stone-900 dark:text-stone-50 sm:text-3xl">{{ title }}</h2>
+  {% if subtitle %}<p class="mt-3 text-stone-600 dark:text-stone-300">{{ subtitle }}</p>{% endif %}
   {% if cta_label and cta_url %}
     <div class="mt-4 {% if align == 'center' %}flex justify-center{% endif %}">
       {% include "components/button.html" with label=cta_label href=cta_url variant="outline" %}

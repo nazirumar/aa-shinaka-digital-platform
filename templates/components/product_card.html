@@ -3,29 +3,29 @@ Product card for a real catalogue listing (Phase 4+).
 Props: listing — an object exposing product name, origin (state/lga), packaging,
 unit price (Decimal), stock status and get_absolute_url. No values are hardcoded.
 {% endcomment %}
-<article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md">
-  <a href="{{ listing.get_absolute_url }}" class="block aspect-[4/3] overflow-hidden bg-cream-dark">
+<article class="group flex flex-col overflow-hidden rounded-xl border border-stone-200 bg-white shadow-sm transition hover:shadow-md dark:border-stone-700 dark:bg-stone-900">
+  <a href="{{ listing.get_absolute_url }}" class="block aspect-[4/3] overflow-hidden bg-cream-dark dark:bg-stone-800">
     {% if listing.primary_image %}
       <img src="{{ listing.primary_image.image.url }}" alt="{{ listing.primary_image.alt_text|default:listing.product.name }}" loading="lazy" decoding="async" class="h-full w-full object-cover transition group-hover:scale-105">
     {% else %}
-      <div class="grid h-full w-full place-items-center text-stone-400">{% trans "No image" %}</div>
+      <div class="grid h-full w-full place-items-center text-stone-400 dark:text-stone-500">{% trans "No image" %}</div>
     {% endif %}
   </a>
   <div class="flex flex-1 flex-col p-4">
-    <h3 class="font-semibold text-stone-900">
-      <a href="{{ listing.get_absolute_url }}" class="hover:text-forest">{{ listing.product.name }}</a>
+    <h3 class="font-semibold text-stone-900 dark:text-stone-50">
+      <a href="{{ listing.get_absolute_url }}" class="hover:text-forest dark:hover:text-brand-200">{{ listing.product.name }}</a>
     </h3>
     {% if listing.state %}
-      <p class="mt-1 text-sm text-stone-500">
+      <p class="mt-1 text-sm text-stone-500 dark:text-stone-400">
         {{ listing.state.name }}{% if listing.lga %} · {{ listing.lga.name }}{% endif %}
       </p>
     {% endif %}
-    {% if listing.packaging %}<p class="mt-1 text-xs text-stone-500">{{ listing.packaging }}</p>{% endif %}
+    {% if listing.packaging %}<p class="mt-1 text-xs text-stone-500 dark:text-stone-400">{{ listing.packaging }}</p>{% endif %}
     <div class="mt-auto flex items-center justify-between pt-4">
       {% if listing.price %}
-        <span class="font-semibold text-forest">{{ listing.price|money }}</span>
+        <span class="font-semibold text-forest dark:text-brand-200">{{ listing.price|money }}</span>
       {% endif %}
-      <span class="rounded-full px-2 py-0.5 text-xs font-medium {% if listing.in_stock %}bg-leaf/10 text-leaf{% else %}bg-stone-100 text-stone-500{% endif %}">
+      <span class="rounded-full px-2 py-0.5 text-xs font-medium {% if listing.in_stock %}bg-leaf/10 text-leaf{% else %}bg-stone-100 text-stone-500 dark:bg-stone-800 dark:text-stone-400{% endif %}">
         {% if listing.in_stock %}{% trans "In stock" %}{% else %}{% trans "Out of stock" %}{% endif %}
       </span>
     </div>

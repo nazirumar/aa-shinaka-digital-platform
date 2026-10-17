@@ -1,9 +1,9 @@
 {% comment %}Reusable metric card. Props: label, value, hint, tone (brand|gold|amber|stone).{% endcomment %}
-<div class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm">
-  <dt class="text-xs font-medium uppercase tracking-wide text-stone-500">{{ label }}</dt>
+<div class="rounded-xl border border-stone-200 bg-white p-5 shadow-sm dark:border-stone-700 dark:bg-stone-900">
+  <dt class="text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">{{ label }}</dt>
   <dd class="mt-2 text-3xl font-semibold
-    {% if tone == 'brand' %}text-brand-700{% elif tone == 'gold' %}text-gold-600{% elif tone == 'amber' %}text-amber-600{% else %}text-stone-900{% endif %}">
+    {% if tone == 'brand' %}text-brand-700 dark:text-brand-300{% elif tone == 'gold' %}text-gold-600 dark:text-gold-400{% elif tone == 'amber' %}text-amber-600 dark:text-amber-400{% else %}text-stone-900 dark:text-stone-50{% endif %}">
     {{ value }}
   </dd>
-  {% if hint %}<p class="mt-1 text-xs text-stone-500">{{ hint }}</p>{% endif %}
+  {% if hint %}<p class="mt-1 text-xs text-stone-500 dark:text-stone-400">{{ hint }}</p>{% endif %}
 </div>

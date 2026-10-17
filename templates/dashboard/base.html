@@ -4,221 +4,444 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}{{ page_title|default:"Dashboard" }}{% endblock %} · AA Shinaka Admin</title>
+  {% include "components/theme_init.html" %}
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
+  <script>
+    /* Sidebar navigation: collapsible category groups. The group holding the
+       current page is opened, marked with aria-current and scrolled into view;
+       open/closed choices are remembered in localStorage. */
+    document.addEventListener('alpine:init', function () {
+      Alpine.data('sidebarNav', function () {
+        return {
+          open: {},
+          activeGroup: null,
+          init: function () {
+            var self = this;
+            var saved = {};
+            try {
+              saved = JSON.parse(localStorage.getItem('sidebar.groups') || '{}') || {};
+            } catch (e) {
+              saved = {};
+            }
+            this.$el.querySelectorAll('[data-nav-group]').forEach(function (group) {
+              var key = group.getAttribute('data-nav-group');
+              self.open[key] = saved[key] === undefined ? true : !!saved[key];
+            });
+            var active = this.$el.querySelector('.sidebar-link.is-active');
+            if (active) {
+              active.setAttribute('aria-current', 'page');
+              var group = active.closest('[data-nav-group]');
+              if (group) {
+                var key = group.getAttribute('data-nav-group');
+                this.activeGroup = key;
+                this.open[key] = true;
+              }
+              this.$nextTick(function () {
+                active.scrollIntoView({ block: 'nearest' });
+              });
+            }
+          },
+          toggle: function (key) {
+            this.open[key] = !this.open[key];
+            try {
+              localStorage.setItem('sidebar.groups', JSON.stringify(this.open));
+            } catch (e) {
+              /* ignore */
+            }
+          },
+        };
+      });
+    });
+  </script>
   <style>[x-cloak] { display: none !important; }</style>
   {% block head_extra %}{% endblock %}
 </head>
-<body class="min-h-full bg-cream-100 text-stone-800 antialiased" x-data="{ sidebar: false }">
+<body class="min-h-full bg-cream-100 text-stone-800 antialiased" x-data="{ sidebar: false, collapsed: false }">
   <a href="#main" class="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded focus:bg-brand-700 focus:px-4 focus:py-2 focus:text-white">Skip to content</a>
 
   <div class="flex min-h-screen">
     {# ---------------- Sidebar ---------------- #}
     <aside id="sidebar"
-           class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full border-r border-brand-900/20 bg-brand-900 text-brand-50 transition-transform lg:static lg:translate-x-0"
-           :class="sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'"
+           class="fixed inset-y-0 left-0 z-40 w-64 -translate-x-full overflow-hidden border-r border-brand-900/40 bg-linear-to-b from-brand-900 to-brand-950 text-brand-50 shadow-xl transition-[transform,width] duration-300 ease-in-out will-change-transform lg:static lg:translate-x-0"
+           :class="[
+             sidebar ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
+             collapsed ? 'lg:w-0 lg:border-transparent' : 'lg:w-64',
+           ]"
            aria-label="Admin navigation">
-      <div class="flex h-16 items-center gap-2 border-b border-white/10 px-5">
-        <span class="grid h-9 w-9 place-items-center rounded-lg bg-gold-400 font-semibold text-brand-950">AS</span>
+      <div class="flex h-full w-64 flex-col">
+      <div class="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 px-5">
+        <span class="grid h-9 w-9 place-items-center rounded-xl bg-linear-to-br from-gold-300 to-gold-500 font-semibold text-brand-950 shadow-sm">AS</span>
         <span class="leading-tight">
-          <span class="block font-semibold">AA Shinaka</span>
+          <span class="block font-semibold tracking-tight text-white">AA Shinaka</span>
           <span class="block text-xs text-brand-200">Admin console</span>
         </span>
       </div>
-      <nav class="space-y-1 px-3 py-4 text-sm">
-        <a href="{% url 'dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'home' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Dashboard</a>
-        {% if can_view_staff %}
-          <a href="{% url 'dashboard:staff_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'staff' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Staff</a>
-        {% endif %}
-        {% if can_view_audit %}
-          <a href="{% url 'dashboard:audit_log' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'audit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Audit log</a>
-        {% endif %}
-        {% if can_manage_media %}
-          <a href="{% url 'dashboard:upload_scans' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'upload_scans' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Upload security</a>
-        {% endif %}
-        {% if can_manage_content %}
-          <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Website</p>
-          <a href="{% url 'cms_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Content</a>
-          <a href="{% url 'cms_dashboard:service_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_services' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Service pages</a>
-          <a href="{% url 'cms_dashboard:post_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_blog' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Blog</a>
-          <a href="{% url 'cms_dashboard:testimonial_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_testimonials' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Testimonials</a>
-          <a href="{% url 'cms_dashboard:media_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_media' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Media</a>
-        {% endif %}
-        {% if can_manage_contact %}
-          <a href="{% url 'cms_dashboard:enquiry_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_enquiries' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Enquiries</a>
-        {% endif %}
-        {% if can_config_site %}
-          <a href="{% url 'cms_dashboard:settings' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if active_nav == 'cms_settings' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Site settings</a>
+      <nav class="sidebar-nav flex-1 space-y-1 px-3 py-4 text-sm" x-data="sidebarNav">
+        <div class="sidebar-group" data-nav-group="overview">
+          <button type="button" class="sidebar-group-header" @click="toggle('overview')" :aria-expanded="open['overview'] ? 'true' : 'false'" aria-controls="nav-group-overview">
+            <span class="flex min-w-0 items-center gap-2.5">
+              <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12l8.954-8.955c.44-.439 1.152-.439 1.591 0L21.75 12M4.5 9.75v10.125c0 .621.504 1.125 1.125 1.125H9.75v-4.875c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21h4.125c.621 0 1.125-.504 1.125-1.125V9.75M8.25 21h8.25"/></svg>
+              <span class="truncate">Overview</span>
+            </span>
+            <span class="flex shrink-0 items-center gap-1.5">
+              <span x-show="activeGroup === 'overview'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+              <svg class="h-4 w-4 transition-transform duration-200" :class="open['overview'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+            </span>
+          </button>
+          <div id="nav-group-overview" class="sidebar-group-body space-y-0.5" x-show="open['overview']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+            <a href="{% url 'dashboard:home' %}" class="sidebar-link {% if active_nav == 'home' %}is-active{% endif %}">Dashboard</a>
+            {% if can_view_staff %}
+              <a href="{% url 'dashboard:staff_list' %}" class="sidebar-link {% if active_nav == 'staff' %}is-active{% endif %}">Staff</a>
+            {% endif %}
+            {% if can_view_audit %}
+              <a href="{% url 'dashboard:audit_log' %}" class="sidebar-link {% if active_nav == 'audit' %}is-active{% endif %}">Audit log</a>
+            {% endif %}
+            {% if can_manage_media %}
+              <a href="{% url 'dashboard:upload_scans' %}" class="sidebar-link {% if active_nav == 'upload_scans' %}is-active{% endif %}">Upload security</a>
+            {% endif %}
+          </div>
+        </div>
+
+        {% if can_manage_content or can_manage_contact or can_config_site %}
+          <div class="sidebar-group" data-nav-group="website">
+            <button type="button" class="sidebar-group-header" @click="toggle('website')" :aria-expanded="open['website'] ? 'true' : 'false'" aria-controls="nav-group-website">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21a9 9 0 100-18 9 9 0 000 18zM3.6 9h16.8M3.6 15h16.8M12 3c2.5 2.5 3.75 6 3.75 9S14.5 18.5 12 21c-2.5-2.5-3.75-6-3.75-9S9.5 5.5 12 3z"/></svg>
+                <span class="truncate">Website</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'website'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['website'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-website" class="sidebar-group-body space-y-0.5" x-show="open['website']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              {% if can_manage_content %}
+                <a href="{% url 'cms_dashboard:home' %}" class="sidebar-link {% if active_nav == 'cms' %}is-active{% endif %}">Content</a>
+                <a href="{% url 'cms_dashboard:service_list' %}" class="sidebar-link {% if active_nav == 'cms_services' %}is-active{% endif %}">Service pages</a>
+                <a href="{% url 'cms_dashboard:post_list' %}" class="sidebar-link {% if active_nav == 'cms_blog' %}is-active{% endif %}">Blog</a>
+                <a href="{% url 'cms_dashboard:testimonial_list' %}" class="sidebar-link {% if active_nav == 'cms_testimonials' %}is-active{% endif %}">Testimonials</a>
+                <a href="{% url 'cms_dashboard:media_list' %}" class="sidebar-link {% if active_nav == 'cms_media' %}is-active{% endif %}">Media</a>
+              {% endif %}
+              {% if can_manage_contact %}
+                <a href="{% url 'cms_dashboard:enquiry_list' %}" class="sidebar-link {% if active_nav == 'cms_enquiries' %}is-active{% endif %}">Enquiries</a>
+              {% endif %}
+              {% if can_config_site %}
+                <a href="{% url 'cms_dashboard:settings' %}" class="sidebar-link {% if active_nav == 'cms_settings' %}is-active{% endif %}">Site settings</a>
+              {% endif %}
+            </div>
+          </div>
         {% endif %}
         {% if can_manage_catalog or can_manage_inventory %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Catalogue</p>
-          {% if can_manage_catalog %}
-            <a href="{% url 'catalog_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'catalog_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Overview</a>
-            <a href="{% url 'catalog_dashboard:category_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'category_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Categories</a>
-            <a href="{% url 'catalog_dashboard:product_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'product_list' or url_name == 'product_images' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Products</a>
-            <a href="{% url 'catalog_dashboard:listing_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'listing_list' or url_name == 'listing_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Listings</a>
-            <a href="{% url 'catalog_dashboard:reference_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reference_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Market references</a>
-          {% endif %}
-          {% if can_manage_inventory %}
-            <a href="{% url 'catalog_dashboard:low_stock' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'low_stock' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Inventory · low stock</a>
-            <a href="{% url 'inventory_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'inventory_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Inventory overview</a>
-            <a href="{% url 'inventory_dashboard:stock_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'stock_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Stock levels</a>
-            <a href="{% url 'inventory_dashboard:warehouse_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'warehouse_list' or url_name == 'warehouse_create' or url_name == 'warehouse_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Warehouses</a>
-            <a href="{% url 'inventory_dashboard:movement_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'movement_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Movements</a>
-            <a href="{% url 'inventory_dashboard:reservation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reservation_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Reservations</a>
-          {% endif %}
+          <div class="sidebar-group" data-nav-group="catalogue">
+            <button type="button" class="sidebar-group-header" @click="toggle('catalogue')" :aria-expanded="open['catalogue'] ? 'true' : 'false'" aria-controls="nav-group-catalogue">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M21 7.5l-9-5.25L3 7.5m18 0l-9 5.25m9-5.25v9l-9 5.25M3 7.5l9 5.25M3 7.5v9l9 5.25m0-9v9"/></svg>
+                <span class="truncate">Catalogue</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'catalogue'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['catalogue'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-catalogue" class="sidebar-group-body space-y-0.5" x-show="open['catalogue']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              {% if can_manage_catalog %}
+                <a href="{% url 'catalog_dashboard:home' %}" class="sidebar-link {% if ns == 'catalog_dashboard' and url_name == 'home' %}is-active{% endif %}">Overview</a>
+                <a href="{% url 'catalog_dashboard:category_list' %}" class="sidebar-link {% if ns == 'catalog_dashboard' and url_name == 'category_list' %}is-active{% endif %}">Categories</a>
+                <a href="{% url 'catalog_dashboard:product_list' %}" class="sidebar-link {% if ns == 'catalog_dashboard' and url_name == 'product_list' or ns == 'catalog_dashboard' and url_name == 'product_images' %}is-active{% endif %}">Products</a>
+                <a href="{% url 'catalog_dashboard:listing_list' %}" class="sidebar-link {% if ns == 'catalog_dashboard' and url_name == 'listing_list' or ns == 'catalog_dashboard' and url_name == 'listing_detail' %}is-active{% endif %}">Listings</a>
+                <a href="{% url 'catalog_dashboard:reference_list' %}" class="sidebar-link {% if ns == 'catalog_dashboard' and url_name == 'reference_list' %}is-active{% endif %}">Market references</a>
+              {% endif %}
+              {% if can_manage_inventory %}
+                <a href="{% url 'catalog_dashboard:low_stock' %}" class="sidebar-link {% if ns == 'catalog_dashboard' and url_name == 'low_stock' %}is-active{% endif %}">Inventory · low stock</a>
+                <a href="{% url 'inventory_dashboard:home' %}" class="sidebar-link {% if ns == 'inventory_dashboard' and url_name == 'home' %}is-active{% endif %}">Inventory overview</a>
+                <a href="{% url 'inventory_dashboard:stock_list' %}" class="sidebar-link {% if ns == 'inventory_dashboard' and url_name == 'stock_list' %}is-active{% endif %}">Stock levels</a>
+                <a href="{% url 'inventory_dashboard:warehouse_list' %}" class="sidebar-link {% if ns == 'inventory_dashboard' and url_name == 'warehouse_list' or ns == 'inventory_dashboard' and url_name == 'warehouse_create' or ns == 'inventory_dashboard' and url_name == 'warehouse_edit' %}is-active{% endif %}">Warehouses</a>
+                <a href="{% url 'inventory_dashboard:movement_list' %}" class="sidebar-link {% if ns == 'inventory_dashboard' and url_name == 'movement_list' %}is-active{% endif %}">Movements</a>
+                <a href="{% url 'inventory_dashboard:reservation_list' %}" class="sidebar-link {% if ns == 'inventory_dashboard' and url_name == 'reservation_list' %}is-active{% endif %}">Reservations</a>
+              {% endif %}
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
-        <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Modules</p>
         {% if can_manage_orders %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'orders_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'orders_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Orders</a>
-          <a href="{% url 'orders_dashboard:order_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'order_list' or url_name == 'order_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">All orders</a>
-          <a href="{% url 'orders_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Quotations</a>
-          <a href="{% url 'orders_dashboard:shipping_zone_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'shipping_zone_list' or url_name == 'shipping_zone_create' or url_name == 'shipping_zone_edit' or url_name == 'shipping_method_list' or url_name == 'shipping_method_create' or url_name == 'shipping_method_edit' or url_name == 'shipping_rate_list' or url_name == 'shipping_rate_create' or url_name == 'shipping_rate_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Shipping</a>
+          <div class="sidebar-group" data-nav-group="orders">
+            <button type="button" class="sidebar-group-header" @click="toggle('orders')" :aria-expanded="open['orders'] ? 'true' : 'false'" aria-controls="nav-group-orders">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z"/></svg>
+                <span class="truncate">Orders</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'orders'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['orders'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-orders" class="sidebar-group-body space-y-0.5" x-show="open['orders']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'orders_dashboard:home' %}" class="sidebar-link {% if ns == 'orders_dashboard' and url_name == 'home' %}is-active{% endif %}">Orders</a>
+              <a href="{% url 'orders_dashboard:order_list' %}" class="sidebar-link {% if ns == 'orders_dashboard' and url_name == 'order_list' or ns == 'orders_dashboard' and url_name == 'order_detail' %}is-active{% endif %}">All orders</a>
+              <a href="{% url 'orders_dashboard:quotation_list' %}" class="sidebar-link {% if ns == 'orders_dashboard' and url_name == 'quotation_list' or ns == 'orders_dashboard' and url_name == 'quotation_detail' %}is-active{% endif %}">Quotations</a>
+              <a href="{% url 'orders_dashboard:shipping_zone_list' %}" class="sidebar-link {% if ns == 'orders_dashboard' and url_name == 'shipping_zone_list' or ns == 'orders_dashboard' and url_name == 'shipping_zone_create' or ns == 'orders_dashboard' and url_name == 'shipping_zone_edit' or ns == 'orders_dashboard' and url_name == 'shipping_method_list' or ns == 'orders_dashboard' and url_name == 'shipping_method_create' or ns == 'orders_dashboard' and url_name == 'shipping_method_edit' or ns == 'orders_dashboard' and url_name == 'shipping_rate_list' or ns == 'orders_dashboard' and url_name == 'shipping_rate_create' or ns == 'orders_dashboard' and url_name == 'shipping_rate_edit' %}is-active{% endif %}">Shipping</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_confirm_payments %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'finance_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'finance_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Finance</a>
-          <a href="{% url 'finance_dashboard:payment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'payment_list' or url_name == 'payment_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Payments</a>
-          <a href="{% url 'finance_dashboard:bank_transfer_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'bank_transfer_list' or url_name == 'bank_transfer_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Bank transfers</a>
-          <a href="{% url 'finance_dashboard:refund_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'refund_list' or url_name == 'refund_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Refunds</a>
-          <a href="{% url 'finance_dashboard:invoice_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'invoice_list' or url_name == 'invoice_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Invoices</a>
-          <a href="{% url 'finance_dashboard:bank_account_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'bank_account_list' or url_name == 'bank_account_create' or url_name == 'bank_account_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Bank accounts</a>
+          <div class="sidebar-group" data-nav-group="finance">
+            <button type="button" class="sidebar-group-header" @click="toggle('finance')" :aria-expanded="open['finance'] ? 'true' : 'false'" aria-controls="nav-group-finance">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg>
+                <span class="truncate">Finance</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'finance'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['finance'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-finance" class="sidebar-group-body space-y-0.5" x-show="open['finance']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'finance_dashboard:home' %}" class="sidebar-link {% if ns == 'finance_dashboard' and url_name == 'home' %}is-active{% endif %}">Finance</a>
+              <a href="{% url 'finance_dashboard:payment_list' %}" class="sidebar-link {% if ns == 'finance_dashboard' and url_name == 'payment_list' or ns == 'finance_dashboard' and url_name == 'payment_detail' %}is-active{% endif %}">Payments</a>
+              <a href="{% url 'finance_dashboard:bank_transfer_list' %}" class="sidebar-link {% if ns == 'finance_dashboard' and url_name == 'bank_transfer_list' or ns == 'finance_dashboard' and url_name == 'bank_transfer_detail' %}is-active{% endif %}">Bank transfers</a>
+              <a href="{% url 'finance_dashboard:refund_list' %}" class="sidebar-link {% if ns == 'finance_dashboard' and url_name == 'refund_list' or ns == 'finance_dashboard' and url_name == 'refund_detail' %}is-active{% endif %}">Refunds</a>
+              <a href="{% url 'finance_dashboard:invoice_list' %}" class="sidebar-link {% if ns == 'finance_dashboard' and url_name == 'invoice_list' or ns == 'finance_dashboard' and url_name == 'invoice_detail' %}is-active{% endif %}">Invoices</a>
+              <a href="{% url 'finance_dashboard:bank_account_list' %}" class="sidebar-link {% if ns == 'finance_dashboard' and url_name == 'bank_account_list' or ns == 'finance_dashboard' and url_name == 'bank_account_create' or ns == 'finance_dashboard' and url_name == 'bank_account_edit' %}is-active{% endif %}">Bank accounts</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_manage_services %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'services_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'services_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Services</a>
-          <a href="{% url 'services_dashboard:request_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'request_list' or url_name == 'request_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Service requests</a>
-          <a href="{% url 'services_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' or url_name == 'quotation_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Service quotations</a>
-          <a href="{% url 'services_dashboard:farm_project_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'farm_project_list' or url_name == 'farm_project_detail' or url_name == 'farm_project_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Farm projects</a>
-          <a href="{% url 'services_dashboard:marketing_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'marketing_list' or url_name == 'marketing_enquiry_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Marketing</a>
-          <a href="{% url 'services_dashboard:facility_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'facility_list' or url_name == 'facility_detail' or url_name == 'facility_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Storage facilities</a>
-          <a href="{% url 'services_dashboard:booking_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'booking_list' or url_name == 'booking_detail' or url_name == 'booking_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Storage bookings</a>
+          <div class="sidebar-group" data-nav-group="services">
+            <button type="button" class="sidebar-group-header" @click="toggle('services')" :aria-expanded="open['services'] ? 'true' : 'false'" aria-controls="nav-group-services">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/></svg>
+                <span class="truncate">Services</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'services'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['services'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-services" class="sidebar-group-body space-y-0.5" x-show="open['services']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'services_dashboard:home' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'home' %}is-active{% endif %}">Services</a>
+              <a href="{% url 'services_dashboard:request_list' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'request_list' or ns == 'services_dashboard' and url_name == 'request_detail' %}is-active{% endif %}">Service requests</a>
+              <a href="{% url 'services_dashboard:quotation_list' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'quotation_list' or ns == 'services_dashboard' and url_name == 'quotation_detail' or ns == 'services_dashboard' and url_name == 'quotation_create' %}is-active{% endif %}">Service quotations</a>
+              <a href="{% url 'services_dashboard:farm_project_list' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'farm_project_list' or ns == 'services_dashboard' and url_name == 'farm_project_detail' or ns == 'services_dashboard' and url_name == 'farm_project_create' %}is-active{% endif %}">Farm projects</a>
+              <a href="{% url 'services_dashboard:marketing_list' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'marketing_list' or ns == 'services_dashboard' and url_name == 'marketing_enquiry_detail' %}is-active{% endif %}">Marketing</a>
+              <a href="{% url 'services_dashboard:facility_list' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'facility_list' or ns == 'services_dashboard' and url_name == 'facility_detail' or ns == 'services_dashboard' and url_name == 'facility_create' %}is-active{% endif %}">Storage facilities</a>
+              <a href="{% url 'services_dashboard:booking_list' %}" class="sidebar-link {% if ns == 'services_dashboard' and url_name == 'booking_list' or ns == 'services_dashboard' and url_name == 'booking_detail' or ns == 'services_dashboard' and url_name == 'booking_create' %}is-active{% endif %}">Storage bookings</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_manage_export %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'export_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'export_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Export</a>
-          <a href="{% url 'export_dashboard:enquiry_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'enquiry_list' or url_name == 'enquiry_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Enquiries</a>
-          <a href="{% url 'export_dashboard:quotation_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'quotation_list' or url_name == 'quotation_detail' or url_name == 'quotation_create' or url_name == 'quotation_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Quotations</a>
-          <a href="{% url 'export_dashboard:order_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'order_list' or url_name == 'order_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Export orders</a>
-          <a href="{% url 'export_dashboard:compliance_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'compliance_list' or url_name == 'compliance_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Compliance</a>
-          <a href="{% url 'export_dashboard:document_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'document_list' or url_name == 'document_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Documents</a>
-          <a href="{% url 'export_dashboard:shipment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'shipment_list' or url_name == 'shipment_detail' or url_name == 'shipment_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Shipments</a>
-          <a href="{% url 'export_dashboard:provider_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'provider_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Providers</a>
-          <a href="{% url 'export_dashboard:destination_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'destination_list' or url_name == 'destination_detail' or url_name == 'destination_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Destinations</a>
-          <a href="{% url 'export_dashboard:product_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'product_list' or url_name == 'product_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Product profiles</a>
-          <a href="{% url 'export_dashboard:reports' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reports' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Reports</a>
+          <div class="sidebar-group" data-nav-group="export">
+            <button type="button" class="sidebar-group-header" @click="toggle('export')" :aria-expanded="open['export'] ? 'true' : 'false'" aria-controls="nav-group-export">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 18.75a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h6m-9 0H3.375a1.125 1.125 0 01-1.125-1.125V14.25m17.25 4.5a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m3 0h1.125c.621 0 1.129-.504 1.09-1.124a17.902 17.902 0 00-3.213-9.193 2.056 2.056 0 00-1.58-.86H14.25M16.5 18.75h-2.25m0-11.177v-.958c0-.568-.422-1.048-.987-1.106a48.554 48.554 0 00-10.026 0 1.106 1.106 0 00-.987 1.106v7.635m12-6.677v6.677m0 4.5v-4.5m0 0h-12"/></svg>
+                <span class="truncate">Export</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'export'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['export'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-export" class="sidebar-group-body space-y-0.5" x-show="open['export']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'export_dashboard:home' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'home' %}is-active{% endif %}">Export</a>
+              <a href="{% url 'export_dashboard:enquiry_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'enquiry_list' or ns == 'export_dashboard' and url_name == 'enquiry_detail' %}is-active{% endif %}">Enquiries</a>
+              <a href="{% url 'export_dashboard:quotation_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'quotation_list' or ns == 'export_dashboard' and url_name == 'quotation_detail' or ns == 'export_dashboard' and url_name == 'quotation_create' or ns == 'export_dashboard' and url_name == 'quotation_edit' %}is-active{% endif %}">Quotations</a>
+              <a href="{% url 'export_dashboard:order_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'order_list' or ns == 'export_dashboard' and url_name == 'order_detail' %}is-active{% endif %}">Export orders</a>
+              <a href="{% url 'export_dashboard:compliance_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'compliance_list' or ns == 'export_dashboard' and url_name == 'compliance_detail' %}is-active{% endif %}">Compliance</a>
+              <a href="{% url 'export_dashboard:document_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'document_list' or ns == 'export_dashboard' and url_name == 'document_detail' %}is-active{% endif %}">Documents</a>
+              <a href="{% url 'export_dashboard:shipment_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'shipment_list' or ns == 'export_dashboard' and url_name == 'shipment_detail' or ns == 'export_dashboard' and url_name == 'shipment_create' %}is-active{% endif %}">Shipments</a>
+              <a href="{% url 'export_dashboard:provider_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'provider_list' %}is-active{% endif %}">Providers</a>
+              <a href="{% url 'export_dashboard:destination_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'destination_list' or ns == 'export_dashboard' and url_name == 'destination_detail' or ns == 'export_dashboard' and url_name == 'destination_create' %}is-active{% endif %}">Destinations</a>
+              <a href="{% url 'export_dashboard:product_list' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'product_list' or ns == 'export_dashboard' and url_name == 'product_edit' %}is-active{% endif %}">Product profiles</a>
+              <a href="{% url 'export_dashboard:reports' %}" class="sidebar-link {% if ns == 'export_dashboard' and url_name == 'reports' %}is-active{% endif %}">Reports</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_manage_training or can_approve_training %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'training_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'training_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Training</a>
-          <a href="{% url 'training_dashboard:course_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'course_list' or url_name == 'course_detail' or url_name == 'course_create' or url_name == 'course_edit' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Courses</a>
-          <a href="{% url 'training_dashboard:category_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'category_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Categories</a>
-          <a href="{% url 'training_dashboard:instructor_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'instructor_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Instructors</a>
-          <a href="{% url 'training_dashboard:venue_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'venue_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Venues</a>
-          <a href="{% url 'training_dashboard:session_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'session_list' or url_name == 'session_detail' or url_name == 'session_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Sessions</a>
-          <a href="{% url 'training_dashboard:enrollment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'enrollment_list' or url_name == 'enrollment_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Enrolments</a>
-          <a href="{% url 'training_dashboard:attendance_session_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'attendance_session_list' or url_name == 'attendance_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Attendance</a>
-          <a href="{% url 'training_dashboard:assessment_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'assessment_list' or url_name == 'assessment_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Assessments</a>
-          <a href="{% url 'training_dashboard:certificate_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'certificate_list' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Certificates</a>
-          <a href="{% url 'training_dashboard:reports' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'reports' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Training reports</a>
+          <div class="sidebar-group" data-nav-group="training">
+            <button type="button" class="sidebar-group-header" @click="toggle('training')" :aria-expanded="open['training'] ? 'true' : 'false'" aria-controls="nav-group-training">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4.26 10.147a60.436 60.436 0 00-.491 6.347A48.627 48.627 0 0112 20.904a48.627 48.627 0 018.232-4.41 60.46 60.46 0 00-.491-6.347m-15.482 0a50.57 50.57 0 00-2.658-.813A59.905 59.905 0 0112 3.493a59.902 59.902 0 0110.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.697 50.697 0 0112 13.489a50.702 50.702 0 017.74-3.342M6.75 15a.75.75 0 100-1.5.75.75 0 000 1.5zm0 0v-3.675A55.378 55.378 0 0112 8.443m-7.007 11.55A5.981 5.981 0 006.75 15.75v-1.5"/></svg>
+                <span class="truncate">Training</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'training'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['training'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-training" class="sidebar-group-body space-y-0.5" x-show="open['training']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'training_dashboard:home' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'home' %}is-active{% endif %}">Training</a>
+              <a href="{% url 'training_dashboard:course_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'course_list' or ns == 'training_dashboard' and url_name == 'course_detail' or ns == 'training_dashboard' and url_name == 'course_create' or ns == 'training_dashboard' and url_name == 'course_edit' %}is-active{% endif %}">Courses</a>
+              <a href="{% url 'training_dashboard:category_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'category_list' %}is-active{% endif %}">Categories</a>
+              <a href="{% url 'training_dashboard:instructor_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'instructor_list' %}is-active{% endif %}">Instructors</a>
+              <a href="{% url 'training_dashboard:venue_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'venue_list' %}is-active{% endif %}">Venues</a>
+              <a href="{% url 'training_dashboard:session_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'session_list' or ns == 'training_dashboard' and url_name == 'session_detail' or ns == 'training_dashboard' and url_name == 'session_create' %}is-active{% endif %}">Sessions</a>
+              <a href="{% url 'training_dashboard:enrollment_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'enrollment_list' or ns == 'training_dashboard' and url_name == 'enrollment_detail' %}is-active{% endif %}">Enrolments</a>
+              <a href="{% url 'training_dashboard:attendance_session_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'attendance_session_list' or ns == 'training_dashboard' and url_name == 'attendance_detail' %}is-active{% endif %}">Attendance</a>
+              <a href="{% url 'training_dashboard:assessment_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'assessment_list' or ns == 'training_dashboard' and url_name == 'assessment_detail' %}is-active{% endif %}">Assessments</a>
+              <a href="{% url 'training_dashboard:certificate_list' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'certificate_list' %}is-active{% endif %}">Certificates</a>
+              <a href="{% url 'training_dashboard:reports' %}" class="sidebar-link {% if ns == 'training_dashboard' and url_name == 'reports' %}is-active{% endif %}">Training reports</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_manage_support %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'support_dashboard:home' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'home' and ns == 'support_dashboard' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Support</a>
-          <a href="{% url 'support_dashboard:ticket_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'ticket_list' or url_name == 'ticket_detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Support tickets</a>
+          <div class="sidebar-group" data-nav-group="support">
+            <button type="button" class="sidebar-group-header" @click="toggle('support')" :aria-expanded="open['support'] ? 'true' : 'false'" aria-controls="nav-group-support">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.625 12a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H8.25m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0H12m4.125 0a.375.375 0 11-.75 0 .375.375 0 01.75 0zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 01-2.555-.337A5.972 5.972 0 015.41 20.97a5.969 5.969 0 01-.474-.065 4.48 4.48 0 00.978-2.025c.09-.457-.133-.901-.467-1.226C3.93 16.178 3 14.189 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25z"/></svg>
+                <span class="truncate">Support</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'support'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['support'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-support" class="sidebar-group-body space-y-0.5" x-show="open['support']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'support_dashboard:home' %}" class="sidebar-link {% if ns == 'support_dashboard' and url_name == 'home' %}is-active{% endif %}">Support</a>
+              <a href="{% url 'support_dashboard:ticket_list' %}" class="sidebar-link {% if ns == 'support_dashboard' and url_name == 'ticket_list' or ns == 'support_dashboard' and url_name == 'ticket_detail' %}is-active{% endif %}">Support tickets</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_view_analytics %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace page=request.resolver_match.kwargs.page %}
-          <p class="px-3 pt-4 text-xs uppercase tracking-wide text-brand-300">Analytics</p>
-          <a href="{% url 'analytics:executive' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'executive' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Executive overview</a>
-          <a href="{% url 'analytics:page' 'sales' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'sales' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Sales</a>
-          <a href="{% url 'analytics:page' 'inventory' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'inventory' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Inventory</a>
-          <a href="{% url 'analytics:page' 'services' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'services' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Services</a>
-          <a href="{% url 'analytics:page' 'export' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'export' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Export</a>
-          <a href="{% url 'analytics:page' 'training' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'training' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Training</a>
-          <a href="{% url 'analytics:page' 'customers' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'customers' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Customers</a>
-          <a href="{% url 'analytics:page' 'support' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'support' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Support</a>
-          {% if can_view_analytics_finance %}
-            <a href="{% url 'analytics:page' 'finance' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'page' and page == 'finance' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Finance</a>
-          {% endif %}
-          <a href="{% url 'analytics:data_quality' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'data_quality' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Data quality</a>
-          {% if can_build_reports %}
-            <a href="{% url 'analytics:report_history' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'report_history' or ns == 'analytics' and url_name == 'report_builder' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Report history</a>
-          {% endif %}
-          {% if can_schedule_reports %}
-            <a href="{% url 'analytics:scheduled_list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if ns == 'analytics' and url_name == 'scheduled_list' or ns == 'analytics' and url_name == 'scheduled_create' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Scheduled reports</a>
-          {% endif %}
+          <div class="sidebar-group" data-nav-group="analytics">
+            <button type="button" class="sidebar-group-header" @click="toggle('analytics')" :aria-expanded="open['analytics'] ? 'true' : 'false'" aria-controls="nav-group-analytics">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/></svg>
+                <span class="truncate">Analytics</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'analytics'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['analytics'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-analytics" class="sidebar-group-body space-y-0.5" x-show="open['analytics']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'analytics:executive' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'executive' %}is-active{% endif %}">Executive overview</a>
+              <a href="{% url 'analytics:page' 'sales' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'sales' %}is-active{% endif %}">Sales</a>
+              <a href="{% url 'analytics:page' 'inventory' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'inventory' %}is-active{% endif %}">Inventory</a>
+              <a href="{% url 'analytics:page' 'services' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'services' %}is-active{% endif %}">Services</a>
+              <a href="{% url 'analytics:page' 'export' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'export' %}is-active{% endif %}">Export</a>
+              <a href="{% url 'analytics:page' 'training' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'training' %}is-active{% endif %}">Training</a>
+              <a href="{% url 'analytics:page' 'customers' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'customers' %}is-active{% endif %}">Customers</a>
+              <a href="{% url 'analytics:page' 'support' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'support' %}is-active{% endif %}">Support</a>
+              {% if can_view_analytics_finance %}
+                <a href="{% url 'analytics:page' 'finance' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'page' and page == 'finance' %}is-active{% endif %}">Finance</a>
+              {% endif %}
+              <a href="{% url 'analytics:data_quality' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'data_quality' %}is-active{% endif %}">Data quality</a>
+              {% if can_build_reports %}
+                <a href="{% url 'analytics:report_history' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'report_history' or ns == 'analytics' and url_name == 'report_builder' %}is-active{% endif %}">Report history</a>
+              {% endif %}
+              {% if can_schedule_reports %}
+                <a href="{% url 'analytics:scheduled_list' %}" class="sidebar-link {% if ns == 'analytics' and url_name == 'scheduled_list' or ns == 'analytics' and url_name == 'scheduled_create' %}is-active{% endif %}">Scheduled reports</a>
+              {% endif %}
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
         {% if can_view_customers %}
           {% with url_name=request.resolver_match.url_name ns=request.resolver_match.namespace %}
-          <a href="{% url 'customers_dashboard:list' %}" class="flex items-center gap-2 rounded-md px-3 py-2 {% if url_name == 'list' or url_name == 'detail' %}bg-white/15 font-medium text-white{% else %}text-brand-100 hover:bg-white/10{% endif %}">Customers</a>
+          <div class="sidebar-group" data-nav-group="customers">
+            <button type="button" class="sidebar-group-header" @click="toggle('customers')" :aria-expanded="open['customers'] ? 'true' : 'false'" aria-controls="nav-group-customers">
+              <span class="flex min-w-0 items-center gap-2.5">
+                <svg class="h-4 w-4 shrink-0" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/></svg>
+                <span class="truncate">Customers</span>
+              </span>
+              <span class="flex shrink-0 items-center gap-1.5">
+                <span x-show="activeGroup === 'customers'" x-cloak class="h-1.5 w-1.5 rounded-full bg-gold-400" aria-hidden="true"></span>
+                <svg class="h-4 w-4 transition-transform duration-200" :class="open['customers'] ? 'rotate-90' : ''" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/></svg>
+              </span>
+            </button>
+            <div id="nav-group-customers" class="sidebar-group-body space-y-0.5" x-show="open['customers']" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 -translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" x-transition:leave="transition ease-in duration-100" x-transition:leave-start="opacity-100 translate-y-0" x-transition:leave-end="opacity-0 -translate-y-1">
+              <a href="{% url 'customers_dashboard:list' %}" class="sidebar-link {% if ns == 'customers_dashboard' and url_name == 'list' or ns == 'customers_dashboard' and url_name == 'detail' %}is-active{% endif %}">Customers</a>
+            </div>
+          </div>
           {% endwith %}
         {% endif %}
       </nav>
+      <div class="shrink-0 border-t border-white/10 p-3">
+        <div class="flex items-center gap-3 rounded-xl bg-white/5 px-3 py-2.5">
+          <span class="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-gold-400 text-sm font-semibold text-brand-950">{{ user.first_name|default:user.email|slice:":1"|upper }}</span>
+          <span class="min-w-0 leading-tight">
+            <span class="block truncate text-sm font-medium text-white">{{ user.full_name }}</span>
+            <span class="block truncate text-xs text-brand-300">{{ user.display_role }}</span>
+          </span>
+        </div>
+      </div>
+      </div>
     </aside>
 
-    <div x-show="sidebar" x-cloak @click="sidebar = false" class="fixed inset-0 z-30 bg-stone-900/40 lg:hidden"></div>
+    <div x-show="sidebar" x-cloak @click="sidebar = false; collapsed = false"
+         x-transition:enter="transition-opacity ease-out duration-300"
+         x-transition:enter-start="opacity-0"
+         x-transition:enter-end="opacity-100"
+         x-transition:leave="transition-opacity ease-in duration-200"
+         x-transition:leave-start="opacity-100"
+         x-transition:leave-end="opacity-0"
+         class="fixed inset-0 z-30 bg-stone-900/40 backdrop-blur-sm dark:bg-stone-950/70 lg:hidden"></div>
 
     {# ---------------- Main column ---------------- #}
     <div class="flex min-w-0 flex-1 flex-col">
-      <header class="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-stone-200 bg-white/95 px-4 backdrop-blur sm:px-6">
+      <header class="sticky top-0 z-20 flex h-16 items-center justify-between gap-3 border-b border-stone-200 bg-white/95 px-4 backdrop-blur transition-colors dark:border-stone-800 dark:bg-stone-900/95 sm:px-6">
         <div class="flex items-center gap-3">
-          <button type="button" class="rounded-md p-2 hover:bg-stone-100 lg:hidden" @click="sidebar = true" aria-label="Open navigation">
+          <button type="button" class="rounded-md p-2 text-stone-600 transition-colors hover:bg-stone-100 hover:text-brand-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-white" @click="sidebar = !sidebar; collapsed = !collapsed" :aria-expanded="collapsed" aria-controls="sidebar" aria-label="Toggle navigation">
             <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
           </button>
-          <span class="font-semibold text-brand-900">{% block header_title %}{{ page_title|default:"Dashboard" }}{% endblock %}</span>
+          <span class="font-semibold text-brand-900 dark:text-stone-100">{% block header_title %}{{ page_title|default:"Dashboard" }}{% endblock %}</span>
         </div>
 
         <div class="flex items-center gap-2">
+          {% include "components/theme_toggle.html" %}
           {# Notification area (real recent activity) #}
           <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-            <button type="button" class="relative rounded-md p-2 hover:bg-stone-100" @click="open = !open" :aria-expanded="open" aria-label="Notifications">
+            <button type="button" class="relative rounded-md p-2 text-stone-600 transition-colors hover:bg-stone-100 hover:text-brand-900 dark:text-stone-300 dark:hover:bg-stone-800 dark:hover:text-white" @click="open = !open" :aria-expanded="open" aria-label="Notifications">
               <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0"/></svg>
               {% if notifications %}<span class="absolute right-1 top-1 h-2 w-2 rounded-full bg-gold-400" aria-hidden="true"></span>{% endif %}
             </button>
-            <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 mt-2 w-80 rounded-lg border border-stone-200 bg-white p-2 shadow-lg" role="menu">
-              <p class="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500">Recent activity</p>
+            <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 mt-2 w-80 rounded-lg border border-stone-200 bg-white p-2 shadow-lg dark:border-stone-700 dark:bg-stone-900" role="menu">
+              <p class="px-2 py-1 text-xs font-medium uppercase tracking-wide text-stone-500 dark:text-stone-400">Recent activity</p>
               {% if notifications %}
-                <ul class="divide-y divide-stone-100">
+                <ul class="divide-y divide-stone-100 dark:divide-stone-800">
                   {% for entry in notifications %}
                     <li class="px-2 py-2 text-sm">
-                      <p class="font-medium text-stone-800">{{ entry.action }}</p>
-                      <p class="text-xs text-stone-500">{{ entry.actor.email|default:"system" }} · {{ entry.created_at|timesince }} ago</p>
+                      <p class="font-medium text-stone-800 dark:text-stone-100">{{ entry.action }}</p>
+                      <p class="text-xs text-stone-500 dark:text-stone-400">{{ entry.actor.email|default:"system" }} · {{ entry.created_at|timesince }} ago</p>
                     </li>
                   {% endfor %}
                 </ul>
               {% else %}
-                <p class="px-2 py-3 text-sm text-stone-500">No notifications.</p>
+                <p class="px-2 py-3 text-sm text-stone-500 dark:text-stone-400">No notifications.</p>
               {% endif %}
             </div>
           </div>
 
           {# Account dropdown #}
           <div class="relative" x-data="{ open: false }" @keydown.escape.window="open = false">
-            <button type="button" class="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-stone-100" @click="open = !open" :aria-expanded="open">
-              <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-600 text-sm font-semibold text-white">{{ user.first_name|default:user.email|slice:":1"|upper }}</span>
+            <button type="button" class="flex items-center gap-2 rounded-md px-2 py-1.5 text-stone-700 transition-colors hover:bg-stone-100 hover:text-brand-900 dark:text-stone-200 dark:hover:bg-stone-800 dark:hover:text-white" @click="open = !open" :aria-expanded="open">
+              <span class="grid h-8 w-8 place-items-center rounded-full bg-brand-600 text-sm font-semibold text-white dark:bg-brand-500">{{ user.first_name|default:user.email|slice:":1"|upper }}</span>
               <span class="hidden text-left text-sm sm:block">
-                <span class="block font-medium leading-tight text-stone-800">{{ user.full_name }}</span>
-                <span class="block text-xs text-stone-500">{{ user.display_role }}</span>
+                <span class="block font-medium leading-tight text-stone-800 dark:text-stone-100">{{ user.full_name }}</span>
+                <span class="block text-xs text-stone-500 dark:text-stone-400">{{ user.display_role }}</span>
               </span>
             </button>
-            <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 mt-2 w-56 rounded-lg border border-stone-200 bg-white p-1 text-sm shadow-lg" role="menu">
-              <a href="{% url 'account:dashboard' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100" role="menuitem">My account</a>
-              <a href="{% url 'core:home' %}" class="block rounded-md px-3 py-2 hover:bg-stone-100" role="menuitem">View public site</a>
+            <div x-show="open" x-cloak @click.outside="open = false" class="absolute right-0 mt-2 w-56 rounded-lg border border-stone-200 bg-white p-1 text-sm shadow-lg dark:border-stone-700 dark:bg-stone-900" role="menu">
+              <a href="{% url 'account:dashboard' %}" class="block rounded-md px-3 py-2 text-stone-700 transition-colors hover:bg-stone-100 hover:text-brand-900 dark:text-stone-200 dark:hover:bg-stone-800 dark:hover:text-white" role="menuitem">My account</a>
+              <a href="{% url 'core:home' %}" class="block rounded-md px-3 py-2 text-stone-700 transition-colors hover:bg-stone-100 hover:text-brand-900 dark:text-stone-200 dark:hover:bg-stone-800 dark:hover:text-white" role="menuitem">View public site</a>
               <form method="post" action="{% url 'accounts:logout' %}">
                 {% csrf_token %}
-                <button type="submit" class="block w-full rounded-md px-3 py-2 text-left hover:bg-stone-100" role="menuitem">Sign out</button>
+                <button type="submit" class="block w-full rounded-md px-3 py-2 text-left text-stone-700 transition-colors hover:bg-stone-100 hover:text-brand-900 dark:text-stone-200 dark:hover:bg-stone-800 dark:hover:text-white" role="menuitem">Sign out</button>
               </form>
             </div>
           </div>
@@ -244,7 +467,7 @@
         </div>
       </main>
 
-      <footer class="border-t border-stone-200 px-4 py-4 text-xs text-stone-500 sm:px-6 lg:px-8">
+      <footer class="border-t border-stone-200 px-4 py-4 text-xs text-stone-500 transition-colors dark:border-stone-800 dark:text-stone-400 sm:px-6 lg:px-8">
         AA Shinaka Digital Business Platform · Admin console
       </footer>
     </div>
