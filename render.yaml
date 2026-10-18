@@ -1,0 +1,323 @@
+# ===========================================================================
+# AA Shinaka Digital Business Platform — Render Blueprint (render.yaml)
+#
+# A production deployment of the Django monolith on Render, built from the
+# same image as the VPS deployment (deploy/Dockerfile) with managed Render
+# Postgres and Render Key Value instead of the Compose db/redis containers.
+#
+# Render auto-detects a root-level file named `render.yaml` (the documented
+# default). A different filename is only picked up if you set the Blueprint
+# Path when creating the Blueprint, so this file is named render.yaml on
+# purpose — rename it to render.yml only if you set that path in the dashboard.
+#
+# What this creates (everything pinned to one region so it can use Render's
+# private network — `frankfurt` is the closest Render region to Nigeria):
+#
+#   1. aa-shinaka-web     Docker web service (Gunicorn), public HTTPS
+#   2. aa-shinaka-worker  Celery worker (background jobs)
+#   3. aa-shinaka-beat    Celery beat scheduler (exactly one instance)
+#   4. aa-shinaka-redis   Render Key Value — cache + Celery broker/results
+#   5. aa-shinaka-db      Render Postgres 16
+#
+# Before you sync (see docs/RENDER_DEPLOYMENT.md for the full walkthrough):
+#   * Two values are secret and are prompted (sync: false) during creation:
+#       - DJANGO_SECRET_KEY  (>= 50 chars; generate with
+#         `python -c "import secrets; print(secrets.token_urlsafe(64))"`)
+#         Render's own "generate value" produces 44 chars, which the app's
+#         production guard rejects, so it is NOT used here.
+#       - EMAIL_HOST_PASSWORD  (only if your SMTP relay requires auth)
+#   * Replace every value marked `# EDIT` (hosts/origins, SITE_URL and the
+#     email host/addresses) with your real values. Blueprint values are
+#     authoritative, so edit them HERE (or in the environment group) and not
+#     only in the dashboard.
+#
+# This file deploys nothing by itself, changes no DNS and enables no live
+# payment: PAYSTACK_ENABLED and PAYSTACK_LIVE_MODE stay false.
+# ===========================================================================
+
+databases:
+  - name: aa-shinaka-db
+    databaseName: aa_shinaka
+    user: aa_shinaka
+    region: frankfurt
+    plan: 0.5c-1g # smallest paid Basic tier; raise as usage grows
+    postgresMajorVersion: "16" # matches deploy/docker-compose.yml (postgres:16-alpine)
+    diskSizeGB: 15
+    storageAutoscalingEnabled: true
+    ipAllowList: [] # no public access: reachable on the private network only
+
+services:
+  # -------------------------------------------------------------------------
+  # Cache + Celery broker / result backend. Private network only.
+  # -------------------------------------------------------------------------
+  - type: keyvalue
+    name: aa-shinaka-redis
+    region: frankfurt
+    plan: 256mb
+    maxmemoryPolicy: allkeys-lru
+    persistenceMode: journal-snapshot
+    ipAllowList: [] # no public access: reachable on the private network only
+
+  # -------------------------------------------------------------------------
+  # Web: Django + Gunicorn. The image entrypoint runs `check --deploy`, then
+  # collectstatic, then Gunicorn. Migrations run once via preDeployCommand.
+  # -------------------------------------------------------------------------
+  - type: web
+    name: aa-shinaka-web
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: 0.5c-512mb
+    healthCheckPath: /healthz/ # Render accepts 2xx/3xx, so the https redirect is fine
+    preDeployCommand: python manage.py migrate --noinput # runs once, before traffic switches
+    initialDeployHook: python manage.py sync_roles # idempotent bootstrap after the first deploy
+    maxShutdownDelaySeconds: 60
+    autoDeployTrigger: checksPass # deploy only when the branch's CI checks pass ('commit' / 'off' also valid)
+    # Media persistence: container filesystems are ephemeral on Render, so
+    # uploaded files are lost on every deploy. A persistent disk attaches to a
+    # single service, is not shared with the worker, and its mount path must be
+    # writable by the image's non-root `app` user. Enable and verify uploads, or
+    # (recommended once you scale past one instance) use object storage.
+    # disk:
+    #   name: aa-shinaka-media
+    #   mountPath: /app/media
+    #   sizeGB: 5
+    envVars:
+      - fromGroup: aa-shinaka-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aa-shinaka-db
+          property: connectionString
+      - key: CACHE_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: RUN_MIGRATIONS
+        value: "false" # migrations belong to preDeployCommand
+      - key: RUN_COLLECTSTATIC
+        value: "true" # this service collects its own static files
+      # --- secrets: prompted once when the Blueprint is created -------------
+      - key: DJANGO_SECRET_KEY
+        sync: false # MUST be >= 50 chars; see the header note
+      - key: EMAIL_HOST_PASSWORD
+        sync: false # leave blank if your SMTP relay needs no authentication
+
+  # -------------------------------------------------------------------------
+  # Celery worker: order expiry, payment reconciliation, notifications,
+  # scheduled reports, export cleanup.
+  # -------------------------------------------------------------------------
+  - type: worker
+    name: aa-shinaka-worker
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: 0.5c-512mb
+    maxShutdownDelaySeconds: 60
+    dockerCommand: celery -A config worker -l info --concurrency 2 --max-tasks-per-child 200
+    envVars:
+      - fromGroup: aa-shinaka-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aa-shinaka-db
+          property: connectionString
+      - key: CACHE_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: RUN_COLLECTSTATIC
+        value: "false"
+      # Share the web service's secret key and SMTP password (no re-typing).
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          type: web
+          name: aa-shinaka-web
+          envVarKey: DJANGO_SECRET_KEY
+      - key: EMAIL_HOST_PASSWORD
+        fromService:
+          type: web
+          name: aa-shinaka-web
+          envVarKey: EMAIL_HOST_PASSWORD
+
+  # -------------------------------------------------------------------------
+  # Celery beat: the periodic scheduler. Exactly ONE instance — two schedulers
+  # would double-fire every periodic task. Do not add numInstances/scaling.
+  # -------------------------------------------------------------------------
+  - type: worker
+    name: aa-shinaka-beat
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: 0.5c-512mb
+    dockerCommand: celery -A config beat -l info --schedule /tmp/celerybeat-schedule --max-interval 300
+    envVars:
+      - fromGroup: aa-shinaka-shared
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aa-shinaka-db
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: RUN_MIGRATIONS
+        value: "false"
+      - key: RUN_COLLECTSTATIC
+        value: "false"
+      - key: DJANGO_SECRET_KEY
+        fromService:
+          type: web
+          name: aa-shinaka-web
+          envVarKey: DJANGO_SECRET_KEY
+
+# ---------------------------------------------------------------------------
+# Shared, non-secret settings applied to every service. Secrets are never put
+# in a group: values here are authoritative and overwritten on every sync, so
+# edit them in this file rather than only in the dashboard.
+# ---------------------------------------------------------------------------
+envVarGroups:
+  - name: aa-shinaka-shared
+    envVars:
+      # --- Django core -----------------------------------------------------
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.prod
+      - key: DJANGO_DEBUG
+        value: "false"
+      # Hosts/origins: keep the deployment bootable and the health check
+      # passing on first sync. EDIT to add your approved domain(s).
+      - key: DJANGO_ALLOWED_HOSTS
+        value: aa-shinaka-web.onrender.com,localhost,127.0.0.1 # EDIT: add www.example.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://aa-shinaka-web.onrender.com # EDIT: add https://www.example.com
+      - key: SITE_URL
+        value: https://aa-shinaka-web.onrender.com # EDIT: https://www.example.com
+      # --- Gunicorn / proxy ------------------------------------------------
+      - key: GUNICORN_BIND
+        value: "0.0.0.0:10000" # Render routes traffic to PORT, which defaults to 10000
+      - key: GUNICORN_WORKERS
+        value: "3"
+      - key: GUNICORN_THREADS
+        value: "2"
+      - key: GUNICORN_TIMEOUT
+        value: "60"
+      - key: GUNICORN_LOG_LEVEL
+        value: info
+      - key: FORWARDED_ALLOW_IPS
+        value: "*" # Render terminates TLS and forwards the headers
+      # --- Database --------------------------------------------------------
+      - key: DB_CONN_MAX_AGE
+        value: "600"
+      - key: DB_ATOMIC_REQUESTS
+        value: "True"
+      - key: DB_SSLMODE_REQUIRE
+        value: "true" # Render internal Postgres supports TLS (sslmode=require)
+      # --- Transport security ---------------------------------------------
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "true"
+      - key: DJANGO_SECURE_HSTS_SECONDS
+        value: "2592000"
+      - key: DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
+        value: "true"
+      - key: DJANGO_SECURE_HSTS_PRELOAD
+        value: "false" # enable only after HTTPS is verified end-to-end
+      - key: USE_X_FORWARDED_HOST
+        value: "true"
+      - key: WHITENOISE_MAX_AGE
+        value: "31536000"
+      - key: SESSION_COOKIE_AGE
+        value: "1209600"
+      - key: DJANGO_LOG_LEVEL
+        value: INFO
+      # --- Rate limiting ---------------------------------------------------
+      - key: LOGIN_RATE_LIMIT_ATTEMPTS
+        value: "10"
+      - key: LOGIN_RATE_LIMIT_WINDOW
+        value: "300"
+      - key: FORM_RATE_LIMIT_ATTEMPTS
+        value: "20"
+      - key: FORM_RATE_LIMIT_WINDOW
+        value: "3600"
+      # --- Staff MFA -------------------------------------------------------
+      - key: MFA_CHALLENGE_TIMEOUT
+        value: "300"
+      - key: MFA_RATE_LIMIT_ATTEMPTS
+        value: "5"
+      - key: MFA_RATE_LIMIT_WINDOW
+        value: "300"
+      # --- Email (real delivery only; EDIT every placeholder) --------------
+      - key: EMAIL_BACKEND
+        value: django.core.mail.backends.smtp.EmailBackend
+      - key: EMAIL_HOST
+        value: smtp.example.com # EDIT: your SMTP host
+      - key: EMAIL_PORT
+        value: "587"
+      - key: EMAIL_USE_TLS
+        value: "True"
+      - key: EMAIL_HOST_USER
+        value: "" # EDIT: your SMTP username (blank if none)
+      - key: DEFAULT_FROM_EMAIL
+        value: "AA Shinaka <no-reply@example.com>" # EDIT
+      - key: SERVER_EMAIL
+        value: no-reply@example.com # EDIT
+      - key: OPS_EMAIL
+        value: ops@example.com # EDIT: where error mail is sent
+      # --- Upload security -------------------------------------------------
+      # ClamAV is optional; the built-in signature scanner always runs. To add
+      # ClamAV, run it as a separate private service and set CLAMAV_HOST/PORT.
+      - key: UPLOAD_SCAN_ENFORCEMENT
+        value: enforce
+      - key: UPLOAD_SCAN_MAX_BYTES
+        value: "33554432"
+      # --- Commerce --------------------------------------------------------
+      - key: ORDER_RESERVATION_TTL_HOURS
+        value: "48"
+      - key: ORDER_TAX_RATE
+        value: "0.00"
+      # --- Paystack (test / disabled until launch is explicitly approved) --
+      - key: PAYSTACK_ENABLED
+        value: "false"
+      - key: PAYSTACK_LIVE_MODE
+        value: "false"
+      # --- Notifications & analytics --------------------------------------
+      - key: NOTIFICATION_EMAIL_ENABLED
+        value: "true"
+      - key: NOTIFICATION_MAX_ATTEMPTS
+        value: "3"
+      - key: ANALYTICS_BASE_CURRENCY
+        value: NGN
+      - key: ANALYTICS_REPORT_RETENTION_DAYS
+        value: "30"
+      - key: ANALYTICS_EXPORT_ASYNC
+        value: "false"

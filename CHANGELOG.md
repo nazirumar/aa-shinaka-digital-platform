@@ -3,6 +3,22 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — Render Blueprint for a managed deployment
+
+### Added
+
+- **`render.yaml`** — a Render Blueprint that deploys the platform's existing
+  image (`deploy/Dockerfile`) as a web service (Gunicorn) plus a Celery worker
+  and a one-instance Celery beat scheduler, backed by a Render Postgres 16
+  database and a Render Key Value instance (cache + broker/results), all pinned
+  to one region on the private network. Migrations run once via
+  `preDeployCommand`; `sync_roles` runs through `initialDeployHook`; the
+  `/healthz/` endpoint is the health check. Paystack stays disabled.
+- **`docs/RENDER_DEPLOYMENT.md`** — setup walkthrough, the reasoning behind the
+  Blueprint's deliberate choices (prompted 50+ character secret key, port
+  `10000`, internal TLS), the post-deploy checklist and the ephemeral-media
+  caveat.
+
 ## [Unreleased] — Categorised, active-aware dashboard sidebar
 
 ### Added
