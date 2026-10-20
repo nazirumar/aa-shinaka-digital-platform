@@ -15,8 +15,9 @@
 #     unless the workspace is upgraded — see docs/RENDER_DEPLOYMENT.md before
 #     using this for anything beyond a demo.
 #   * No preDeployCommand: Render only offers pre-deploy commands on paid
-#     services. The container entrypoint runs `migrate` before Gunicorn instead
-#     (safe with exactly one free instance).
+#     services. `start.sh` applies `migrate` before Gunicorn instead (safe with
+#     exactly one free instance), and `build.sh` collects static files during
+#     the build step.
 #   * No persistent disk. Uploaded media is lost on every deploy/restart. This
 #     is a hard limitation of the Free plan; use object storage for real use.
 #   * Outbound SMTP (25/465/587) is blocked on Free web services, so email goes
@@ -54,9 +55,12 @@ services:
 
   - type: web
     name: aa-shinaka-web
-    runtime: docker
-    dockerfilePath: ./deploy/Dockerfile
-    dockerContext: .
+    # Native Python runtime: Render runs ./build.sh (which compiles Tailwind CSS
+    # and runs collectstatic) before the start command. This is the profile that
+    # matches a service created from the dashboard's "Python 3" runtime.
+    runtime: python
+    buildCommand: ./build.sh
+    startCommand: ./start.sh gunicorn config.wsgi:application --config deploy/gunicorn.conf.py
     region: frankfurt
     plan: free
     healthCheckPath: /healthz/
@@ -84,11 +88,12 @@ services:
           type: keyvalue
           name: aa-shinaka-redis
           property: connectionString
-      # No pre-deploy command on Free: migrate from the entrypoint instead.
+      # No pre-deploy command on Free: start.sh applies migrations, then starts
+      # Gunicorn. Static files are collected once by build.sh during the build.
       - key: RUN_MIGRATIONS
         value: "true"
       - key: RUN_COLLECTSTATIC
-        value: "true"
+        value: "false"
       # --- secrets: prompted once when the Blueprint is created -------------
       - key: DJANGO_SECRET_KEY
         sync: false # MUST be >= 50 chars

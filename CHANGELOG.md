@@ -24,10 +24,28 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 - **`tests/test_render_deployment.py`** — regression coverage for the database
   URL parsing/SSL options, Redis cache and WhiteNoise manifest storage,
   Render-injected host/CSRF trust, transport security, the Celery fallback, the
-  Resend backend, the crash-proof 500 page, the scheduler command/endpoint and
-  the media-root override.
+  Resend backend, the crash-proof 500 page, the scheduler command/endpoint, the
+  media-root override and the native-runtime build (`build.sh`/`start.sh`),
+  including rendering the public and staff layouts with `DEBUG=False` under the
+  real `CompressedManifestStaticFilesStorage`.
+- **`build.sh`** — Render native-runtime build command. Installs Python and Node
+  dependencies, compiles Tailwind to `static/css/app.css`, runs `collectstatic`
+  under `config.settings.prod`, and verifies that `staticfiles/staticfiles.json`
+  contains `css/app.css`. Strict (`set -euo pipefail`); fails the deploy rather
+  than serve a broken page.
+- **`start.sh`** — Render native-runtime start command. Applies migrations
+  (idempotent) and execs Gunicorn so it becomes PID 1 and receives Render's
+  SIGTERM.
 
 ### Fixed
+
+- **HTTP 500 on the live Render service (`Missing staticfiles manifest entry for
+  'css/app.css'`).** The service runs Render's auto-detected Python build, which
+  never ran `collectstatic`, so `staticfiles.json` was absent and every template
+  using `{% static %}` raised. The native runtime now uses `./build.sh` (build)
+  and `./start.sh gunicorn config.wsgi:application --config deploy/gunicorn.conf.py`
+  (start); `render.free.yaml` is updated to match, and the CI test job builds the
+  CSS so the static-file regression test runs against the real asset.
 
 - **`collectstatic` failed under production settings**, aborting the container
   entrypoint (and therefore every Render/VPS deploy): WhiteNoise's manifest

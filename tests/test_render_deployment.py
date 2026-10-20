@@ -428,3 +428,109 @@ def test_scheduled_jobs_endpoint_runs_and_is_throttled(client):
 def test_media_root_can_be_redirected_to_a_mounted_disk():
     settings = _dump_settings({"DJANGO_MEDIA_ROOT": "/var/lib/aa-shinaka/media"})
     assert settings["MEDIA_ROOT"].replace("\\", "/") == "/var/lib/aa-shinaka/media"
+
+
+# ---------------------------------------------------------------------------
+# Static files: the CSS manifest must exist and satisfy the templates
+# ---------------------------------------------------------------------------
+# Regression for the production 500:
+#   ValueError: Missing staticfiles manifest entry for 'css/app.css'
+# caused by a Render build that never ran `collectstatic`.
+
+
+def test_build_script_compiles_css_and_collects_static_files():
+    script = (REPO_ROOT / "build.sh").read_text(encoding="utf-8")
+
+    # It must compile Tailwind, collect static, and verify both outputs.
+    assert "npm run build:css" in script
+    assert "collectstatic" in script
+    assert "static/css/app.css" in script
+    assert "staticfiles/staticfiles.json" in script
+    # And fail fast rather than leave a half-built deploy.
+    assert "set -euo pipefail" in script
+
+
+def test_start_script_applies_migrations_before_serving():
+    script = (REPO_ROOT / "start.sh").read_text(encoding="utf-8")
+
+    assert "manage.py migrate" in script
+    assert 'exec "$@"' in script
+
+
+def test_free_blueprint_uses_the_build_and_start_scripts():
+    text = (REPO_ROOT / "render.free.yaml").read_text(encoding="utf-8")
+
+    assert "buildCommand: ./build.sh" in text
+    assert "./start.sh gunicorn config.wsgi:application" in text
+    assert "runtime: python" in text
+
+
+def _collect_static_into(tmp_path: Path) -> Path:
+    """Run the real collectstatic with the production manifest storage."""
+    from django.core.management import call_command
+
+    static_root = tmp_path / "staticfiles"
+    static_root.mkdir(parents=True, exist_ok=True)
+    with override_settings(
+        DEBUG=False,
+        STATIC_ROOT=str(static_root),
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+            "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+        },
+    ):
+        call_command("collectstatic", "--noinput", verbosity=0)
+    return static_root
+
+
+@pytest.mark.django_db
+def test_homepage_renders_with_manifest_storage(client, tmp_path):
+    static_root = _collect_static_into(tmp_path)
+
+    # The mistake that broke production: the manifest was never produced.
+    manifest_path = static_root / "staticfiles.json"
+    assert manifest_path.exists(), "collectstatic did not produce a manifest"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    assert "css/app.css" in manifest["paths"], "manifest is missing css/app.css"
+
+    with override_settings(
+        DEBUG=False,
+        STATIC_ROOT=str(static_root),
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+            "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+        },
+    ):
+        response = client.get(reverse("core:home"))
+
+    assert response.status_code == 200
+    # The hashed stylesheet URL is emitted, proving the manifest was consulted.
+    assert b"/static/css/app." in response.content
+
+
+@pytest.mark.django_db
+def test_dashboard_base_renders_with_manifest_storage(owner, tmp_path):
+    """The staff layout references the same hashed stylesheet.
+
+    ``dashboard/base.html`` reads ``user.email``/``full_name``/``display_role``
+    and ``request.resolver_match``, so it needs a real staff user and a request
+    rather than an anonymous context.
+    """
+    from django.template.loader import render_to_string
+    from django.test import RequestFactory
+
+    static_root = _collect_static_into(tmp_path)
+    request = RequestFactory().get("/dashboard/")
+    request.user = owner
+
+    with override_settings(
+        DEBUG=False,
+        STATIC_ROOT=str(static_root),
+        STORAGES={
+            "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+            "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+        },
+    ):
+        html = render_to_string("dashboard/base.html", {"user": owner, "request": request})
+
+    assert "/static/css/app." in html

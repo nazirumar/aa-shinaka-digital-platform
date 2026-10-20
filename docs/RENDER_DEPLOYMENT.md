@@ -33,9 +33,9 @@ Render Free has hard limits that shape the free Blueprint:
   work there would silently lose it, which is the other reason Celery stays
   disabled.
 * **No pre-deploy command.** Render only offers pre-deploy commands on paid
-  services, so the free Blueprint sets `RUN_MIGRATIONS=true`: the container
-  entrypoint runs `migrate` before Gunicorn. Safe because there is exactly one
-  free instance.
+  services, so the free Blueprint sets `RUN_MIGRATIONS=true`: `start.sh` runs
+  `migrate` before Gunicorn. Safe because there is exactly one free instance.
+  Static files are collected once by `build.sh` at build time.
 * **No persistent disk.** Uploads are lost on every deploy/restart (see
   [Media files](#media-files)).
 * **Outbound SMTP (ports 25/465/587) is blocked.** Email must go over HTTPS;
@@ -228,12 +228,40 @@ context) and are covered by regression tests.
 
 ## Static files
 
-Static assets are compiled by the Docker `assets` stage and collected in the web
-entrypoint into `STATIC_ROOT`, then served by **WhiteNoise** with
+Static assets are compiled to `static/css/app.css` by Tailwind and collected
+into `STATIC_ROOT` (`staticfiles/`), then served by **WhiteNoise** with
 `CompressedManifestStaticFilesStorage`. The manifest (`staticfiles.json`) is
-required at request time, so if collection fails the entrypoint exits non-zero
-and the deploy fails loudly instead of serving broken HTML. `WHITENOISE_MAX_AGE`
-sets a one-year cache lifetime for hashed assets.
+required at request time: if collection never runs, every page that uses
+`{% static %}` raises `ValueError: Missing staticfiles manifest entry` and
+returns HTTP 500.
+
+Two build paths produce the manifest, and both fail loudly if a step breaks:
+
+* **Docker (`render.yaml`, paid):** the `assets` stage compiles the CSS and the
+  web entrypoint (`deploy/entrypoint.sh`) runs `collectstatic` before Gunicorn.
+* **Native Python runtime (`render.free.yaml`, and any dashboard-built Python
+  service):** Render runs `./build.sh` as the **build command**, which installs
+  Python and Node dependencies, compiles Tailwind, runs
+  `collectstatic` under `config.settings.prod` and verifies that
+  `staticfiles/staticfiles.json` contains `css/app.css`. `./start.sh` then
+  applies migrations (idempotent) and execs Gunicorn.
+
+`build.sh` is strict (`set -euo pipefail`) and checks its own outputs, so a
+missing CSS bundle or manifest fails the deploy instead of surfacing as a 500.
+
+> **Native runtime build command / start command (exact values):**
+>
+> * Build command: `./build.sh`
+> * Start command: `./start.sh gunicorn config.wsgi:application --config deploy/gunicorn.conf.py`
+
+> **If a service is already deployed on the native Python runtime and 500s with
+> `Missing staticfiles manifest entry for 'css/app.css'`,** Render's auto
+> build command never ran `collectstatic`. In the Render Dashboard open the
+> service, go to **Settings → Build & Deploy**, and set the commands above
+> (Build Command `./build.sh`; Start Command
+> `./start.sh gunicorn config.wsgi:application --config deploy/gunicorn.conf.py`),
+> then trigger **Manual Deploy → Deploy latest commit**. No code change is
+> needed beyond the ones already in this repo.
 
 ---
 
@@ -251,8 +279,14 @@ sets a one-year cache lifetime for hashed assets.
 1. **New → Blueprint**, then set **Blueprint Path** to `render.free.yaml`.
 2. Provide the prompted secrets: `DJANGO_SECRET_KEY`, a ≥ 32-character
    `SCHEDULED_JOBS_TOKEN` and a `RESEND_API_KEY`.
-3. Apply. The single web service migrates, collects static files and starts.
+3. Apply. `build.sh` compiles CSS and collects static files during the build;
+   `start.sh` migrates and starts Gunicorn.
 4. Create an account with the `onrender.com` cron-job.org schedule above.
+
+> **Not using a Blueprint?** Create the service as a **Python 3** web service and
+> set the Build/Start commands exactly as shown in
+> [Static files](#static-files). Rendering's Python runtime includes Node/npm,
+> so `build.sh` can compile Tailwind.
 
 ## After the first deploy (both profiles)
 
@@ -278,11 +312,15 @@ sets a one-year cache lifetime for hashed assets.
 Run locally with safe, non-secret values before syncing:
 
 ```bash
-uv run python manage.py check --deploy          # with DJANGO_SETTINGS_MODULE=config.settings.prod
+npm ci && npm run build:css                # produces static/css/app.css
+uv run python manage.py check --deploy     # with DJANGO_SETTINGS_MODULE=config.settings.prod
 uv run python manage.py collectstatic --noinput
 uv run python manage.py run_scheduled_jobs --json
 uv run pytest -q
 ```
+
+`collectstatic` under production settings requires the compiled stylesheet, so
+build the CSS first (or run `./build.sh`, which does both).
 
 `check --deploy` should report no `ERROR`-level issues; the only expected warning
 is HSTS preload being off by design (`DJANGO_SECURE_HSTS_PRELOAD=false`).
@@ -324,6 +362,12 @@ Summary:
 10. **`/healthz/` no longer leaks database errors** unless `DEBUG=True`.
 11. **Free-profile Blueprint added** (`render.free.yaml`) without touching the
     paid production Blueprint.
+12. **Native-runtime 500 fixed.** The live service runs Render's auto-detected
+    Python build, which never ran `collectstatic`, so the manifest was missing
+    and every `{% static %}` page raised. `build.sh` (build command) compiles
+    Tailwind and collects static files with production settings and verifies the
+    manifest; `start.sh` (start command) migrates and execs Gunicorn. Both the
+    free Blueprint and any dashboard-created Python service can use them.
 
 ### Remaining blockers (need people/credentials, not code)
 

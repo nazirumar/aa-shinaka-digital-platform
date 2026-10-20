@@ -3,10 +3,12 @@
 **Scope:** audit and stabilize the Django application so it deploys reliably to
 **Render's Free plan** without weakening production security.
 
-**Status:** configuration, code and tests delivered. **Nothing was deployed**, no
-DNS was changed and no live payment credential was enabled. Live gates (a real
-Render account, a real `onrender.com` hostname and a real email sender) remain
-**NOT VERIFIED**.
+**Status:** configuration, code and tests delivered, plus a follow-up fix for the
+first live deploy (the native-Runtime build never produced the static manifest, so
+every page 500'd; `build.sh`/`start.sh` now supply the build and start commands).
+The follow-up changes are committed but **not yet redeployed**. No DNS was changed
+and no live payment credential was enabled. Live gates (a real Render account, a
+real `onrender.com` hostname and a real email sender) remain **NOT VERIFIED**.
 
 See [`RENDER_DEPLOYMENT.md`](RENDER_DEPLOYMENT.md) for the operator walkthrough.
 
@@ -145,15 +147,25 @@ See [`RENDER_DEPLOYMENT.md`](RENDER_DEPLOYMENT.md) for the operator walkthrough.
   copies 129 files, post-processes 385, writes `staticfiles.json`, hashes
   `static/css/app.css` and collects **no** source. The manifest storage backend
   is asserted by test.
+* **Follow-up fix: the native-Render 500.** The live service runs Render's
+  auto-detected Python build/start commands, not the Docker entrypoint, so
+  `collectstatic` never ran and `staticfiles.json` was missing — every page
+  raised `ValueError: Missing staticfiles manifest entry for 'css/app.css'`. The
+  native runtime now uses `build.sh` (compile CSS → `collectstatic` → verify the
+  manifest contains `css/app.css`) as the build command and `start.sh` (migrate →
+  exec Gunicorn) as the start command. `render.free.yaml` carries both; the CI
+  test job builds the CSS so the regression test runs against the real asset.
 
 ## 12. Regression tests
 
-* New `tests/test_render_deployment.py` (25 tests) covers the database URL
+* New `tests/test_render_deployment.py` (29 tests) covers the database URL
   parsing/SSL options, Redis cache + WhiteNoise manifest, Render host/CSRF trust,
   transport security, the Paystack kill switch, the Celery fallback (eager +
   reliability), the sentinel-token guard, the Resend backend, the crash-proof 500
-  page, the original-exception logging, the scheduler command/endpoint and the
-  media-root override.
+  page, the original-exception logging, the scheduler command/endpoint, the
+  media-root override, the `build.sh`/`start.sh` contents and rendering the
+  public and staff layouts with `DEBUG=False` under the real
+  `CompressedManifestStaticFilesStorage` (the exact production failure mode).
 * Existing theme/sidebar tests were updated to the new Tailwind source path.
 
 ## 13. `check --deploy` with production settings

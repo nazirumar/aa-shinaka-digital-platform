@@ -102,7 +102,16 @@ jobs:
       - uses: astral-sh/setup-uv@f0ec1fc3b38f5e7cd731bb6ce540c5af426746bb # v6.1.0
         with:
           enable-cache: true
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: "20.18.0"
+          cache: npm
       - run: uv sync --frozen
+      # The static-files regression test runs the real `collectstatic` under the
+      # production manifest storage, which requires the compiled Tailwind bundle
+      # (static/css/app.css is gitignored). Build it exactly as Render does.
+      - run: npm ci --no-audit --no-fund
+      - run: npm run build:css
       - name: Security tests (auth, MFA, hardening, E2E) — run first, fail fast
         run: >-
           uv run pytest
