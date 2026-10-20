@@ -101,6 +101,9 @@ def bootstrap_owner(request: HttpRequest) -> JsonResponse:
     """
     expected = str(getattr(settings, "BOOTSTRAP_OWNER_TOKEN", "") or "")
     if not expected:
+        logger.warning(
+            "Owner-bootstrap endpoint hit but disabled: BOOTSTRAP_OWNER_TOKEN is not set."
+        )
         raise Http404
 
     provided = request.headers.get("X-Bootstrap-Token", "")
