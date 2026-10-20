@@ -283,10 +283,18 @@ LOCALE_PATHS = [BASE_DIR / "locale"]
 # Static & media
 # ---------------------------------------------------------------------------
 STATIC_URL = "static/"
+# Only compiled assets live under `static/`. The Tailwind source lives in
+# `assets/css/` (outside the collected tree) because WhiteNoise's manifest
+# storage parses every collected .css file and would abort `collectstatic` on the
+# source's `@import "tailwindcss"` (which is not a real file URL).
 STATICFILES_DIRS = [BASE_DIR / "static"]
 STATIC_ROOT = BASE_DIR / "staticfiles"
 MEDIA_URL = "media/"
-MEDIA_ROOT = BASE_DIR / "media"
+# Overridable so a managed host can mount a persistent disk somewhere other
+# than the code checkout (Render/Heroku-style platforms). The default stays
+# inside the repo for local development and the Compose deployment.
+_media_root = env("DJANGO_MEDIA_ROOT", default="").strip()
+MEDIA_ROOT = Path(_media_root) if _media_root else BASE_DIR / "media"
 
 STORAGES = {
     "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
@@ -307,6 +315,30 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_TRACK_STARTED = True
 CELERY_TASK_TIME_LIMIT = 60 * 30
 CELERY_TASK_ALWAYS_EAGER = False  # tests override this to True
+
+# When no worker can run (for example the Render Free plan, which cannot host
+# background workers) enqueueing a task would leave it sitting in the broker
+# until Redis restarts and drops it — a silent loss. ``CELERY_ENABLED=false``
+# makes ``.delay()`` execute inline in the web process instead, so work such as
+# notification delivery still happens. Periodic jobs are then triggered through
+# ``manage.py run_scheduled_jobs`` or the token-protected endpoint documented in
+# docs/RENDER_DEPLOYMENT.md.
+CELERY_ENABLED = env.bool("CELERY_ENABLED", default=True)
+if not CELERY_ENABLED:
+    CELERY_TASK_ALWAYS_EAGER = True
+    CELERY_TASK_STORE_EAGER_RESULT = False
+
+# Reliability: a message is acknowledged after the task finishes, and a task
+# whose worker disappears is requeued rather than dropped. Together with
+# prefetch=1 this prevents silent loss during Render deploys/restarts (SIGTERM
+# with a short grace period). Results expire quickly to protect small Redis
+# instances (Render Key Value Free is 25 MB).
+CELERY_TASK_ACKS_LATE = True
+CELERY_TASK_REJECT_ON_WORKER_LOST = True
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
+CELERY_BROKER_CONNECTION_RETRY_ON_STARTUP = True
+CELERY_BROKER_CONNECTION_MAX_RETRIES = None
+CELERY_RESULT_EXPIRES = env.int("CELERY_RESULT_EXPIRES", default=60 * 60 * 24)
 # Periodically release stock held by abandoned pending-payment orders. The same
 # logic is available as ``manage.py expire_orders`` for deployments without beat.
 CELERY_BEAT_SCHEDULE = {
@@ -346,6 +378,23 @@ EMAIL_USE_TLS = env("EMAIL_USE_TLS")
 EMAIL_HOST_USER = env("EMAIL_HOST_USER", default="")
 EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD", default="")
 EMAIL_TIMEOUT = env.int("EMAIL_TIMEOUT", default=10)
+
+# HTTPS email delivery (recommended on Render: outbound SMTP ports 25/465/587
+# are blocked on Free web services). Select it with:
+#   EMAIL_BACKEND=config.email_backends.ResendEmailBackend
+# The key is only read from the environment and is never logged.
+RESEND_API_KEY = env("RESEND_API_KEY", default="")
+RESEND_API_URL = env("RESEND_API_URL", default="https://api.resend.com/emails")
+RESEND_TIMEOUT = env.int("RESEND_TIMEOUT", default=10)
+
+# ---------------------------------------------------------------------------
+# Periodic jobs fallback
+# ---------------------------------------------------------------------------
+# A long random token enables ``POST /internal/scheduled-jobs/`` so an external
+# scheduler (cron-job.org, GitHub Actions, a Render Cron Job, ...) can run the
+# Celery-beat jobs when no worker/beat is available. Empty = endpoint disabled.
+SCHEDULED_JOBS_TOKEN = env("SCHEDULED_JOBS_TOKEN", default="")
+SCHEDULED_JOBS_MIN_INTERVAL = env.int("SCHEDULED_JOBS_MIN_INTERVAL", default=60)
 
 # ---------------------------------------------------------------------------
 # Messages -> Tailwind-friendly CSS classes

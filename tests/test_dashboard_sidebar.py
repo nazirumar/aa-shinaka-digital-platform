@@ -56,7 +56,7 @@ def test_sidebar_active_link_is_marked_and_scrolled_to(client, owner):
 
 
 def test_sidebar_group_css_is_always_emitted():
-    css = Path("static/src/app.css").read_text(encoding="utf-8")
+    css = Path("assets/css/app.css").read_text(encoding="utf-8")
 
     assert ".sidebar-group-header" in css
     assert ".sidebar-group-body" in css

@@ -1,0 +1,211 @@
+# ===========================================================================
+# AA Shinaka — Render **Free** Blueprint (render.free.yaml)
+#
+# The Free-plan counterpart of ./render.yaml. Create it with
+#   New > Blueprint > Blueprint Path: render.free.yaml
+# so the paid production Blueprint stays untouched.
+#
+# What is different from ./render.yaml, and why:
+#   * One web service only. Render Free cannot host background workers or
+#     cron jobs, so there is no Celery worker/beat. `CELERY_ENABLED=false`
+#     makes task dispatch run inline instead of queueing work that would never
+#     be consumed.
+#   * Free Postgres (256 MB RAM / 1 GB disk) and free Key Value (25 MB,
+#     in-memory). Free Postgres is deleted by Render 30 days after creation
+#     unless the workspace is upgraded — see docs/RENDER_DEPLOYMENT.md before
+#     using this for anything beyond a demo.
+#   * No preDeployCommand: Render only offers pre-deploy commands on paid
+#     services. The container entrypoint runs `migrate` before Gunicorn instead
+#     (safe with exactly one free instance).
+#   * No persistent disk. Uploaded media is lost on every deploy/restart. This
+#     is a hard limitation of the Free plan; use object storage for real use.
+#   * Outbound SMTP (25/465/587) is blocked on Free web services, so email goes
+#     through Resend's HTTPS API (`config.email_backends.ResendEmailBackend`).
+#
+# Still secure: config.settings.prod runs unchanged (DEBUG=False, secure
+# cookies, HSTS, SSL redirect, Paystack live payments disabled).
+#
+# Periodic jobs: because beat is unavailable, point a free external scheduler
+# (for example cron-job.org) at
+#   POST https://<service>.onrender.com/internal/scheduled-jobs/
+#   X-Scheduled-Jobs-Token: <SCHEDULED_JOBS_TOKEN>
+# every 15–30 minutes. Without this, stock reservations never expire, payment
+# reconciliation never runs and queued notifications are only retried inline.
+# Alternatively, run `python manage.py run_scheduled_jobs` from any scheduler
+# that can reach the database.
+# ===========================================================================
+
+databases:
+  - name: aa-shinaka-db
+    databaseName: aa_shinaka
+    user: aa_shinaka
+    region: frankfurt
+    plan: free # 256 MB RAM / 1 GB disk. EXPIRES AFTER 30 DAYS.
+    postgresMajorVersion: "16"
+    ipAllowList: [] # private network only
+
+services:
+  - type: keyvalue
+    name: aa-shinaka-redis
+    region: frankfurt
+    plan: free # 25 MB, in-memory: data is lost on restart
+    maxmemoryPolicy: allkeys-lru
+    ipAllowList: [] # private network only
+
+  - type: web
+    name: aa-shinaka-web
+    runtime: docker
+    dockerfilePath: ./deploy/Dockerfile
+    dockerContext: .
+    region: frankfurt
+    plan: free
+    healthCheckPath: /healthz/
+    initialDeployHook: python manage.py sync_roles
+    maxShutdownDelaySeconds: 60
+    autoDeployTrigger: checksPass
+    envVars:
+      - fromGroup: aa-shinaka-free
+      - key: DATABASE_URL
+        fromDatabase:
+          name: aa-shinaka-db
+          property: connectionString
+      - key: CACHE_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_BROKER_URL
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      - key: CELERY_RESULT_BACKEND
+        fromService:
+          type: keyvalue
+          name: aa-shinaka-redis
+          property: connectionString
+      # No pre-deploy command on Free: migrate from the entrypoint instead.
+      - key: RUN_MIGRATIONS
+        value: "true"
+      - key: RUN_COLLECTSTATIC
+        value: "true"
+      # --- secrets: prompted once when the Blueprint is created -------------
+      - key: DJANGO_SECRET_KEY
+        sync: false # MUST be >= 50 chars
+      - key: SCHEDULED_JOBS_TOKEN
+        sync: false # MUST be >= 32 chars; enables the jobs endpoint
+      - key: RESEND_API_KEY
+        sync: false # required by the HTTPS email backend
+
+envVarGroups:
+  - name: aa-shinaka-free
+    envVars:
+      # --- Django core -----------------------------------------------------
+      - key: DJANGO_SETTINGS_MODULE
+        value: config.settings.prod
+      - key: DJANGO_DEBUG
+        value: "false"
+      # Render's own hostname/URL are appended automatically by prod.py; add a
+      # custom domain here once one is attached.
+      - key: DJANGO_ALLOWED_HOSTS
+        value: aa-shinaka-web.onrender.com
+      - key: CSRF_TRUSTED_ORIGINS
+        value: https://aa-shinaka-web.onrender.com
+      - key: SITE_URL
+        value: https://aa-shinaka-web.onrender.com # EDIT if Render suffixes the name
+      # --- Gunicorn / proxy ------------------------------------------------
+      - key: GUNICORN_BIND
+        value: "0.0.0.0:10000"
+      - key: GUNICORN_WORKERS
+        value: "2" # 512 MB instance
+      - key: GUNICORN_THREADS
+        value: "2"
+      - key: GUNICORN_TIMEOUT
+        value: "60"
+      - key: GUNICORN_LOG_LEVEL
+        value: info
+      - key: FORWARDED_ALLOW_IPS
+        value: "*"
+      # --- Database --------------------------------------------------------
+      - key: DB_CONN_MAX_AGE
+        value: "600"
+      - key: DB_ATOMIC_REQUESTS
+        value: "True"
+      - key: DB_SSLMODE_REQUIRE
+        value: "true"
+      # --- Celery ----------------------------------------------------------
+      # No worker on Free. Inline execution prevents tasks being queued into a
+      # broker that no process consumes (and that loses data on restart).
+      - key: CELERY_ENABLED
+        value: "false"
+      # --- Transport security ---------------------------------------------
+      - key: DJANGO_SECURE_SSL_REDIRECT
+        value: "true"
+      - key: DJANGO_SECURE_HSTS_SECONDS
+        value: "2592000"
+      - key: DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS
+        value: "true"
+      - key: DJANGO_SECURE_HSTS_PRELOAD
+        value: "false"
+      - key: USE_X_FORWARDED_HOST
+        value: "true"
+      - key: WHITENOISE_MAX_AGE
+        value: "31536000"
+      - key: SESSION_COOKIE_AGE
+        value: "1209600"
+      - key: DJANGO_LOG_LEVEL
+        value: INFO
+      # --- Scheduled jobs fallback ----------------------------------------
+      - key: SCHEDULED_JOBS_MIN_INTERVAL
+        value: "60"
+      # --- Rate limiting ---------------------------------------------------
+      - key: LOGIN_RATE_LIMIT_ATTEMPTS
+        value: "10"
+      - key: LOGIN_RATE_LIMIT_WINDOW
+        value: "300"
+      - key: FORM_RATE_LIMIT_ATTEMPTS
+        value: "20"
+      - key: FORM_RATE_LIMIT_WINDOW
+        value: "3600"
+      # --- Staff MFA -------------------------------------------------------
+      - key: MFA_CHALLENGE_TIMEOUT
+        value: "300"
+      - key: MFA_RATE_LIMIT_ATTEMPTS
+        value: "5"
+      - key: MFA_RATE_LIMIT_WINDOW
+        value: "300"
+      # --- Email (HTTPS API: Free web services cannot use SMTP) ------------
+      - key: EMAIL_BACKEND
+        value: config.email_backends.ResendEmailBackend
+      - key: DEFAULT_FROM_EMAIL
+        value: "AA Shinaka <no-reply@example.com>" # EDIT: a Resend-verified sender
+      - key: SERVER_EMAIL
+        value: no-reply@example.com # EDIT
+      - key: OPS_EMAIL
+        value: ops@example.com # EDIT
+      # --- Upload security -------------------------------------------------
+      - key: UPLOAD_SCAN_ENFORCEMENT
+        value: enforce
+      - key: UPLOAD_SCAN_MAX_BYTES
+        value: "33554432"
+      # --- Commerce --------------------------------------------------------
+      - key: ORDER_RESERVATION_TTL_HOURS
+        value: "48"
+      - key: ORDER_TAX_RATE
+        value: "0.00"
+      # --- Paystack: remain test/disabled until launch is approved ---------
+      - key: PAYSTACK_ENABLED
+        value: "false"
+      - key: PAYSTACK_LIVE_MODE
+        value: "false"
+      # --- Notifications & analytics --------------------------------------
+      - key: NOTIFICATION_EMAIL_ENABLED
+        value: "true"
+      - key: NOTIFICATION_MAX_ATTEMPTS
+        value: "3"
+      - key: ANALYTICS_BASE_CURRENCY
+        value: NGN
+      - key: ANALYTICS_REPORT_RETENTION_DAYS
+        value: "30"
+      - key: ANALYTICS_EXPORT_ASYNC
+        value: "false"

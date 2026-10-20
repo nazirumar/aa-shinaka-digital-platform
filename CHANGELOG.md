@@ -3,6 +3,60 @@
 All notable changes to the AA Shinaka Digital Business Platform.
 Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased] — Render free-tier deployment stabilization
+
+### Added
+
+- **`render.free.yaml`** — a second, free-tier Blueprint (web service only, free
+  Postgres + free Key Value, no workers) so the free profile never degrades the
+  paid `render.yaml`. It disables Celery (`CELERY_ENABLED=false`, tasks run
+  inline), migrates from the entrypoint because Free has no pre-deploy command,
+  and delivers email over HTTPS via Resend.
+- **`config/email_backends.py`** — a dependency-free `ResendEmailBackend` for
+  hosts that block outbound SMTP (Render Free). Standard library only; logs
+  exception type/HTTP status and never recipients, bodies or the key.
+- **`apps/core/scheduled_jobs.py`** plus **`manage.py run_scheduled_jobs`** and a
+  token-protected, cache-throttled `POST /internal/scheduled-jobs/` endpoint —
+  the fallback for the Celery-beat periodic jobs when no worker/beat is deployed
+  (order expiry, payment reconciliation, training reminders, scheduled reports,
+  export cleanup, notification delivery). Disabled unless `SCHEDULED_JOBS_TOKEN`
+  is set; a short token is rejected at startup in production.
+- **`tests/test_render_deployment.py`** — regression coverage for the database
+  URL parsing/SSL options, Redis cache and WhiteNoise manifest storage,
+  Render-injected host/CSRF trust, transport security, the Celery fallback, the
+  Resend backend, the crash-proof 500 page, the scheduler command/endpoint and
+  the media-root override.
+
+### Fixed
+
+- **`collectstatic` failed under production settings**, aborting the container
+  entrypoint (and therefore every Render/VPS deploy): WhiteNoise's manifest
+  storage parsed the Tailwind *source* `static/src/app.css` and tried to resolve
+  its `@import "tailwindcss"` as a file URL. The source now lives in
+  `assets/css/app.css` (outside the collected `static/` tree) and the build
+  tooling, Dockerfile, `.gitignore`, docs and tests follow it.
+- **`templates/500.html` could itself error.** Rewritten fully standalone — no
+  inheritance, no context variables, no template tags, no static lookups, no
+  database access — so it renders even when a database or static-manifest failure
+  caused the 500.
+- **False 400s on Render.** `config.settings.prod` now appends
+  `RENDER_EXTERNAL_HOSTNAME` to `DJANGO_ALLOWED_HOSTS` and `RENDER_EXTERNAL_URL`
+  to `CSRF_TRUSTED_ORIGINS`, so the generated `onrender.com` domain is trusted
+  without weakening the wildcard-ban or https-only guards.
+- **Unhealthy containers.** The Dockerfile and Compose health checks now send
+  `X-Forwarded-Proto: https` and read `$PORT`, so `SECURE_SSL_REDIRECT` no longer
+  makes the probe fail. Gunicorn binds `$PORT` when `GUNICORN_BIND` is unset.
+- **Silent task loss when no worker runs.** `CELERY_ENABLED=false` makes
+  `.delay()` execute inline; Celery gains `acks_late`,
+  `reject_on_worker_lost`, prefetch 1 and broker reconnect-on-startup so a task
+  is requeued rather than dropped when a worker disappears mid-deploy.
+- **Email on SMTP-blocked hosts** — the Resend HTTPS backend (above) is accepted
+  by the production guard, which now only requires `EMAIL_HOST` for the SMTP
+  backend and `RESEND_API_KEY` for the API backend.
+- **`/healthz/` no longer leaks database errors** unless `DEBUG=True`.
+- **Media root made overridable** via `DJANGO_MEDIA_ROOT` so a persistent disk
+  can be mounted; an empty value safely falls back to `<repo>/media`.
+
 ## [Unreleased] — Render Blueprint for a managed deployment
 
 ### Added

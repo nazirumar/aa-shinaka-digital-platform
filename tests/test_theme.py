@@ -41,7 +41,7 @@ def test_dashboard_includes_theme_switcher(client, owner):
 
 
 def test_theme_css_defines_class_based_dark_variant():
-    css = Path("static/src/app.css").read_text(encoding="utf-8")
+    css = Path("assets/css/app.css").read_text(encoding="utf-8")
 
     assert "@custom-variant dark (&:where(.dark, .dark *))" in css
     assert "color-scheme: dark" in css

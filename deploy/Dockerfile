@@ -14,7 +14,7 @@ FROM node:20-slim AS assets
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
-COPY static/src ./static/src
+COPY assets/css ./assets/css
 COPY templates ./templates
 RUN npm run build:css
 
@@ -49,8 +49,11 @@ RUN useradd --create-home --uid 1001 app \
 USER app
 
 EXPOSE 8000
+# Probe with X-Forwarded-Proto: https so the production SSL redirect (which
+# would otherwise bounce the probe to https://127.0.0.1) does not make the
+# container look unhealthy. Honours Render's $PORT as well as the default.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
-    CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=3).status==200 else 1)"
+    CMD python -c "import http.client,os,sys; c=http.client.HTTPConnection('127.0.0.1', int(os.environ.get('PORT','8000')), timeout=3); c.request('GET','/healthz/',headers={'X-Forwarded-Proto':'https'}); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"
 
 ENTRYPOINT ["/app/deploy/entrypoint.sh"]
 CMD ["gunicorn", "config.wsgi:application", "--config", "deploy/gunicorn.conf.py"]

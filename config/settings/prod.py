@@ -40,13 +40,31 @@ if not ALLOWED_HOSTS or ALLOWED_HOSTS == ["*"]:
         "DJANGO_ALLOWED_HOSTS must list the real hostnames in production (never '*')."
     )
 
+# Render injects the service's public hostname at runtime. Trusting it here means
+# a deploy never 400s because the generated `onrender.com` subdomain differs from
+# the value committed in the Blueprint, without relaxing the wildcard ban.
+_render_hostname = env("RENDER_EXTERNAL_HOSTNAME", default="").strip()
+if _render_hostname and _render_hostname not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(_render_hostname)
+
 CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=[])
+# Render injects the full public URL (https://<service>.onrender.com). Adding it
+# keeps staff forms working on the generated domain even before a custom domain
+# is attached.
+_render_url = env("RENDER_EXTERNAL_URL", default="").strip().rstrip("/")
+if _render_url.startswith("https://") and _render_url not in CSRF_TRUSTED_ORIGINS:
+    CSRF_TRUSTED_ORIGINS.append(_render_url)
 # Behind HTTPS every trusted origin must be an https:// origin.
 for _origin in CSRF_TRUSTED_ORIGINS:
     if not _origin.startswith("https://"):
         raise ImproperlyConfigured(
             f"CSRF_TRUSTED_ORIGINS entries must use https:// (got {_origin!r})."
         )
+
+# The fallback jobs endpoint is publicly reachable; refuse a guessable token.
+_scheduled_jobs_token = env("SCHEDULED_JOBS_TOKEN", default="").strip()
+if _scheduled_jobs_token and len(_scheduled_jobs_token) < 32:
+    raise ImproperlyConfigured("SCHEDULED_JOBS_TOKEN must be at least 32 characters when enabled.")
 
 # ---------------------------------------------------------------------------
 # Database & cache — least-privilege credentials come from the environment.
@@ -74,8 +92,16 @@ if "console" in _email_backend or "locmem" in _email_backend or "dummy" in _emai
         "EMAIL_BACKEND must be a real delivery backend in production (SMTP/API)."
     )
 EMAIL_BACKEND = _email_backend
-if not EMAIL_HOST or EMAIL_HOST == "localhost":  # noqa: F405
-    raise ImproperlyConfigured("EMAIL_HOST must be set to the production mail host.")
+if _email_backend == "config.email_backends.ResendEmailBackend":
+    # Render's Free web services cannot open outbound SMTP connections, so the
+    # HTTPS API backend is the supported option there.
+    if not RESEND_API_KEY:  # noqa: F405
+        raise ImproperlyConfigured(
+            "RESEND_API_KEY must be set when EMAIL_BACKEND is the Resend HTTPS backend."
+        )
+else:
+    if not EMAIL_HOST or EMAIL_HOST == "localhost":  # noqa: F405
+        raise ImproperlyConfigured("EMAIL_HOST must be set to the production mail host.")
 
 # ---------------------------------------------------------------------------
 # HTTPS / transport security. HSTS preload stays off until it has been verified

@@ -493,7 +493,7 @@ CREATE DATABASE aa_shinaka OWNER aa_shinaka ENCODING 'UTF8';
 ### 3. Build CSS, migrate and run
 
 ```bash
-npm run build:css                 # compiles static/src/app.css -> static/css/app.css
+npm run build:css                 # compiles assets/css/app.css -> static/css/app.css
 uv run python manage.py migrate
 uv run python manage.py seed_data           # baseline records + safe development samples
 uv run python manage.py createsuperuser     # prompts for email (no username)

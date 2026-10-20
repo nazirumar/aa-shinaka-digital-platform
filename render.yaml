@@ -33,6 +33,10 @@
 #
 # This file deploys nothing by itself, changes no DNS and enables no live
 # payment: PAYSTACK_ENABLED and PAYSTACK_LIVE_MODE stay false.
+#
+# For the Render Free plan (no workers/beat, 30-day Postgres, no SMTP) use
+# `render.free.yaml` instead — it is a separate Blueprint so this production
+# definition stays intact. See docs/RENDER_DEPLOYMENT.md.
 # ===========================================================================
 
 databases:
@@ -243,6 +247,9 @@ envVarGroups:
         value: "True"
       - key: DB_SSLMODE_REQUIRE
         value: "true" # Render internal Postgres supports TLS (sslmode=require)
+      # --- Celery ----------------------------------------------------------
+      - key: CELERY_ENABLED
+        value: "true" # paid worker + beat are part of this Blueprint
       # --- Transport security ---------------------------------------------
       - key: DJANGO_SECURE_SSL_REDIRECT
         value: "true"

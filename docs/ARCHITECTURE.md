@@ -273,8 +273,10 @@ templates/
 
 ### 5.1 Static assets / Tailwind pipeline
 
-- Source: `static/src/app.css` (`@import "tailwindcss"` + `@source` globs +
-  brand theme tokens).
+- Source: `assets/css/app.css` (`@import "tailwindcss"` + `@source` globs +
+  brand theme tokens). It lives outside `static/` on purpose: WhiteNoise's
+  manifest storage parses every collected `.css` file and would abort
+  `collectstatic` on the source's `@import "tailwindcss"`.
 - Build: `npm run build:css` → `static/css/app.css` (gitignored, built in dev
   and CI). `npm run watch:css` during development.
 - Django serves hashed static files through WhiteNoise in production

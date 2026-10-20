@@ -1,15 +1,72 @@
-{% extends "base.html" %}
-
-{% block title %}Something went wrong{% endblock %}
-
-{% block content %}
-<div class="mx-auto max-w-md px-4 py-20 text-center">
-  <p class="text-5xl font-semibold text-brand-700">500</p>
-  <h1 class="mt-4 text-xl font-semibold text-stone-900">Something went wrong</h1>
-  <p class="mt-2 text-sm text-stone-600">
-    We could not complete your request. The issue has been logged and our team will look into it.
-    Please try again shortly.
-  </p>
-  <a href="{% url 'core:home' %}" class="mt-6 inline-block rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700">Back home</a>
-</div>
-{% endblock %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex, nofollow">
+  <title>Something went wrong · AA Shinaka</title>
+  <style>
+    :root { color-scheme: light dark; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      background: #faf9f6;
+      color: #292524;
+      font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+    }
+    .panel {
+      width: 100%;
+      max-width: 30rem;
+      text-align: center;
+      background: #ffffff;
+      border: 1px solid #e7e5e4;
+      border-radius: 0.75rem;
+      padding: 2.5rem 1.75rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .code { margin: 0; font-size: 3rem; font-weight: 700; color: #14532d; letter-spacing: -0.02em; }
+    h1 { margin: 1rem 0 0; font-size: 1.25rem; font-weight: 600; }
+    p { margin: 0.5rem 0 0; font-size: 0.875rem; line-height: 1.5; color: #57534e; }
+    a {
+      display: inline-block;
+      margin-top: 1.5rem;
+      padding: 0.5rem 1rem;
+      border-radius: 0.375rem;
+      background: #15803d;
+      color: #ffffff;
+      font-size: 0.875rem;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    a:hover, a:focus { background: #166534; }
+    @media (prefers-color-scheme: dark) {
+      body { background: #0c0a09; color: #f5f5f4; }
+      .panel { background: #1c1917; border-color: #292524; }
+      .code { color: #4ade80; }
+      p { color: #a8a29e; }
+    }
+  </style>
+</head>
+<body>
+  <!--
+    Deliberately self-contained: no template inheritance, no context
+    variables, no Django template tags, no static-file lookups and no database
+    access. A 500 can be caused by a database or static-manifest failure, so
+    this page must render even when every one of those is unavailable.
+  -->
+  <main class="panel">
+    <p class="code">500</p>
+    <h1>Something went wrong</h1>
+    <p>
+      We could not complete your request. The issue has been logged and our team
+      will look into it. Please try again shortly.
+    </p>
+    <a href="/">Back home</a>
+  </main>
+</body>
+</html>

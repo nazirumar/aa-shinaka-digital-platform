@@ -176,7 +176,7 @@ services:
       - media:/app/media
       - staticfiles:/app/staticfiles
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8000/healthz/', timeout=5)"]
+      test: ["CMD", "python", "-c", "import http.client,os,sys; c=http.client.HTTPConnection('127.0.0.1', int(os.environ.get('PORT','8000')), timeout=5); c.request('GET','/healthz/',headers={'X-Forwarded-Proto':'https'}); r=c.getresponse(); sys.exit(0 if r.status==200 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3

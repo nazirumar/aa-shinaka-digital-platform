@@ -21,7 +21,6 @@
    Django apps/templates live outside the default glob, so declare them. */
 @source "../../templates";
 @source "../../apps";
-
 /* AA Shinaka brand tokens. Replace with owner-approved brand values. */
 @theme {
   --color-brand-50: #f0f7f2;

@@ -31,7 +31,7 @@
 
 | Token | Value (to be finalised by owner) |
 |---|---|
-| Primary (brand) | Deep agricultural green ramp `--color-brand-50…950` (see `static/src/app.css`) |
+| Primary (brand) | Deep agricultural green ramp `--color-brand-50…950` (see `assets/css/app.css`) |
 | Neutral | `stone` scale |
 | Accent | Amber (status/warning), red (error) — semantic only |
 | Font | `Inter` (system fallback), headings semibold |
