@@ -46,6 +46,14 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
   and `./start.sh gunicorn config.wsgi:application --config deploy/gunicorn.conf.py`
   (start); `render.free.yaml` is updated to match, and the CI test job builds the
   CSS so the static-file regression test runs against the real asset.
+- **HTTP 500 on registration/login (`/accounts/register/`).** The `rate_limit`
+  decorator's cache lookup raised `redis.exceptions.ConnectionError` when the
+  configured cache was unreachable, so the 500 surfaced on the first public page
+  that touched the cache. `apps/core/ratelimit.py` now **fails open** on any
+  cache error (`hit`, `is_rate_limited`, `reset`): the request is allowed and a
+  warning is logged, so a cache outage can no longer take down the pages the
+  limiter protects. Regression tests cover rendering register/login and creating
+  an account while Redis is unreachable.
 
 - **`collectstatic` failed under production settings**, aborting the container
   entrypoint (and therefore every Render/VPS deploy): WhiteNoise's manifest

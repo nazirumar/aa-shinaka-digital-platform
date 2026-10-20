@@ -37,6 +37,12 @@ See [`RENDER_DEPLOYMENT.md`](RENDER_DEPLOYMENT.md) for the operator walkthrough.
 * `redis>=5.2` (6.4.0 installed) and `celery[redis]>=5.4` are declared, so the
   cache backend and broker both have their driver.
 * **Verified by test**: the cache backend name contains `redis`.
+* **Cache-outage resilience.** A Redis outage previously turned every
+  rate-limited public page into an HTTP 500 (`redis.ConnectionError` escaped the
+  limiter). `apps/core/ratelimit.py` now fails open on any cache error, so
+  register/login/password-reset/contact/MFA/training pages keep serving during a
+  cache blip. **Verified by test**: those pages render `200` and registration
+  succeeds while the cache is unreachable.
 
 ## 3. `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`
 

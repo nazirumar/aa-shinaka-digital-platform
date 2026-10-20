@@ -534,3 +534,59 @@ def test_dashboard_base_renders_with_manifest_storage(owner, tmp_path):
         html = render_to_string("dashboard/base.html", {"user": owner, "request": request})
 
     assert "/static/css/app." in html
+
+
+# ---------------------------------------------------------------------------
+# Cache resilience: a Redis outage must not 500 public, rate-limited pages
+# ---------------------------------------------------------------------------
+# Regression for the live report: GET /accounts/register/ returned HTTP 500
+# because the rate limiter's cache lookup raised redis.ConnectionError when the
+# configured cache was unreachable. A mitigations control must fail open.
+
+
+_UNREACHABLE_REDIS = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": "redis://127.0.0.1:6399/0",  # nothing listens here
+    }
+}
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("url_name", ["accounts:register", "accounts:login"])
+def test_public_pages_render_when_the_cache_is_unreachable(client, url_name):
+    with override_settings(CACHES=_UNREACHABLE_REDIS):
+        response = client.get(reverse(url_name))
+
+    assert response.status_code == 200
+
+
+@pytest.mark.django_db
+def test_registration_post_still_succeeds_when_the_cache_is_unreachable(client):
+    with override_settings(CACHES=_UNREACHABLE_REDIS):
+        response = client.post(
+            reverse("accounts:register"),
+            {
+                "email": "cache-outage@example.com",
+                "first_name": "Cache",
+                "last_name": "Outage",
+                "phone": "08000000000",
+                "password1": "very-secret-pass-42",
+                "password2": "very-secret-pass-42",
+                "accept_terms": "on",
+            },
+        )
+
+    # The account is created and the user is logged in (redirect to dashboard).
+    assert response.status_code == 302
+
+
+def test_rate_limiter_fails_open_on_a_cache_outage():
+    from apps.core.ratelimit import hit, is_rate_limited, reset
+
+    with override_settings(CACHES=_UNREACHABLE_REDIS):
+        # Never raises, never reports the limit as exceeded...
+        assert hit("probe", "ip:1.2.3.4", limit=1, window=60) is False
+        assert is_rate_limited("probe", "ip:1.2.3.4", limit=1, window=60) is False
+        # ...and reset is best-effort rather than fatal.
+        reset("probe", "ip:1.2.3.4")

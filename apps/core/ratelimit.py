@@ -3,15 +3,23 @@
 Uses Django's cache framework (in-process memory in development, Redis in
 production). Deliberately dependency-free — no third-party rate-limit package is
 required for Phase 2.
+
+A rate limiter is a mitigations control, not a correctness one: if the cache is
+unreachable (Redis down, misconfigured ``CACHE_URL``, network blip) the limiter
+**fails open** — the request is allowed and a warning is logged — instead of
+turning every decorated public page into an HTTP 500.
 """
 
 from __future__ import annotations
 
+import logging
 from functools import wraps
 
 from django.core.cache import cache
 from django.http import HttpResponse
 from django.template.response import TemplateResponse
+
+logger = logging.getLogger(__name__)
 
 
 def get_client_ip(request) -> str:
@@ -30,26 +38,45 @@ def hit(scope: str, identifier: str, *, limit: int, window: int) -> bool:
     """Register an attempt and return ``True`` if the limit is now exceeded.
 
     The counter is created on first call and expires after ``window`` seconds.
+    If the cache is unavailable the limiter fails open (returns ``False``) so a
+    cache outage cannot break the pages it protects.
     """
     key = _bucket_key(scope, identifier)
-    if cache.add(key, 1, timeout=window):
-        return 1 > limit
     try:
-        count = cache.incr(key)
-    except ValueError:
-        # Key expired between add() and incr(); restart the window.
-        cache.set(key, 1, timeout=window)
-        count = 1
-    return count > limit
+        if cache.add(key, 1, timeout=window):
+            return 1 > limit
+        try:
+            count = cache.incr(key)
+        except ValueError:
+            # Key expired between add() and incr(); restart the window.
+            cache.set(key, 1, timeout=window)
+            count = 1
+        return count > limit
+    except Exception:  # noqa: BLE001 - cache outage must not break the request
+        logger.warning(
+            "Rate-limit cache unavailable; failing open for scope %r.", scope, exc_info=True
+        )
+        return False
 
 
 def reset(scope: str, identifier: str) -> None:
-    cache.delete(_bucket_key(scope, identifier))
+    try:
+        cache.delete(_bucket_key(scope, identifier))
+    except Exception:  # noqa: BLE001 - best-effort cleanup
+        logger.warning("Rate-limit cache unavailable while resetting %r.", scope, exc_info=True)
 
 
 def is_rate_limited(scope: str, identifier: str, *, limit: int, window: int) -> bool:
-    """Check the current count without incrementing."""
-    return (cache.get(_bucket_key(scope, identifier)) or 0) >= limit
+    """Check the current count without incrementing (fails open on outage)."""
+    try:
+        return (cache.get(_bucket_key(scope, identifier)) or 0) >= limit
+    except Exception:  # noqa: BLE001 - cache outage must not break the request
+        logger.warning(
+            "Rate-limit cache unavailable; reporting unlimited for scope %r.",
+            scope,
+            exc_info=True,
+        )
+        return False
 
 
 def rate_limit_response(request, *, message: str | None = None) -> HttpResponse:
