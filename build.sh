@@ -105,15 +105,4 @@ if missing:
 print(f"[build] OK: manifest has {len(paths)} entries; css/app.css -> {paths['css/app.css']}")
 PY
 
-# ---------------------------------------------------------------------------
-# 6. Database Migrations & Automated Superuser Creation
-# ---------------------------------------------------------------------------
-echo "[build] Running database migrations..."
-DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-config.settings.prod}" \
-  uv run "$PYTHON" manage.py migrate --noinput
-
-echo "[build] Creating superuser (if it doesn't exist)..."
-DJANGO_SETTINGS_MODULE="${DJANGO_SETTINGS_MODULE:-config.settings.prod}" \
-  uv run "$PYTHON" manage.py createsuperuser --noinput || true
-
 echo "[build] Build complete."
