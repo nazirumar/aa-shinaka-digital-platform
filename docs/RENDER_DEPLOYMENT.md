@@ -299,13 +299,53 @@ missing CSS bundle or manifest fails the deploy instead of surfacing as a 500.
 3. **Add a custom domain** in *Settings → Custom Domains*, then add it to
    `DJANGO_ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS` (`https://…`) and set
    `SITE_URL`.
-4. **Create the owner account** from the web service *Shell* tab (paid only):
-   `python manage.py createsuperuser`. On free, create it with a one-off
-   management action or seed command reachable from the app.
+4. **Create the owner account.** On a paid service with a *Shell* tab:
+   `python manage.py createsuperuser`. On **Render Free (no Shell)** use the
+   one-shot bootstrap below.
 5. **Run the verifier** and confirm no `FAIL`:
    ```bash
    python manage.py verify_deployment
    ```
+
+## Create the owner account (no shell required)
+
+Render Free has no Shell tab, and `createsuperuser` is interactive. The project
+ships a one-shot, self-disabling bootstrap that works on any host.
+
+**Option A — management command (any host with a shell / a Render Job):**
+
+```bash
+# Password from the environment so it never lands in shell history:
+DJANGO_SUPERUSER_PASSWORD='<strong-password>' \
+  python manage.py bootstrap_owner --email owner@example.com
+```
+
+The command is idempotent: if a superuser already exists it reports and exits 0
+(add `--fail-if-exists` for a non-zero exit).
+
+**Option B — token-protected HTTP endpoint (Render Free):**
+
+1. In the Render dashboard add two env vars to the web service:
+   - `BOOTSTRAP_OWNER_TOKEN` — a long random string (≥ 32 chars);
+   - `BOOTSTRAP_OWNER_EMAIL` — the owner's login email.
+   Redeploy so they take effect.
+2. Call the endpoint once (the password is sent in the body, never stored):
+
+   ```bash
+   curl -X POST https://<service>.onrender.com/internal/bootstrap-owner/ \
+     -H "X-Bootstrap-Token: $BOOTSTRAP_OWNER_TOKEN" \
+     --data-urlencode "email=owner@example.com" \
+     --data-urlencode "password=<strong-password>"
+   ```
+   On success it returns `201 {"created": true, "email": "owner@example.com"}`.
+3. **Remove `BOOTSTRAP_OWNER_TOKEN`** from the dashboard afterwards. The
+   endpoint is *also* self-disabling — once any superuser exists it returns `409`
+   and can never mint a second owner — but removing the token retires it
+   completely.
+
+**Safety properties:** disabled (`404`) unless the token is set; exact,
+constant-time token match; `POST`-only; a short token is rejected at startup in
+production; and it refuses to run at all once the platform already has an owner.
 
 ## Verification checklist
 

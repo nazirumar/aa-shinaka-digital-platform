@@ -590,3 +590,91 @@ def test_rate_limiter_fails_open_on_a_cache_outage():
         assert is_rate_limited("probe", "ip:1.2.3.4", limit=1, window=60) is False
         # ...and reset is best-effort rather than fatal.
         reset("probe", "ip:1.2.3.4")
+
+
+# ---------------------------------------------------------------------------
+# One-shot owner bootstrap (hosts with no shell)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db
+def test_bootstrap_endpoint_is_disabled_without_a_token(client):
+    with override_settings(BOOTSTRAP_OWNER_TOKEN=""):
+        response = client.post(reverse("core:bootstrap_owner"), HTTP_X_BOOTSTRAP_TOKEN="x")
+
+    assert response.status_code == 404
+
+
+@pytest.mark.django_db
+def test_bootstrap_endpoint_rejects_a_bad_token(client):
+    with override_settings(BOOTSTRAP_OWNER_TOKEN="t" * 40):
+        response = client.post(reverse("core:bootstrap_owner"), HTTP_X_BOOTSTRAP_TOKEN="wrong")
+
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_bootstrap_endpoint_rejects_get(client):
+    with override_settings(BOOTSTRAP_OWNER_TOKEN="t" * 40):
+        response = client.get(reverse("core:bootstrap_owner"), HTTP_X_BOOTSTRAP_TOKEN="t" * 40)
+
+    assert response.status_code == 405
+
+
+@pytest.mark.django_db
+def test_bootstrap_endpoint_creates_the_owner_then_self_disables(client):
+    from django.contrib.auth import get_user_model
+
+    token = "t" * 40
+    payload = {"email": "owner@example.com", "password": "very-secret-pass-42"}
+
+    with override_settings(BOOTSTRAP_OWNER_TOKEN=token):
+        first = client.post(reverse("core:bootstrap_owner"), payload, HTTP_X_BOOTSTRAP_TOKEN=token)
+        second = client.post(reverse("core:bootstrap_owner"), payload, HTTP_X_BOOTSTRAP_TOKEN=token)
+
+    assert first.status_code == 201
+    assert first.json() == {"created": True, "email": "owner@example.com"}
+    # A second call cannot mint another owner.
+    assert second.status_code == 409
+
+    owner = get_user_model().objects.get(email="owner@example.com")
+    assert owner.is_superuser and owner.is_staff
+    assert owner.check_password("very-secret-pass-42")
+
+
+@pytest.mark.django_db
+def test_bootstrap_command_is_idempotent(owner):
+    from io import StringIO
+
+    from django.core.management import call_command
+
+    out = StringIO()
+    call_command("bootstrap_owner", "--email", "another@example.com", stdout=out)
+
+    # `owner` fixture already created a superuser, so nothing new is made.
+    assert "already exists" in out.getvalue()
+    from django.contrib.auth import get_user_model
+
+    assert not get_user_model().objects.filter(email="another@example.com").exists()
+
+
+@pytest.mark.django_db
+def test_bootstrap_command_creates_the_owner():
+    from io import StringIO
+
+    from django.contrib.auth import get_user_model
+    from django.core.management import call_command
+
+    out = StringIO()
+    call_command(
+        "bootstrap_owner",
+        "--email",
+        "root@example.com",
+        "--password",
+        "very-secret-pass-42",
+        stdout=out,
+    )
+
+    user = get_user_model().objects.get(email="root@example.com")
+    assert user.is_superuser and user.is_staff
+    assert "root@example.com" in out.getvalue()

@@ -396,6 +396,13 @@ RESEND_TIMEOUT = env.int("RESEND_TIMEOUT", default=10)
 SCHEDULED_JOBS_TOKEN = env("SCHEDULED_JOBS_TOKEN", default="")
 SCHEDULED_JOBS_MIN_INTERVAL = env.int("SCHEDULED_JOBS_MIN_INTERVAL", default=60)
 
+# A one-shot bootstrap for the first owner account on hosts with no shell (e.g.
+# Render Free). A long random token enables ``POST /internal/bootstrap-owner/``,
+# which creates the superuser named by ``BOOTSTRAP_OWNER_EMAIL`` once and then
+# permanently disables itself as soon as any superuser exists. Empty = disabled.
+BOOTSTRAP_OWNER_TOKEN = env("BOOTSTRAP_OWNER_TOKEN", default="")
+BOOTSTRAP_OWNER_EMAIL = env("BOOTSTRAP_OWNER_EMAIL", default="")
+
 # ---------------------------------------------------------------------------
 # Messages -> Tailwind-friendly CSS classes
 # ---------------------------------------------------------------------------

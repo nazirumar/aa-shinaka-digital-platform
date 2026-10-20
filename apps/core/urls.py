@@ -13,4 +13,10 @@ urlpatterns = [
         views.run_scheduled_jobs,
         name="scheduled_jobs",
     ),
+    # One-shot owner-account bootstrap for hosts with no interactive shell.
+    path(
+        "internal/bootstrap-owner/",
+        views.bootstrap_owner,
+        name="bootstrap_owner",
+    ),
 ]

@@ -66,6 +66,12 @@ _scheduled_jobs_token = env("SCHEDULED_JOBS_TOKEN", default="").strip()
 if _scheduled_jobs_token and len(_scheduled_jobs_token) < 32:
     raise ImproperlyConfigured("SCHEDULED_JOBS_TOKEN must be at least 32 characters when enabled.")
 
+# The owner-bootstrap endpoint creates a superuser, so the token must be strong
+# (it is also self-disabling once a superuser exists — see apps/core).
+_bootstrap_owner_token = env("BOOTSTRAP_OWNER_TOKEN", default="").strip()
+if _bootstrap_owner_token and len(_bootstrap_owner_token) < 32:
+    raise ImproperlyConfigured("BOOTSTRAP_OWNER_TOKEN must be at least 32 characters when enabled.")
+
 # ---------------------------------------------------------------------------
 # Database & cache — least-privilege credentials come from the environment.
 # ---------------------------------------------------------------------------

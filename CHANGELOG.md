@@ -36,6 +36,12 @@ Format loosely follows [Keep a Changelog](https://keepachangelog.com/).
 - **`start.sh`** — Render native-runtime start command. Applies migrations
   (idempotent) and execs Gunicorn so it becomes PID 1 and receives Render's
   SIGTERM.
+- **One-shot owner bootstrap** for hosts with no shell (Render Free):
+  `manage.py bootstrap_owner` and a token-protected, self-disabling
+  `POST /internal/bootstrap-owner/`. Disabled unless `BOOTSTRAP_OWNER_TOKEN`
+  (≥ 32 chars in production) is set, requires an exact constant-time match, is
+  `POST`-only, refuses once any superuser exists, and creates the superuser
+  idempotently via the existing `create_superuser` manager.
 
 ### Fixed
 

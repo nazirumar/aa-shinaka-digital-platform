@@ -88,3 +88,45 @@ def run_scheduled_jobs(request: HttpRequest) -> JsonResponse:
 
     result = run_all()
     return JsonResponse(result, status=207 if result["failed"] else 200)
+
+
+@csrf_exempt
+@require_POST
+def bootstrap_owner(request: HttpRequest) -> JsonResponse:
+    """One-shot owner-account creation for hosts with no shell (Render Free).
+
+    Disabled (404) unless ``BOOTSTRAP_OWNER_TOKEN`` is configured, and — as a
+    second, independent guard — permanently disabled as soon as any superuser
+    exists. Requires an exact, constant-time token match.
+    """
+    expected = str(getattr(settings, "BOOTSTRAP_OWNER_TOKEN", "") or "")
+    if not expected:
+        raise Http404
+
+    provided = request.headers.get("X-Bootstrap-Token", "")
+    if not provided or not secrets.compare_digest(
+        provided.encode("utf-8"), expected.encode("utf-8")
+    ):
+        logger.warning("Rejected owner-bootstrap request with an invalid token.")
+        return JsonResponse({"detail": "Forbidden."}, status=403)
+
+    from .owner_bootstrap import BootstrapError, ensure_owner, owner_exists
+
+    if owner_exists():
+        return JsonResponse({"detail": "An owner account already exists."}, status=409)
+
+    email = request.POST.get("email") or str(getattr(settings, "BOOTSTRAP_OWNER_EMAIL", "") or "")
+    password = request.POST.get("password") or str(
+        getattr(settings, "DJANGO_SUPERUSER_PASSWORD", "") or ""
+    )
+    try:
+        result = ensure_owner(
+            email=email,
+            password=password,
+            first_name=request.POST.get("first_name", "Owner"),
+            last_name=request.POST.get("last_name", ""),
+        )
+    except BootstrapError as exc:
+        return JsonResponse({"detail": str(exc)}, status=400)
+
+    return JsonResponse({"created": result.created, "email": result.email}, status=201)
