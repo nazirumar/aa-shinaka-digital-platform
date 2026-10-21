@@ -14,6 +14,7 @@ is shown instead of fabricated prices, origins or business claims.
 {% featured_products as products %}
 {% featured_testimonials as testimonials %}
 {% latest_posts as posts %}
+{% if banners|length > 1 %}{% include "components/hero_carousel.html" %}{% endif %}
 
 {% url 'cms:service_list' as services_url %}
 {% url 'cms:contact' as contact_url %}
@@ -62,52 +63,114 @@ is shown instead of fabricated prices, origins or business claims.
 {% translate "AA Shinaka supports the agricultural value chain through consultancy, farming services, marketing, storage, export, product sales and training." as t_about_default %}
 
 {# ------------------------------------------------------------------ Hero #}
-<section class="relative overflow-hidden bg-forest text-cream">
-  <div class="absolute inset-0 opacity-20" aria-hidden="true">
-    <div class="h-full w-full bg-[radial-gradient(circle_at_top_right,_var(--color-harvest),_transparent_55%)]"></div>
+{# Animated, autoplaying banner carousel.  #}
+{# Alpine owns the slide index; CSS owns the motion (see assets/css/app.css). #}
+{# Autoplay pauses on hover/focus/hidden-tab and stops for good once the       #}
+{# visitor takes control, so a manual choice is never overridden.             #}
+<section class="relative overflow-hidden bg-forest text-cream"
+         {% if banners|length > 1 %}
+         x-data="heroCarousel({{ banners|length }})"
+         @mouseenter="pause()" @mouseleave="resume()"
+         @focusin="pause()" @focusout="resume()"
+         @keydown.arrow-left.window="go(prev())" @keydown.arrow-right.window="go(next())"
+         {% else %}
+         x-data="{ }"
+         {% endif %}>
+  <div class="pointer-events-none absolute inset-0" aria-hidden="true">
+    <div class="hero-glow h-full w-full bg-[radial-gradient(circle_at_top_right,_var(--color-harvest),_transparent_55%)]"></div>
   </div>
+
   {% if banners %}
-    <div class="relative mx-auto max-w-7xl px-4 py-20 sm:py-28" x-data="{ slide: 0 }">
-      {% for banner in banners %}
-        <div x-show="slide === {{ forloop.counter0 }}" {% if not forloop.first %}x-cloak{% endif %} class="grid items-center gap-10 lg:grid-cols-2">
-          <div>
-            {% if banner.eyebrow %}<p class="text-sm font-semibold uppercase tracking-wider text-harvest">{{ banner.eyebrow }}</p>{% endif %}
-            <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{{ banner.title }}</h1>
-            {% if banner.subtitle %}<p class="mt-4 max-w-xl text-lg text-cream/85">{{ banner.subtitle }}</p>{% endif %}
-            <div class="mt-8 flex flex-wrap gap-3">
-              {% if banner.cta_label %}{% include "components/button.html" with label=banner.cta_label href=banner.cta_url|default:services_url variant="secondary" size="lg" %}{% endif %}
-              {% if banner.secondary_cta_label %}{% include "components/button.html" with label=banner.secondary_cta_label href=banner.secondary_cta_url|default:contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}{% endif %}
+    <div class="relative mx-auto max-w-7xl px-4 py-20 sm:py-28">
+      <div class="grid items-center gap-10 lg:grid-cols-2">
+        {% for banner in banners %}
+          <div x-show="slide === {{ forloop.counter0 }}"
+               {% if not forloop.first %}x-cloak{% endif %}
+               x-transition:enter="hero-fade-enter"
+               x-transition:enter-start="hero-fade-enter-start"
+               x-transition:enter-end="hero-fade-enter-end"
+               x-transition:leave="hero-fade-leave"
+               x-transition:leave-start="hero-fade-leave-start"
+               x-transition:leave-end="hero-fade-leave-end"
+               class="hero-slide grid items-center gap-10 lg:grid-cols-2">
+            <div>
+              {% if banner.eyebrow %}
+                <p class="hero-anim text-sm font-semibold uppercase tracking-wider text-harvest"
+                   style="--hero-delay: 0ms">{{ banner.eyebrow }}</p>
+              {% endif %}
+              <h1 class="hero-anim mt-3 text-4xl font-bold tracking-tight sm:text-5xl"
+                  style="--hero-delay: 90ms">{{ banner.title }}</h1>
+              {% if banner.subtitle %}
+                <p class="hero-anim mt-4 max-w-xl text-lg text-cream/85"
+                   style="--hero-delay: 180ms">{{ banner.subtitle }}</p>
+              {% endif %}
+              <div class="mt-8 flex flex-wrap gap-3">
+                {% if banner.cta_label %}
+                  <span class="hero-anim inline-flex" style="--hero-delay: 270ms">
+                    {% include "components/button.html" with label=banner.cta_label href=banner.cta_url|default:services_url variant="secondary" size="lg" %}
+                  </span>
+                {% endif %}
+                {% if banner.secondary_cta_label %}
+                  <span class="hero-anim inline-flex" style="--hero-delay: 340ms">
+                    {% include "components/button.html" with label=banner.secondary_cta_label href=banner.secondary_cta_url|default:contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}
+                  </span>
+                {% endif %}
+              </div>
+            </div>
+            <div class="hero-anim-image" style="--hero-delay: 140ms">
+              {% if banner.image %}
+                {% include "components/lazy_image.html" with image=banner.image alt=banner.title ratio="h-80 w-full rounded-2xl object-cover shadow-2xl" eager=True %}
+              {% else %}
+                <div class="h-80 rounded-2xl border border-cream/20 bg-forest-light/40"></div>
+              {% endif %}
             </div>
           </div>
-          <div>
-            {% if banner.image %}
-              {% include "components/lazy_image.html" with image=banner.image alt=banner.title ratio="h-80 w-full rounded-2xl object-cover shadow-2xl" eager=True %}
-            {% else %}
-              <div class="h-80 rounded-2xl border border-cream/20 bg-forest-light/40"></div>
-            {% endif %}
-          </div>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
+
       {% if banners|length > 1 %}
-        <div class="mt-8 flex gap-2" role="tablist" aria-label="{% translate 'Hero slides' %}">
-          {% for banner in banners %}
-            <button type="button" role="tab" :aria-selected="slide === {{ forloop.counter0 }}" @click="slide = {{ forloop.counter0 }}" class="h-2.5 w-8 rounded-full" :class="slide === {{ forloop.counter0 }} ? 'bg-harvest' : 'bg-cream/40'"></button>
-          {% endfor %}
+        {# Controls: arrows flank the dot indicators. #}
+        <div class="mt-10 flex items-center justify-center gap-4">
+          <button type="button"
+                  class="grid h-10 w-10 place-items-center rounded-full border border-cream/30 text-cream transition-colors hover:border-harvest hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-harvest/60"
+                  @click="go(prev())"
+                  aria-label="{% translate 'Previous slide' %}">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5 8.25 12l7.5-7.5"/></svg>
+          </button>
+
+          <div class="flex items-center gap-2" role="tablist" aria-label="{% translate 'Hero slides' %}">
+            {% for banner in banners %}
+              <button type="button" role="tab"
+                      :aria-selected="slide === {{ forloop.counter0 }}"
+                      :aria-current="slide === {{ forloop.counter0 }}"
+                      @click="go({{ forloop.counter0 }})"
+                      class="h-2.5 rounded-full transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-harvest/60"
+                      :class="slide === {{ forloop.counter0 }} ? 'w-8 bg-harvest' : 'w-2.5 bg-cream/40 hover:bg-cream/70'"
+                      aria-label="{{ banner.title }}"></button>
+            {% endfor %}
+          </div>
+
+          <button type="button"
+                  class="grid h-10 w-10 place-items-center rounded-full border border-cream/30 text-cream transition-colors hover:border-harvest hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-harvest/60"
+                  @click="go(next())"
+                  aria-label="{% translate 'Next slide' %}">
+            <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5"/></svg>
+          </button>
         </div>
       {% endif %}
     </div>
   {% else %}
     <div class="relative mx-auto grid max-w-7xl items-center gap-10 px-4 py-20 sm:py-28 lg:grid-cols-2">
       <div>
-        <p class="text-sm font-semibold uppercase tracking-wider text-harvest">{% translate "Agriculture, end to end" %}</p>
-        <h1 class="mt-3 text-4xl font-bold tracking-tight sm:text-5xl">{% translate "Nigeria's agricultural value chain, in one platform." %}</h1>
-        <p class="mt-4 max-w-xl text-lg text-cream/85">{% translate "Consultancy, farming, marketing, storage, export, agricultural product sales and training — delivered by AA Shinaka." %}</p>
+        <p class="hero-anim text-sm font-semibold uppercase tracking-wider text-harvest" style="--hero-delay: 0ms">{% translate "Agriculture, end to end" %}</p>
+        <h1 class="hero-anim mt-3 text-4xl font-bold tracking-tight sm:text-5xl" style="--hero-delay: 90ms">{% translate "Nigeria's agricultural value chain, in one platform." %}</h1>
+        <p class="hero-anim mt-4 max-w-xl text-lg text-cream/85" style="--hero-delay: 180ms">{% translate "Consultancy, farming, marketing, storage, export, agricultural product sales and training — delivered by AA Shinaka." %}</p>
         <div class="mt-8 flex flex-wrap gap-3">
-          {% include "components/button.html" with label=t_explore href=services_url variant="secondary" size="lg" %}
-          {% include "components/button.html" with label=t_talk href=contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}
+          <span class="hero-anim inline-flex" style="--hero-delay: 270ms">{% include "components/button.html" with label=t_explore href=services_url variant="secondary" size="lg" %}</span>
+          <span class="hero-anim inline-flex" style="--hero-delay: 340ms">{% include "components/button.html" with label=t_talk href=contact_url variant="outline" size="lg" extra_class="border-cream text-cream hover:bg-white/10" %}</span>
         </div>
       </div>
-      <div class="h-80 rounded-2xl border border-cream/20 bg-forest-light/40"></div>
+      <div class="hero-anim-image h-80 rounded-2xl border border-cream/20 bg-forest-light/40" style="--hero-delay: 140ms"></div>
     </div>
   {% endif %}
 </section>

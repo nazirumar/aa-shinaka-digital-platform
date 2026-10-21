@@ -2,11 +2,15 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from django.urls import reverse
-from django.utils import translation
+from django.utils import timezone, translation
 
-from apps.cms.models import BlogPost, PublishStatus, ServicePage
+from apps.cms.models import BlogPost, HeroBanner, PublishStatus, ServicePage
+
+REPO = Path(__file__).resolve().parents[1]
 
 pytestmark = pytest.mark.django_db
 
@@ -37,6 +41,21 @@ def make_post(*, title="Harvest update", status=PublishStatus.PUBLISHED, **kwarg
         body=kwargs.pop("body", "<p>Full article body.</p>"),
         **kwargs,
     )
+
+
+def make_banner(*, title="Fresh from the farm", sort_order=0, **kwargs) -> HeroBanner:
+    return HeroBanner.objects.create(
+        title=title,
+        status=PublishStatus.PUBLISHED,
+        published_at=timezone.now(),
+        sort_order=sort_order,
+        **kwargs,
+    )
+
+
+def _hero_script() -> str:
+    """The carousel behaviour source, for asserting on the JS contract."""
+    return (REPO / "templates" / "components" / "hero_carousel.html").read_text(encoding="utf-8")
 
 
 # ---------------------------------------------------------------------------
@@ -81,6 +100,105 @@ def test_homepage_shows_product_empty_states_when_catalogue_absent(client):
     assert response.status_code == 200
     # Catalogue ships in a later phase, so previews must degrade gracefully.
     assert b"catalogue is live" in response.content or b"on the way" in response.content
+
+
+# ---------------------------------------------------------------------------
+# Hero banner carousel
+# ---------------------------------------------------------------------------
+
+
+def test_single_banner_renders_without_carousel_controls(client):
+    make_banner(title="Only slide")
+
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert "Only slide" in content
+    # One slide needs no arrows, dots or autoplay wiring.
+    assert "heroCarousel(" not in content
+    assert "Previous slide" not in content
+    assert "hero-anim" in content
+
+
+def test_multiple_banners_render_a_carousel(client):
+    make_banner(title="First slide", sort_order=0)
+    make_banner(title="Second slide", sort_order=1)
+
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert "First slide" in content
+    assert "Second slide" in content
+    assert "heroCarousel(2)" in content
+    assert "Previous slide" in content
+    assert "Next slide" in content
+
+
+def test_carousel_only_autoplays_slides_that_can_change(client):
+    """Autoplay must be wired only when there is more than one slide."""
+    make_banner(title="Lonely", sort_order=0)
+
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert "heroCarousel" not in content
+
+
+def test_carousel_pauses_on_hover_and_focus(client):
+    make_banner(title="A", sort_order=0)
+    make_banner(title="B", sort_order=1)
+
+    content = client.get(reverse("core:home")).content.decode()
+
+    # Autoplay must yield to the visitor.
+    assert '@mouseenter="pause()"' in content
+    assert '@mouseleave="resume()"' in content
+    assert '@focusin="pause()"' in content
+
+
+def test_carousel_dots_are_labelled_and_keyboard_reachable(client):
+    make_banner(title="Alpha slide", sort_order=0)
+    make_banner(title="Beta slide", sort_order=1)
+
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert 'role="tablist"' in content
+    assert 'aria-label="Alpha slide"' in content
+    assert 'aria-label="Beta slide"' in content
+    for label in ("Previous slide", "Next slide"):
+        assert f'aria-label="{label}"' in content
+
+
+def test_carousel_animations_respect_reduced_motion(client):
+    """The stylesheet must neutralise every hero animation when the visitor has
+    asked for reduced motion (docs/UI_UX_SPEC.md)."""
+    css = (REPO / "assets" / "css" / "app.css").read_text(encoding="utf-8")
+
+    assert "prefers-reduced-motion: reduce" in css
+    reduced_block = css.split("prefers-reduced-motion: reduce", 1)[1]
+    for animation in (".hero-anim", ".hero-anim-image", ".hero-glow"):
+        assert animation in reduced_block
+
+
+def test_carousel_disables_autoplay_for_reduced_motion(client):
+    """The behaviour, not just the CSS, must stand down."""
+    script = _hero_script()
+
+    assert "prefers-reduced-motion: reduce" in script
+    # Autoplay is gated behind the preference.
+    assert "this.reduced || this.paused" in script
+
+
+def test_carousel_stops_autoplay_once_the_visitor_takes_control(client):
+    script = _hero_script()
+
+    assert "settled = true" in script
+
+
+def test_hero_markup_leaves_no_template_comment(client):
+    make_banner(title="A", sort_order=0)
+    make_banner(title="B", sort_order=1)
+
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert "{#" not in content
 
 
 def test_fallback_navigation_links_are_present(client):

@@ -1,0 +1,155 @@
+{% comment %}
+Homepage hero carousel behaviour.
+
+Registered on `alpine:init` so the component is available before Alpine walks
+the DOM. The template supplies only the slide count; all timing and gesture
+logic lives here so the markup stays declarative.
+
+Guarantees
+  * Autoplay never fights the visitor: hovering, focusing, changing tabs or
+    touching the banner pauses it, and any manual choice stops it for good.
+  * `prefers-reduced-motion: reduce` disables autoplay and the transitions
+    entirely (the CSS neutralises the animations).
+  * No dependencies — plain Alpine + IntersectionObserver + touch events.
+{% endcomment %}
+<script>
+  document.addEventListener('alpine:init', function () {
+    Alpine.data('heroCarousel', function (count) {
+      return {
+        slide: 0,
+        count: count,
+        timer: null,
+        paused: false,
+        settled: false,
+        reduced: false,
+        interval: 7000,
+
+        init: function () {
+          if (this.count < 2) return;
+
+          // Honour the OS motion preference, and react if it changes.
+          var mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+          this.reduced = mq.matches;
+          var self = this;
+          var onChange = function (event) {
+            self.reduced = event.matches;
+            if (self.reduced) {
+              self.stop();
+            } else {
+              self.resume();
+            }
+          };
+          if (mq.addEventListener) {
+            mq.addEventListener('change', onChange);
+          } else if (mq.addListener) {
+            mq.addListener(onChange);
+          }
+
+          // Only advance while the banner is actually on screen.
+          var element = this.$el;
+          if (element && 'IntersectionObserver' in window) {
+            new IntersectionObserver(
+              function (entries) {
+                entries.forEach(function (entry) {
+                  if (entry.isIntersecting) {
+                    self.resume();
+                  } else {
+                    self.pause();
+                  }
+                });
+              },
+              { threshold: 0.25 },
+            ).observe(element);
+          }
+
+          // A hidden tab must not keep cycling.
+          document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+              self.pause();
+            } else {
+              self.resume();
+            }
+          });
+
+          this.bindSwipe(element);
+          this.resume();
+        },
+
+        bindSwipe: function (element) {
+          if (!element) return;
+          var startX = null;
+          var startY = null;
+          var self = this;
+
+          element.addEventListener(
+            'touchstart',
+            function (event) {
+              if (event.touches.length !== 1) return;
+              startX = event.touches[0].clientX;
+              startY = event.touches[0].clientY;
+            },
+            { passive: true },
+          );
+
+          element.addEventListener(
+            'touchend',
+            function (event) {
+              if (startX === null) return;
+              var touch = event.changedTouches[0];
+              var dx = touch.clientX - startX;
+              var dy = touch.clientY - startY;
+              startX = null;
+              startY = null;
+
+              // Ignore vertical scrolls and short taps.
+              if (Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy)) return;
+              self.go(dx < 0 ? self.next() : self.prev());
+            },
+            { passive: true },
+          );
+        },
+
+        next: function () {
+          return (this.slide + 1) % this.count;
+        },
+
+        prev: function () {
+          return (this.slide - 1 + this.count) % this.count;
+        },
+
+        go: function (index) {
+          if (index === this.slide) return;
+          this.slide = index;
+          // A deliberate choice wins: stop autoplay permanently.
+          this.settled = true;
+          this.stop();
+        },
+
+        start: function () {
+          if (this.timer || this.reduced || this.paused || this.count < 2) return;
+          var self = this;
+          this.timer = window.setInterval(function () {
+            self.slide = self.next();
+          }, this.interval);
+        },
+
+        stop: function () {
+          if (this.timer) {
+            window.clearInterval(this.timer);
+            this.timer = null;
+          }
+        },
+
+        pause: function () {
+          this.paused = true;
+          this.stop();
+        },
+
+        resume: function () {
+          this.paused = false;
+          if (!this.settled) this.start();
+        },
+      };
+    });
+  });
+</script>

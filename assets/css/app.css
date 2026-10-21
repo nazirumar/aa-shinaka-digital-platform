@@ -92,6 +92,109 @@
   }
 }
 
+/* ---------------------------------------------------------------------------
+   Homepage hero.
+   Alpine drives which slide is active; these rules provide the motion. Every
+   animation is declared here (not inline) so `prefers-reduced-motion` can
+   neutralise all of them in one place.
+   --------------------------------------------------------------------------- */
+
+/* Slide crossfade: the outgoing slide is taken out of flow so the incoming one
+   does not jump, then both animate opacity. */
+.hero-slide {
+  grid-column: 1 / -1;
+  grid-row: 1;
+}
+
+.hero-fade-enter {
+  transition:
+    opacity 600ms ease,
+    transform 600ms ease;
+}
+.hero-fade-enter-start {
+  opacity: 0;
+  transform: translateY(0.75rem);
+}
+.hero-fade-enter-end {
+  opacity: 1;
+  transform: translateY(0);
+}
+.hero-fade-leave {
+  transition:
+    opacity 400ms ease,
+    transform 400ms ease;
+}
+.hero-fade-leave-start {
+  opacity: 1;
+  transform: translateY(0);
+}
+.hero-fade-leave-end {
+  opacity: 0;
+  transform: translateY(-0.5rem);
+}
+
+/* Per-element entrance, staggered by the inline `--hero-delay` custom property. */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translateY(1rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes hero-image-in {
+  from {
+    opacity: 0;
+    transform: scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* Re-triggered on every slide change because the key changes with `:key`. */
+.hero-anim {
+  animation: hero-rise 620ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--hero-delay, 0ms);
+}
+.hero-anim-image {
+  animation: hero-image-in 700ms cubic-bezier(0.22, 1, 0.36, 1) both;
+  animation-delay: var(--hero-delay, 0ms);
+}
+
+/* Slow drift on the decorative radial gradient behind the hero. */
+@keyframes hero-glow {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+    opacity: 0.2;
+  }
+  50% {
+    transform: translate3d(-3%, 2%, 0) scale(1.12);
+    opacity: 0.3;
+  }
+}
+.hero-glow {
+  animation: hero-glow 18s ease-in-out infinite;
+}
+
+/* Respect the visitor's system preference: no motion, no autoplay surface. */
+@media (prefers-reduced-motion: reduce) {
+  .hero-fade-enter,
+  .hero-fade-leave {
+    transition: none;
+  }
+  .hero-anim,
+  .hero-anim-image,
+  .hero-glow {
+    animation: none;
+  }
+}
+
 /* Dashboard sidebar navigation. Plain CSS so the rules are always emitted,
    independent of Tailwind's content-based pruning; theme colours come from
    the `@theme` tokens declared above. */
