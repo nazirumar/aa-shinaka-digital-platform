@@ -92,3 +92,59 @@ def test_customer_account_base_renders_nav(client, customer):
 
     assert response.status_code == 200
     assert b'aria-label="Account sections"' in response.content
+
+
+# ---------------------------------------------------------------------------
+# Site header (navbar) — responsive + no-JS mobile menu
+# ---------------------------------------------------------------------------
+
+
+def test_navbar_mobile_toggle_works_without_javascript(client):
+    """The hamburger must be a plain checkbox/label pair so it opens even when
+    the Alpine CDN is unreachable — and the CSS rule must be able to reach the
+    panel, which requires the checkbox and the panel to share a parent."""
+    content = client.get(reverse("core:home")).content.decode()
+
+    checkbox = content.index('id="nav-toggle"')
+    label = content.index('for="nav-toggle"')
+    panel = content.index('id="mobile-nav"')
+
+    # The checkbox must precede both its label and the panel, so the general
+    # sibling selector `#nav-toggle:checked ~ #mobile-nav` can match.
+    assert checkbox < label < panel
+    assert 'type="checkbox"' in content[checkbox - 60 : checkbox + 40]
+    assert "#nav-toggle:checked ~ #mobile-nav" in content
+
+
+def test_navbar_mobile_panel_is_hidden_by_default(client):
+    """The panel starts hidden and is never shown on desktop."""
+    content = client.get(reverse("core:home")).content.decode()
+
+    panel_tag = content[content.index('<nav id="mobile-nav"') :][:400]
+
+    assert "hidden" in panel_tag
+    assert "lg:hidden" in panel_tag
+
+
+def test_navbar_avoids_ios_breaking_sticky_blur(client):
+    """`backdrop-blur` on the sticky header breaks tap hit-testing in iOS Safari."""
+    content = client.get(reverse("core:home")).content.decode()
+    header_tag = content[content.index("<header") : content.index(">", content.index("<header"))]
+
+    assert "backdrop-blur" not in header_tag
+
+
+def test_navbar_brand_text_is_bounded(client):
+    """A long CMS site name/tagline must not be able to break the header layout."""
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert "truncate" in content
+    assert "min-w-0" in content
+
+
+def test_navbar_leaves_no_template_comment_in_output(client):
+    """Django's `{# ... #}` is single-line only; a multi-line one renders as
+    literal text. Guard against that regressing."""
+    content = client.get(reverse("core:home")).content.decode()
+
+    assert "{#" not in content

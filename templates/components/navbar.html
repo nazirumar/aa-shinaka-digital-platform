@@ -1,25 +1,55 @@
 {% load static i18n %}
-<header class="sticky top-0 z-40 border-b border-stone-200/80 bg-white/85 shadow-sm backdrop-blur-md transition-colors dark:border-stone-800 dark:bg-stone-900/85" x-data="{ open: false }">
+{% comment %}
+Site header.
+
+The mobile menu is driven by a hidden checkbox (`#nav-toggle`) so it still opens
+when the Alpine CDN is unreachable — Alpine only *enhances* it (escape-to-close,
+and unchecking on link taps). The checkbox and the panel are siblings inside
+`<header>`, so a plain CSS rule does the work with zero JavaScript.
+
+`backdrop-blur` is deliberately not used here: blur on a sticky element breaks
+tap hit-testing in iOS Safari.
+{% endcomment %}
+<header class="sticky top-0 z-40 border-b border-stone-200/80 bg-white/95 shadow-sm transition-colors dark:border-stone-800 dark:bg-stone-900/95"
+        x-data="{}"
+        @keydown.escape.window="document.getElementById('nav-toggle').checked = false">
+  {% comment %}
+  CSS-only fallback. The checkbox sits here — a direct child of <header>, right
+  before the row that holds its <label> and before #mobile-nav — so a general
+  sibling selector can reach both, with no JavaScript at all.
+  {% endcomment %}
+  <input id="nav-toggle" type="checkbox" class="sr-only" aria-label="{% trans 'Toggle navigation' %}" aria-controls="mobile-nav">
+  <style>
+    /* Only below the lg breakpoint, and only when the checkbox is checked. */
+    @media (max-width: 1023.98px) {
+      #nav-toggle:checked ~ #mobile-nav { display: block; }
+    }
+    /* Keyboard focus lands on the visually-hidden checkbox, so surface it as a
+       ring on the visible hamburger label instead. */
+    #nav-toggle:focus-visible ~ div label[for="nav-toggle"] { outline: 2px solid currentColor; outline-offset: 2px; }
+  </style>
   <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
     {# Brand — uses the official logo if uploaded, otherwise a neutral text mark. #}
-    <a href="{% url 'core:home' %}" class="flex items-center gap-2.5 rounded-lg font-semibold text-forest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40 dark:text-white">
+    <a href="{% url 'core:home' %}" class="flex min-w-0 items-center gap-2.5 rounded-lg font-semibold text-forest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40 dark:text-white">
       {% if site.logo %}
-        <img src="{{ site.logo.file.url }}" alt="{{ site.logo.alt_text|default:site.site_name }}" class="h-10 w-auto">
+        <img src="{{ site.logo.file.url }}" alt="{{ site.logo.alt_text|default:site.site_name }}" class="h-10 w-auto max-w-[10rem] object-contain">
       {% else %}
-        <span class="grid h-10 w-10 place-items-center rounded-xl bg-forest text-sm font-bold tracking-wide text-white shadow-sm dark:bg-brand-600" aria-hidden="true">AS</span>
+        <span class="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-forest text-sm font-bold tracking-wide text-white shadow-sm dark:bg-brand-600" aria-hidden="true">AS</span>
       {% endif %}
-      <span class="leading-tight">
-        <span class="block text-base">{{ site.site_name|default:"AA Shinaka" }}</span>
-        <span class="block text-xs font-normal text-stone-500 dark:text-stone-400">{{ site.tagline|default:"Digital Business Platform" }}</span>
+      <span class="min-w-0 leading-tight">
+        <span class="block truncate text-base">{{ site.site_name|default:"AA Shinaka" }}</span>
+        {% if site.tagline and site.tagline|lower != site.site_name|lower %}
+          <span class="hidden truncate text-xs font-normal text-stone-500 dark:text-stone-400 sm:block">{{ site.tagline }}</span>
+        {% endif %}
       </span>
     </a>
 
     {# Primary navigation #}
-    <nav class="hidden items-center gap-1 lg:flex" aria-label="{% trans 'Primary' %}">
+    <nav class="hidden min-w-0 items-center gap-0.5 lg:flex" aria-label="{% trans 'Primary' %}">
       {% if header_nav %}
         {% for item in header_nav %}
           <div class="relative" x-data="{ sub: false }" @mouseenter="sub = true" @mouseleave="sub = false">
-            <a href="{{ item.resolve_url }}" class="inline-flex items-center gap-1 rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" {% if item.opens_new_tab %}target="_blank" rel="noopener"{% endif %} {% if item.children.all %}@focus="sub = true" :aria-expanded="sub"{% endif %}>
+            <a href="{{ item.resolve_url }}" class="inline-flex items-center gap-1 whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" {% if item.opens_new_tab %}target="_blank" rel="noopener"{% endif %} {% if item.children.all %}@focus="sub = true" :aria-expanded="sub"{% endif %}>
               {{ item.label }}
               {% if item.children.all %}
                 <svg class="h-4 w-4 text-stone-400 dark:text-stone-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
@@ -37,91 +67,103 @@
           </div>
         {% endfor %}
       {% else %}
-        <a href="{% url 'core:home' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Home" %}</a>
-        <a href="{% url 'cms:service_list' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Services" %}</a>
-        <a href="{% url 'training:training_home' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Training" %}</a>
-        <a href="{% url 'cms:about' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "About" %}</a>
-        <a href="{% url 'cms:blog_list' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "News" %}</a>
-        <a href="{% url 'cms:faq_list' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "FAQs" %}</a>
-        <a href="{% url 'cms:contact' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Contact" %}</a>
+        <a href="{% url 'core:home' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Home" %}</a>
+        <a href="{% url 'cms:service_list' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Services" %}</a>
+        <a href="{% url 'training:training_home' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Training" %}</a>
+        <a href="{% url 'cms:about' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "About" %}</a>
+        <a href="{% url 'cms:blog_list' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "News" %}</a>
+        <a href="{% url 'cms:faq_list' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "FAQs" %}</a>
+        <a href="{% url 'cms:contact' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Contact" %}</a>
       {% endif %}
     </nav>
 
     {# Desktop actions #}
-    <div class="hidden items-center gap-1.5 lg:flex">
-      <a href="{% url 'orders:cart' %}" class="group relative inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" aria-label="{% trans 'Cart' %}" title="{% trans 'Cart' %}">
+    <div class="hidden shrink-0 items-center gap-1 lg:flex">
+      <a href="{% url 'orders:cart' %}" class="group relative inline-flex items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" aria-label="{% trans 'Cart' %}" title="{% trans 'Cart' %}">
         <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
         <span class="hidden xl:inline">{% trans "Cart" %}</span>
         {% if cart_item_count %}<span class="grid h-5 min-w-5 place-items-center rounded-full bg-forest px-1.5 text-xs font-semibold leading-none text-white">{{ cart_item_count }}</span>{% endif %}
       </a>
       {% include "components/theme_toggle.html" %}
-      {% include "components/language_switcher.html" %}
+
+      {# Language + notifications only appear once there is genuinely room. #}
+      <div class="hidden xl:block">{% include "components/language_switcher.html" %}</div>
+
       {% if user.is_authenticated %}
-        <a href="{% url 'notifications:center' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" aria-label="{% trans 'Notifications' %}" title="{% trans 'Notifications' %}">
+        <a href="{% url 'notifications:center' %}" class="relative hidden rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40 xl:inline-flex" aria-label="{% trans 'Notifications' %}" title="{% trans 'Notifications' %}">
           <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
           {% if unread_notifications_count %}<span class="absolute right-0.5 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-gold-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">{{ unread_notifications_count }}</span>{% endif %}
         </a>
-        <a href="{% url 'account:dashboard' %}" class="inline-flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" aria-label="{% trans 'My account' %}" title="{% trans 'My account' %}">
-          <svg class="h-5 w-5" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg>
+        <a href="{% url 'account:dashboard' %}" class="inline-flex items-center gap-2 rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40" aria-label="{% trans 'My account' %}" title="{% trans 'My account' %}">
+          <svg class="h-5 w-5 shrink-0" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0A17.933 17.933 0 0 1 12 21.75c-2.676 0-5.216-.584-7.499-1.632Z"/></svg>
           <span class="hidden xl:inline">{% trans "My account" %}</span>
         </a>
-        {% if user.is_staff %}<a href="{% url 'dashboard:home' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40">{% trans "Dashboard" %}</a>{% endif %}
+        {% if user.is_staff %}<a href="{% url 'dashboard:home' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40">{% trans "Dashboard" %}</a>{% endif %}
         <form method="post" action="{% url 'accounts:logout' %}">
           {% csrf_token %}
-          <button type="submit" class="rounded-full border border-stone-300 px-4 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-forest hover:bg-brand-50 hover:text-forest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40 dark:border-stone-600 dark:text-stone-200 dark:hover:border-brand-400 dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Sign out" %}</button>
+          <button type="submit" class="whitespace-nowrap rounded-full border border-stone-300 px-3 py-2 text-sm font-medium text-stone-700 transition-colors hover:border-forest hover:bg-brand-50 hover:text-forest focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40 dark:border-stone-600 dark:text-stone-200 dark:hover:border-brand-400 dark:hover:bg-stone-800 dark:hover:text-white">{% trans "Sign out" %}</button>
         </form>
       {% else %}
-        <a href="{% url 'accounts:login' %}" class="rounded-full px-3 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40">{% trans "Sign in" %}</a>
-        <a href="{% url 'accounts:register' %}" class="rounded-full bg-forest px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-forest-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40">{% trans "Create account" %}</a>
+        <a href="{% url 'accounts:login' %}" class="whitespace-nowrap rounded-full px-2.5 py-2 text-sm font-medium text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40">{% trans "Sign in" %}</a>
+        <a href="{% url 'accounts:register' %}" class="whitespace-nowrap rounded-full bg-forest px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-forest-light focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-leaf/40">{% trans "Create account" %}</a>
       {% endif %}
     </div>
 
     {# Mobile quick actions + menu button #}
-    <div class="flex items-center gap-1 lg:hidden">
-      <a href="{% url 'orders:cart' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white" aria-label="{% trans 'Cart' %}">
+    <div class="flex shrink-0 items-center gap-1 lg:hidden">
+      <a href="{% url 'orders:cart' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white" aria-label="{% trans 'Cart' %}" title="{% trans 'Cart' %}">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
         {% if cart_item_count %}<span class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-forest px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">{{ cart_item_count }}</span>{% endif %}
       </a>
       {% if user.is_authenticated %}
-        <a href="{% url 'notifications:center' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white" aria-label="{% trans 'Notifications' %}">
+        <a href="{% url 'notifications:center' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white" aria-label="{% trans 'Notifications' %}" title="{% trans 'Notifications' %}">
           <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
           {% if unread_notifications_count %}<span class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-gold-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">{{ unread_notifications_count }}</span>{% endif %}
         </a>
       {% endif %}
       {% include "components/theme_toggle.html" %}
-      <button type="button" class="rounded-full p-2 text-stone-700 transition-colors hover:bg-brand-50 dark:text-stone-200 dark:hover:bg-stone-800" @click="open = !open" :aria-expanded="open" aria-controls="mobile-nav" aria-label="{% trans 'Toggle navigation' %}">
+
+      {% comment %}
+      The header checkbox (#nav-toggle) drives the no-JS fallback; the label
+      below is its visible toggle. Alpine is not required for this to work.
+      {% endcomment %}
+      <label for="nav-toggle" class="cursor-pointer rounded-full p-2 text-stone-700 transition-colors hover:bg-brand-50 dark:text-stone-200 dark:hover:bg-stone-800" aria-label="{% trans 'Toggle navigation' %}">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
-      </button>
+      </label>
     </div>
   </div>
 
-  {# Mobile menu #}
-  <nav id="mobile-nav" x-show="open" x-cloak class="border-t border-stone-200 bg-white px-4 pb-4 dark:border-stone-800 dark:bg-stone-900 lg:hidden" aria-label="{% trans 'Mobile' %}">
+  {% comment %}
+  Mobile menu. `hidden` is the no-JS default; the `<style>` rule above flips
+  it to `block` when the checkbox is checked, with no JavaScript involved.
+  {% endcomment %}
+  <nav id="mobile-nav" class="hidden border-t border-stone-200 bg-white px-4 pb-4 dark:border-stone-800 dark:bg-stone-900 lg:hidden" aria-label="{% trans 'Mobile' %}">
     <div class="flex flex-col gap-1 py-3 text-sm font-medium text-stone-700 dark:text-stone-200">
       {% if header_nav %}
         {% for item in header_nav %}
-          <a href="{{ item.resolve_url }}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{{ item.label }}</a>
+          <a href="{{ item.resolve_url }}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{{ item.label }}</a>
           {% for child in item.children.all %}
-            {% if child.is_active %}<a href="{{ child.resolve_url }}" class="rounded-lg px-3 py-2 pl-6 text-stone-500 transition-colors hover:bg-brand-50 hover:text-forest dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-white" @click="open = false">{{ child.label }}</a>{% endif %}
+            {% if child.is_active %}<a href="{{ child.resolve_url }}" class="rounded-lg px-3 py-2 pl-6 text-stone-500 transition-colors hover:bg-brand-50 hover:text-forest dark:text-stone-400 dark:hover:bg-stone-800 dark:hover:text-white" @click="document.getElementById('nav-toggle').checked = false">{{ child.label }}</a>{% endif %}
           {% endfor %}
         {% endfor %}
       {% else %}
-        <a href="{% url 'core:home' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "Home" %}</a>
-        <a href="{% url 'cms:service_list' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "Services" %}</a>
-        <a href="{% url 'training:training_home' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "Training" %}</a>
-        <a href="{% url 'cms:about' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "About" %}</a>
-        <a href="{% url 'cms:blog_list' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "News" %}</a>
-        <a href="{% url 'cms:contact' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "Contact" %}</a>
+        <a href="{% url 'core:home' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "Home" %}</a>
+        <a href="{% url 'cms:service_list' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "Services" %}</a>
+        <a href="{% url 'training:training_home' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "Training" %}</a>
+        <a href="{% url 'cms:about' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "About" %}</a>
+        <a href="{% url 'cms:blog_list' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "News" %}</a>
+        <a href="{% url 'cms:faq_list' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "FAQs" %}</a>
+        <a href="{% url 'cms:contact' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "Contact" %}</a>
       {% endif %}
     </div>
     <div class="flex flex-col gap-1 border-t border-stone-100 pt-3 text-sm font-medium dark:border-stone-800">
       {% if user.is_authenticated %}
-        <a href="{% url 'account:dashboard' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "My account" %}</a>
-        {% if user.is_staff %}<a href="{% url 'dashboard:home' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "Dashboard" %}</a>{% endif %}
+        <a href="{% url 'account:dashboard' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "My account" %}</a>
+        {% if user.is_staff %}<a href="{% url 'dashboard:home' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "Dashboard" %}</a>{% endif %}
         <form method="post" action="{% url 'accounts:logout' %}">{% csrf_token %}<button type="submit" class="w-full rounded-lg px-3 py-2 text-left transition-colors hover:bg-brand-50 hover:text-forest">{% trans "Sign out" %}</button></form>
       {% else %}
-        <a href="{% url 'accounts:login' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="open = false">{% trans "Sign in" %}</a>
-        <a href="{% url 'accounts:register' %}" class="mt-1 rounded-full bg-forest px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-forest-light" @click="open = false">{% trans "Create account" %}</a>
+        <a href="{% url 'accounts:login' %}" class="rounded-lg px-3 py-2 transition-colors hover:bg-brand-50 hover:text-forest" @click="document.getElementById('nav-toggle').checked = false">{% trans "Sign in" %}</a>
+        <a href="{% url 'accounts:register' %}" class="mt-1 rounded-full bg-forest px-4 py-2 text-center font-semibold text-white transition-colors hover:bg-forest-light" @click="document.getElementById('nav-toggle').checked = false">{% trans "Create account" %}</a>
       {% endif %}
       <div class="px-1 pt-1">{% include "components/language_switcher.html" with variant="mobile" %}</div>
     </div>
