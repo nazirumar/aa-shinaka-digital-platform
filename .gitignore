@@ -29,6 +29,11 @@ node_modules/
 !deploy/.env.production.example
 !deploy/.env.staging.example
 !deploy/.env.local.example
+# Real deployment env files hold live secrets. These are listed explicitly so a
+# `git add -f` (which bypasses the rules above) is still caught in review.
+deploy/.env.production
+deploy/.env.staging
+deploy/.env.local
 
 # Deployment state — rendered per deployment, never committed
 /deploy/nginx/certs/

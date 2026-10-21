@@ -136,3 +136,46 @@ def test_required_jobs_are_present():
     text = _text()
     for job in ("lint", "checks", "assets", "test", "security"):
         assert f"\n  {job}:\n" in text, f"missing mandatory CI job: {job}"
+
+
+# ---------------------------------------------------------------------------
+# No real deployment env file may ever be tracked
+# ---------------------------------------------------------------------------
+
+# Only the `*.example` templates are safe to commit; every other env file holds
+# live secrets. A `git add -f` bypasses .gitignore, so this asserts on the set of
+# paths Git actually tracks.
+TRACKED_ENV_FILES = {
+    "deploy/.env.production",
+    "deploy/.env.staging",
+    "deploy/.env.local",
+    ".env",
+}
+
+
+def _tracked_paths() -> set[str]:
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "ls-files"],
+        cwd=REPO,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return {line.strip().replace("\\", "/") for line in result.stdout.splitlines()}
+
+
+def test_no_real_env_file_is_tracked():
+    tracked = _tracked_paths()
+    leaked = sorted(tracked & TRACKED_ENV_FILES)
+    assert not leaked, (
+        "real (non-example) environment files are tracked by Git and must be "
+        f"removed from the index — they hold live secrets: {leaked}"
+    )
+
+
+def test_gitignore_blocks_real_env_files():
+    text = (REPO / ".gitignore").read_text(encoding="utf-8")
+    for name in TRACKED_ENV_FILES:
+        assert f"\n{name}\n" in text, f".gitignore must explicitly ignore {name}"
