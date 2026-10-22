@@ -12,6 +12,7 @@ from decimal import Decimal, InvalidOperation
 from django.core.paginator import Paginator
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
+from django.urls import reverse
 
 from apps.locations.models import LGA
 from apps.seo import canonical_from_request, seo_context
@@ -50,8 +51,7 @@ def _has_filters(request: HttpRequest) -> bool:
     it (and with each other).
     """
     return bool(
-        set(request.GET)
-        & {"page", "state", "lga", "in_stock", "min_price", "max_price", "sort"}
+        set(request.GET) & {"page", "state", "lga", "in_stock", "min_price", "max_price", "sort"}
     )
 
 
@@ -60,25 +60,33 @@ def _has_filters(request: HttpRequest) -> bool:
 #: equivalents. These views are reachable by two URLs each; emitting the
 #: canonical one from whichever alias served the request consolidates the
 #: duplicate without redirecting away a working link.
+#:
+#: Note the segment differs between the index and the detail pages: the state
+#: *index* is ``/shop/states/`` (plural) but a state *detail* is
+#: ``/shop/state/<slug>/`` (singular), so the mapping cannot be a plain prefix
+#: substitution. ``(legacy_prefix, canonical_prefix, keep_suffix)``.
 _LEGACY_CANONICAL_PREFIXES = (
-    ("/states/", "/shop/states/"),
-    ("/products/", "/shop/product/"),
+    # Detail pages first: ``/states/<slug>/`` → ``/shop/state/<slug>/``.
+    ("/states/", "/shop/state/", True),
+    ("/products/", "/shop/product/", True),
 )
 
 
 def _canonical(request: HttpRequest) -> str:
     """Canonical URL for a catalogue page, collapsing legacy aliases.
 
-    ``/states/<slug>/`` canonicalises to ``/shop/state/<slug>/`` and
-    ``/products/<slug>/`` to ``/shop/product/<slug>/``; every other catalogue
-    path (and all query strings) falls through to the shared
-    :func:`canonical_from_request` behaviour.
+    ``/states/<slug>/`` canonicalises to ``/shop/state/<slug>/``,
+    ``/states/`` to ``/shop/states/`` and ``/products/<slug>/`` to
+    ``/shop/product/<slug>/``; every other catalogue path (and all query
+    strings) falls through to :func:`canonical_from_request`.
     """
     path = request.path or ""
-    for legacy, canonical_prefix in _LEGACY_CANONICAL_PREFIXES:
+    if path == "/states/":
+        return request.build_absolute_uri("/shop/states/")
+    for legacy, canonical_prefix, keep_suffix in _LEGACY_CANONICAL_PREFIXES:
         if path.startswith(legacy):
-            suffix = path[len(legacy) :].lstrip("/")
-            target = canonical_prefix if not suffix else f"{canonical_prefix}{suffix}"
+            suffix = path[len(legacy) :].strip("/") if keep_suffix else ""
+            target = canonical_prefix if not suffix else f"{canonical_prefix}{suffix}/"
             return request.build_absolute_uri(target)
     return canonical_from_request(request)
 
@@ -169,8 +177,11 @@ def category_detail(request: HttpRequest, slug: str) -> HttpResponse:
         **_seo(
             title=category.seo_title or category.name,
             description=category.seo_description or category.description[:200],
-            # Canonical is the clean category URL, even when filtered/paginated.
-            canonical=canonical_from_request(request),
+            # Canonical is the clean category URL, even when filtered/paginated
+            # and even when the legacy ``/shop/<slug>/`` alias served this page.
+            canonical=request.build_absolute_uri(
+                reverse("catalog:category_detail", kwargs={"slug": category.slug})
+            ),
             noindex=_has_filters(request),
         ),
         "category": category,
@@ -269,6 +280,7 @@ def state_list(request: HttpRequest) -> HttpResponse:
         **_seo(
             title="Shop by state",
             description="Browse agricultural products by their Nigerian state of origin.",
+            canonical=_canonical(request),
         ),
         "states": selectors.state_list(),
         "breadcrumbs": [

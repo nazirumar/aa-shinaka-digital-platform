@@ -65,6 +65,10 @@ LOCAL_APPS = [
     "apps.notifications",
     "apps.support",
     "apps.analytics",
+    # Search-visibility helpers and the JSON-LD template tag. Model-free, so it
+    # contributes no migrations; registered only so Django discovers its
+    # ``templatetags`` package.
+    "apps.seo",
 ]
 
 THIRD_PARTY_APPS: list[str] = []

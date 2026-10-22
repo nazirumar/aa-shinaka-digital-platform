@@ -98,9 +98,11 @@ class ProductSitemap(Sitemap):
 
         # Only published products that actually have a sellable listing, so a
         # product with no stock never advertises itself as available.
-        return catalog_selectors.all_products().filter(
-            status="published", listings__status="active"
-        ).distinct()
+        return (
+            catalog_selectors.all_products()
+            .filter(status="published", listings__status="active")
+            .distinct()
+        )
 
     def location(self, obj):
         return obj.get_absolute_url()

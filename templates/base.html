@@ -1,9 +1,9 @@
-{% load static i18n %}<!doctype html>
+{% load static i18n seo_tags %}<!doctype html>
 <html lang="{{ LANGUAGE_CODE|default:'en'|slice:':2' }}" class="h-full scroll-smooth">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{% firstof seo_title page_title site.site_name "AA Shinaka" %}{% endblock %}{% if site.site_name %} · {{ site.site_name }}{% else %} · AA Shinaka{% endif %}</title>
+  <title>{% block title %}{% firstof seo_title page_title site.site_name "AA Shinaka" %}{% endblock %}{% with brand=site.site_name|default:"AA Shinaka" %}{% if seo_title_suppress_brand or brand in seo_title %}{% else %} · {{ brand }}{% endif %}{% endwith %}</title>
 
   {% block meta %}
     <meta name="description" content="{% block meta_description %}{% firstof seo_description site.default_meta_description "AA Shinaka Digital Business Platform — agricultural consultancy, farming services, marketing, storage, export, products and training." %}{% endblock %}">
@@ -31,6 +31,7 @@
   <script src="https://unpkg.com/htmx.org@2.0.4" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js" defer></script>
   <style>[x-cloak] { display: none !important; }</style>
+  {% json_ld %}
   {% block head_extra %}{% endblock %}
 </head>
 <body class="flex min-h-full flex-col bg-cream text-stone-800 antialiased transition-colors dark:bg-stone-950 dark:text-stone-100">
