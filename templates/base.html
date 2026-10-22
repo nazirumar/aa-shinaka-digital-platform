@@ -8,18 +8,21 @@
   {% block meta %}
     <meta name="description" content="{% block meta_description %}{% firstof seo_description site.default_meta_description "AA Shinaka Digital Business Platform — agricultural consultancy, farming services, marketing, storage, export, products and training." %}{% endblock %}">
     <link rel="canonical" href="{% block canonical %}{{ seo_canonical|default:request.build_absolute_uri }}{% endblock %}">
-    {% if seo_noindex %}<meta name="robots" content="noindex, follow">{% endif %}
+    {% if seo_noindex %}<meta name="robots" content="noindex, follow">{% else %}<meta name="robots" content="index, follow">{% endif %}
 
     {# Open Graph / social sharing #}
-    <meta property="og:type" content="website">
+    <meta property="og:type" content="{{ seo_og_type|default:'website' }}">
+    <meta property="og:locale" content="{% if LANGUAGE_CODE|slice:':2' == 'ha' %}ha_NG{% else %}en_NG{% endif %}">
     <meta property="og:site_name" content="{{ site.site_name|default:'AA Shinaka' }}">
     <meta property="og:title" content="{% firstof seo_title page_title site.site_name 'AA Shinaka' %}">
     <meta property="og:description" content="{% firstof seo_description site.default_meta_description %}">
     <meta property="og:url" content="{{ seo_canonical|default:request.build_absolute_uri }}">
-    {% if seo_og_image %}<meta property="og:image" content="{{ seo_og_image.file.url }}">{% endif %}
-    <meta name="twitter:card" content="summary_large_image">
+    {% if seo_og_image %}<meta property="og:image" content="{{ request.scheme }}://{{ request.get_host }}{{ seo_og_image.file.url }}">
+    <meta property="og:image:alt" content="{{ seo_og_image.alt_text|default:seo_og_image.title|default:'AA Shinaka' }}">{% endif %}
+    <meta name="twitter:card" content="{% if seo_og_image %}summary_large_image{% else %}summary{% endif %}">
     <meta name="twitter:title" content="{% firstof seo_title page_title site.site_name 'AA Shinaka' %}">
     <meta name="twitter:description" content="{% firstof seo_description site.default_meta_description %}">
+    {% if seo_og_image %}<meta name="twitter:image" content="{{ request.scheme }}://{{ request.get_host }}{{ seo_og_image.file.url }}">{% endif %}
   {% endblock %}
 
   {% if site.favicon %}<link rel="icon" href="{{ site.favicon.file.url }}">{% endif %}

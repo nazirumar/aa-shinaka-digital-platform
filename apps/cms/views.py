@@ -14,6 +14,7 @@ from django.shortcuts import redirect, render
 from django.urls import reverse
 
 from apps.core.ratelimit import rate_limit
+from apps.seo import canonical_from_request, content_seo, seo_context
 
 from . import selectors
 from .forms import ContactForm
@@ -27,30 +28,25 @@ def _seo(
     canonical: str = "",
     og_image=None,
     noindex: bool = False,
+    og_type: str = "website",
 ) -> dict:
-    return {
-        "page_title": title,
-        "seo_title": title,
-        "seo_description": description,
-        "seo_canonical": canonical,
-        "seo_og_image": og_image,
-        "seo_noindex": noindex,
-    }
-
-
-def _content_seo(obj, *, fallback_title: str = "") -> dict:
-    """Build SEO context from a content object with ``SEOModel`` fields."""
-    title = (getattr(obj, "meta_title", "") or getattr(obj, "title", "") or fallback_title).strip()
-    return _seo(
+    """SEO context for this app. Signature kept for existing call sites."""
+    return seo_context(
         title=title,
-        description=getattr(obj, "meta_description", "")
-        or getattr(obj, "summary", "")
-        or getattr(obj, "excerpt", "")
-        or getattr(obj, "intro", ""),
-        canonical=getattr(obj, "canonical_url", ""),
-        og_image=getattr(obj, "og_image", None) or getattr(obj, "hero_image", None),
-        noindex=getattr(obj, "noindex", False),
+        description=description,
+        canonical=canonical,
+        og_image=og_image,
+        noindex=noindex,
+        og_type=og_type,
     )
+
+
+def _content_seo(obj, *, fallback_title: str = "", canonical: str = "", og_type: str = "") -> dict:
+    """Build SEO context from a content object with ``SEOModel`` fields."""
+    kwargs = {}
+    if og_type:
+        kwargs["og_type"] = og_type
+    return content_seo(obj, fallback_title=fallback_title, canonical=canonical, **kwargs)
 
 
 # ---------------------------------------------------------------------------
@@ -190,9 +186,13 @@ def blog_list(request: HttpRequest) -> HttpResponse:
     posts = selectors.published_blog_posts(category=category)
     page_obj = Paginator(posts, 6).get_page(request.GET.get("page"))
     context = {
+        # Pagination and category filters must not fork the canonical: without
+        # this, /news/?page=2 declared itself canonical and every page competed
+        # with the others instead of consolidating.
         **_seo(
             title="News & insights",
             description="Agricultural news, guidance and insights from AA Shinaka.",
+            canonical=canonical_from_request(request),
         ),
         "posts": page_obj,
         "page_obj": page_obj,
@@ -210,7 +210,8 @@ def blog_detail(request: HttpRequest, slug: str) -> HttpResponse:
     if post is None:
         return render(request, "cms/not_found.html", status=404)
     context = {
-        **_content_seo(post),
+        # Blog articles are articles, not generic websites.
+        **_content_seo(post, og_type="article"),
         "post": post,
         "related": [p for p in selectors.latest_blog_posts(limit=4) if p.pk != post.pk][:3],
         "breadcrumbs": [
@@ -241,14 +242,38 @@ def faq_list(request: HttpRequest) -> HttpResponse:
 
 def robots_txt(request: HttpRequest) -> HttpResponse:
     sitemap_url = request.build_absolute_uri(reverse("sitemap"))
+    sitemap_index_url = request.build_absolute_uri(reverse("sitemap_index"))
     lines = [
         "User-agent: *",
+        # Staff and internal areas.
         "Disallow: /dashboard/",
         "Disallow: /admin/",
+        "Disallow: /internal/",
+        "Disallow: /healthz/",
+        # Customer identity, commerce and portal.
         "Disallow: /account/",
         "Disallow: /accounts/",
+        "Disallow: /cart/",
+        "Disallow: /checkout/",
+        "Disallow: /orders/",
+        "Disallow: /payments/",
+        "Disallow: /invoices/",
+        "Disallow: /receipts/",
+        "Disallow: /quotations/",
+        # Language switching triggers a POST and is not content.
         "Disallow: /i18n/",
+        # Catalogue utility endpoints: filtered/sorted views, comparison and the
+        # dependent LGA lookup are all `noindex` pages that add crawl waste.
+        "Disallow: /shop/search",
+        "Disallow: /shop/compare",
+        "Disallow: /lga-options",
+        # Certificate verification is a lookup tool, not content.
+        "Disallow: /training/verify",
+        "Allow: /",
         "",
+        # Both are advertised: the flat urlset stays for compatibility, the
+        # index is what crawlers should prefer as the site grows.
         f"Sitemap: {sitemap_url}",
+        f"Sitemap: {sitemap_index_url}",
     ]
     return HttpResponse("\n".join(lines), content_type="text/plain")

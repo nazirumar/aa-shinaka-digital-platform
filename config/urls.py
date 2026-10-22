@@ -7,6 +7,7 @@ prefix. Feature apps add their routes here as phases land.
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.sitemaps.views import index as sitemap_index
 from django.contrib.sitemaps.views import sitemap
 from django.urls import include, path
 
@@ -17,7 +18,21 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     # Internationalisation: language switching (``/i18n/setlang/``).
     path("i18n/", include("django.conf.urls.i18n")),
+    # Flat urlset kept exactly as before, so existing consumers and tests that
+    # expect individual page URLs here keep working.
     path("sitemap.xml", sitemap, {"sitemaps": SITEMAPS}, name="sitemap"),
+    # A proper sitemap index alongside it, enumerating each section. Search
+    # engines accept either; the index scales past the 50k-URL ceiling and lets
+    # each section be submitted and diagnosed independently.
+    path("sitemap-index.xml", sitemap_index, {"sitemaps": SITEMAPS}, name="sitemap_index"),
+    path(
+        "sitemap-<section>.xml",
+        sitemap,
+        {"sitemaps": SITEMAPS},
+        # Django's `sitemap_index` view reverses this exact name to build the
+        # child <loc> entries, so it cannot be renamed.
+        name="django.contrib.sitemaps.views.sitemap",
+    ),
     path("", include("apps.core.urls")),
     # Public website content (services, about, contact, news, pages, robots.txt).
     path("", include("apps.cms.urls")),

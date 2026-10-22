@@ -101,6 +101,7 @@ TEMPLATES = [
                 "apps.dashboard.context_processors.notifications",
                 "apps.cms.context_processors.site_context",
                 "apps.orders.context_processors.cart_summary",
+                "apps.seo.context_processors.seo_defaults",
             ],
         },
     },

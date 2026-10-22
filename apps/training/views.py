@@ -20,14 +20,34 @@ from django.views.decorators.http import require_POST
 from apps.core.ratelimit import rate_limit
 from apps.orders import payments as order_payments
 from apps.orders.payment_models import PaymentProvider, PaymentState
+from apps.seo import canonical_from_request, seo_context
 
 from . import selectors, services
 from .forms import CourseFilterForm
 from .models import CertificateStatus, EnrollmentStatus, TrainingSession
 
 
-def _seo(*, title: str, description: str = "") -> dict:
-    return {"page_title": title, "seo_title": title, "seo_description": description}
+def _seo(
+    *,
+    title: str,
+    description: str = "",
+    canonical: str = "",
+    noindex: bool = False,
+    og_type: str = "website",
+) -> dict:
+    """SEO context for this app. Signature kept for existing call sites.
+
+    Previously this helper returned only a title and description, so every
+    training page emitted a query-string canonical and could be indexed even
+    when filtered.
+    """
+    return seo_context(
+        title=title,
+        description=description,
+        canonical=canonical,
+        noindex=noindex,
+        og_type=og_type,
+    )
 
 
 def _errors(exc) -> str:
@@ -45,6 +65,7 @@ def training_home(request):
                     "Practical agricultural training courses and scheduled sessions "
                     "from AA Shinaka."
                 ),
+                canonical=canonical_from_request(request),
             ),
             "categories": selectors.active_categories(),
             "featured_courses": selectors.featured_courses(limit=3),
@@ -73,7 +94,12 @@ def course_list(request):
         request,
         "training/course_list.html",
         {
-            **_seo(title="Courses"),
+            **_seo(
+                title="Courses",
+                canonical=canonical_from_request(request),
+                # Filtered/paginated course lists consolidate onto the base URL.
+                noindex=bool(set(request.GET) & {"page", "category", "delivery_mode", "q"}),
+            ),
             "courses": page_obj,
             "page_obj": page_obj,
             "form": form,
@@ -93,7 +119,11 @@ def category_detail(request, slug):
         request,
         "training/category_detail.html",
         {
-            **_seo(title=category.name, description=category.description),
+            **_seo(
+                title=category.name,
+                description=category.description,
+                canonical=canonical_from_request(request),
+            ),
             "category": category,
             "courses": page_obj,
         },
@@ -109,7 +139,11 @@ def course_detail(request, slug):
         request,
         "training/course_detail.html",
         {
-            **_seo(title=course.title, description=course.short_description),
+            **_seo(
+                title=course.title,
+                description=course.short_description,
+                canonical=canonical_from_request(request),
+            ),
             "course": course,
             "modules": modules,
             "instructors": selectors.course_instructors(course),
@@ -129,7 +163,10 @@ def session_list(request):
         request,
         "training/session_list.html",
         {
-            **_seo(title="Upcoming training sessions"),
+            **_seo(
+                title="Upcoming training sessions",
+                canonical=canonical_from_request(request),
+            ),
             "sessions": selectors.upcoming_sessions(),
         },
     )
@@ -143,7 +180,10 @@ def session_detail(request, pk):
         request,
         "training/session_detail.html",
         {
-            **_seo(title=session.title or session.course.title),
+            **_seo(
+                title=session.title or session.course.title,
+                canonical=canonical_from_request(request),
+            ),
             "session": session,
             "course": session.course,
             "schedule": session.schedule.order_by("date", "sort_order"),
@@ -192,7 +232,13 @@ def certificate_verify(request, code: str = ""):
         request,
         "training/certificate_verify.html",
         {
-            **_seo(title="Verify a certificate"),
+            # A verification lookup is a utility page, not content: keep it out
+            # of the index (and out of the sitemap) entirely.
+            **_seo(
+                title="Verify a certificate",
+                canonical=canonical_from_request(request),
+                noindex=True,
+            ),
             "submitted": submitted,
             "certificate": certificate,
             "is_valid": bool(certificate and certificate.status == CertificateStatus.ISSUED),

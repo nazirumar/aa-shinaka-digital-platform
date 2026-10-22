@@ -864,7 +864,11 @@ def test_certificate_pdf_renders(customer, training_manager, administrator):
     certificate = services.issue_certificate(actor=administrator, enrollment=enrollment)
     payload = documents.certificate_pdf(certificate)
     assert payload.startswith(b"%PDF")
+    assert b"/MediaBox [0 0 842 595]" in payload
     assert certificate.verification_code.encode() in payload
+    assert b"AA SHINAKA" in payload
+    assert b"VERIFICATION CODE" in payload
+    assert b"0.120 0.300 0.210 rg" in payload
 
 
 # ---------------------------------------------------------------------------

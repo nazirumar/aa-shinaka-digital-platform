@@ -14,6 +14,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 
 from apps.locations.models import LGA
+from apps.seo import canonical_from_request, seo_context
 
 from . import selectors
 
@@ -22,15 +23,64 @@ COMPARE_LIMIT = 4
 
 
 def _seo(
-    *, title: str = "", description: str = "", canonical: str = "", noindex: bool = False
+    *,
+    title: str = "",
+    description: str = "",
+    canonical: str = "",
+    noindex: bool = False,
+    og_image=None,
+    og_type: str = "website",
 ) -> dict:
-    return {
-        "page_title": title,
-        "seo_title": title,
-        "seo_description": description,
-        "seo_canonical": canonical,
-        "seo_noindex": noindex,
-    }
+    """SEO context for this app. Signature kept for existing call sites."""
+    return seo_context(
+        title=title,
+        description=description,
+        canonical=canonical,
+        og_image=og_image,
+        noindex=noindex,
+        og_type=og_type,
+    )
+
+
+def _has_filters(request: HttpRequest) -> bool:
+    """Whether the request narrows a listing with a query parameter.
+
+    Filtered and paginated listing URLs are not distinct pages worth indexing;
+    they consolidate their signals onto the base URL instead of competing with
+    it (and with each other).
+    """
+    return bool(
+        set(request.GET)
+        & {"page", "state", "lga", "in_stock", "min_price", "max_price", "sort"}
+    )
+
+
+#: Legacy URL prefixes that still serve 200 (shared links in
+#: ``docs/UI_UX_SPEC.md`` §5.2) mapped to their canonical ``/shop/...``
+#: equivalents. These views are reachable by two URLs each; emitting the
+#: canonical one from whichever alias served the request consolidates the
+#: duplicate without redirecting away a working link.
+_LEGACY_CANONICAL_PREFIXES = (
+    ("/states/", "/shop/states/"),
+    ("/products/", "/shop/product/"),
+)
+
+
+def _canonical(request: HttpRequest) -> str:
+    """Canonical URL for a catalogue page, collapsing legacy aliases.
+
+    ``/states/<slug>/`` canonicalises to ``/shop/state/<slug>/`` and
+    ``/products/<slug>/`` to ``/shop/product/<slug>/``; every other catalogue
+    path (and all query strings) falls through to the shared
+    :func:`canonical_from_request` behaviour.
+    """
+    path = request.path or ""
+    for legacy, canonical_prefix in _LEGACY_CANONICAL_PREFIXES:
+        if path.startswith(legacy):
+            suffix = path[len(legacy) :].lstrip("/")
+            target = canonical_prefix if not suffix else f"{canonical_prefix}{suffix}"
+            return request.build_absolute_uri(target)
+    return canonical_from_request(request)
 
 
 def _clean_decimal(value):
@@ -119,6 +169,9 @@ def category_detail(request: HttpRequest, slug: str) -> HttpResponse:
         **_seo(
             title=category.seo_title or category.name,
             description=category.seo_description or category.description[:200],
+            # Canonical is the clean category URL, even when filtered/paginated.
+            canonical=canonical_from_request(request),
+            noindex=_has_filters(request),
         ),
         "category": category,
         "children": selectors.category_children(category),
@@ -161,7 +214,12 @@ def product_detail(request: HttpRequest, slug: str) -> HttpResponse:
     listings = selectors.product_listings(product)
     title, description = product.seo()
     context = {
-        **_seo(title=title, description=description),
+        **_seo(
+            title=title,
+            description=description,
+            canonical=_canonical(request),
+            og_type="product",
+        ),
         "product": product,
         "listings": listings,
         "images": selectors.product_images(product),
@@ -234,6 +292,8 @@ def state_detail(request: HttpRequest, slug: str) -> HttpResponse:
             description=(
                 f"Browse agricultural product listings originating in {state.name}, Nigeria."
             ),
+            canonical=_canonical(request),
+            noindex=_has_filters(request),
         ),
         "location_state": state,
         "lgas": selectors.lgas_with_listings(state),
@@ -265,6 +325,8 @@ def lga_detail(request: HttpRequest, state: str, lga: str) -> HttpResponse:
         **_seo(
             title=f"Agricultural products from {lga_obj.name}",
             description=f"Browse product listings originating in {lga_obj.name}, {state_obj.name}.",
+            canonical=_canonical(request),
+            noindex=_has_filters(request),
         ),
         "location_state": state_obj,
         "location_lga": lga_obj,
@@ -325,6 +387,9 @@ def search(request: HttpRequest) -> HttpResponse:
         **_seo(
             title=f"Search: {query}" if query else "Search products",
             description="Search agricultural products by name, category, origin or price.",
+            # Noindex, so the canonical should point at the clean search path
+            # rather than echoing the visitor's query string.
+            canonical=canonical_from_request(request),
             noindex=True,
         ),
         "query": query,
