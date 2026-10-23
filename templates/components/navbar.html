@@ -27,6 +27,8 @@ tap hit-testing in iOS Safari.
     /* Keyboard focus lands on the visually-hidden checkbox, so surface it as a
        ring on the visible hamburger label instead. */
     #nav-toggle:focus-visible ~ div label[for="nav-toggle"] { outline: 2px solid currentColor; outline-offset: 2px; }
+    /* Ensure mobile menu button and toggles are easily tappable */
+    label[for="nav-toggle"], .mobile-nav-toggle { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
   </style>
   <div class="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-3">
     {# Brand — uses the official logo if uploaded, otherwise a neutral text mark. #}
@@ -110,24 +112,24 @@ tap hit-testing in iOS Safari.
     </div>
 
     {# Mobile quick actions + menu button #}
-    <div class="flex shrink-0 items-center gap-1 lg:hidden">
-      <a href="{% url 'orders:cart' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white" aria-label="{% trans 'Cart' %}" title="{% trans 'Cart' %}">
+  <div class="flex shrink-0 items-center gap-1 lg:hidden">
+      <a href="{% url 'orders:cart' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="{% trans 'Cart' %}" title="{% trans 'Cart' %}">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 3h1.386c.51 0 .955.343 1.087.835l.383 1.437M7.5 14.25a3 3 0 0 0-3 3h15.75m-12.75-3h11.218c1.121-2.3 2.1-4.684 2.924-7.138a60.114 60.114 0 0 0-16.536-1.84M7.5 14.25 5.106 5.272M6 20.25a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Zm12.75 0a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z"/></svg>
         {% if cart_item_count %}<span class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-forest px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">{{ cart_item_count }}</span>{% endif %}
       </a>
       {% if user.is_authenticated %}
-        <a href="{% url 'notifications:center' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white" aria-label="{% trans 'Notifications' %}" title="{% trans 'Notifications' %}">
+        <a href="{% url 'notifications:center' %}" class="relative rounded-full p-2 text-stone-600 transition-colors dark:text-stone-300 hover:bg-brand-50 hover:text-forest dark:hover:bg-stone-800 dark:hover:text-white touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="{% trans 'Notifications' %}" title="{% trans 'Notifications' %}">
           <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="1.7" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M14.857 17.082a23.848 23.848 0 0 0 5.454-1.31A8.967 8.967 0 0 1 18 9.75V9A6 6 0 0 0 6 9v.75a8.967 8.967 0 0 1-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 0 1-5.714 0m5.714 0a3 3 0 1 1-5.714 0"/></svg>
           {% if unread_notifications_count %}<span class="absolute right-0 top-0 grid h-4 min-w-4 place-items-center rounded-full bg-gold-500 px-1 text-[10px] font-semibold leading-none text-white ring-2 ring-white">{{ unread_notifications_count }}</span>{% endif %}
         </a>
       {% endif %}
-      {% include "components/theme_toggle.html" %}
+      <div class="touch-manipulation">{% include "components/theme_toggle.html" %}</div>
 
       {% comment %}
       The header checkbox (#nav-toggle) drives the no-JS fallback; the label
       below is its visible toggle. Alpine is not required for this to work.
       {% endcomment %}
-      <label for="nav-toggle" class="cursor-pointer rounded-full p-2 text-stone-700 transition-colors hover:bg-brand-50 dark:text-stone-200 dark:hover:bg-stone-800" aria-label="{% trans 'Toggle navigation' %}">
+      <label for="nav-toggle" class="cursor-pointer rounded-full p-2 text-stone-700 transition-colors hover:bg-brand-50 dark:text-stone-200 dark:hover:bg-stone-800 touch-manipulation min-h-[44px] min-w-[44px] inline-flex items-center justify-center" aria-label="{% trans 'Toggle navigation' %}">
         <svg class="h-6 w-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/></svg>
       </label>
     </div>
